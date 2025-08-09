@@ -120,6 +120,7 @@ jobs:
         run: pnpm run crawl ${{ matrix.cafe }}
         env:
           NODE_ENV: production
+          CI: true
 
       - name: Check crawler output exists
         run: |

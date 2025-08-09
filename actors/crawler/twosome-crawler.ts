@@ -57,14 +57,34 @@ const maxRequestsInTestMode = isTestMode
   : 50;
 
 const CRAWLER_CONFIG = {
-  maxConcurrency: 3, // Increase concurrency for better performance
+  maxConcurrency: process.env.CI ? 1 : 3, // Lower concurrency in CI
   maxRequestsPerCrawl: isTestMode ? maxRequestsInTestMode : 50,
-  maxRequestRetries: 3, // Increase retries
-  requestHandlerTimeoutSecs: isTestMode ? 120 : 300, // Increase timeout
-  navigationTimeoutSecs: 90, // Add navigation timeout
+  maxRequestRetries: process.env.CI ? 5 : 3, // More retries in CI
+  requestHandlerTimeoutSecs: isTestMode ? 120 : process.env.CI ? 180 : 300, // Shorter timeout in CI
+  navigationTimeoutSecs: process.env.CI ? 60 : 90, // Shorter navigation timeout in CI
   launchOptions: {
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--no-first-run',
+      '--no-zygote',
+      '--single-process',
+      '--disable-background-timer-throttling',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding',
+      '--disable-features=TranslateUI',
+      '--disable-ipc-flooding-protection',
+      '--disable-extensions',
+      '--disable-default-apps',
+      '--disable-background-networking',
+      '--disable-sync',
+      '--metrics-recording-only',
+      '--no-default-browser-check',
+      '--disable-web-security',
+    ],
   },
 };
 
@@ -261,12 +281,24 @@ async function handleMainMenuPage(
 ) {
   logger.info('Processing main menu page to discover categories');
 
-  // Set longer navigation timeout for the page
-  page.setDefaultNavigationTimeout(90_000); // 90 seconds
-  page.setDefaultTimeout(60_000); // 60 seconds for other operations
+  // Set CI-appropriate timeouts
+  const navigationTimeout = process.env.CI ? 60_000 : 90_000; // 60s in CI, 90s locally
+  const defaultTimeout = process.env.CI ? 30_000 : 60_000; // 30s in CI, 60s locally
+
+  page.setDefaultNavigationTimeout(navigationTimeout);
+  page.setDefaultTimeout(defaultTimeout);
+
+  logger.info(
+    `Navigation timeout: ${navigationTimeout}ms, Default timeout: ${defaultTimeout}ms`
+  );
+  logger.info(`Current URL: ${page.url()}`);
 
   await waitForLoad(page);
-  await takeDebugScreenshot(page, 'twosome-main-menu');
+
+  // Only take screenshots in debug mode to save time in CI
+  if (process.env.NODE_ENV !== 'production') {
+    await takeDebugScreenshot(page, 'twosome-main-menu');
+  }
 
   const categories = await extractCategoriesFromMenu(page);
 
@@ -329,9 +361,45 @@ export const createTwosomeCrawler = () =>
     async requestHandler({ page, crawler: crawlerInstance, request }) {
       try {
         logger.info(`🌐 Attempting to crawl: ${request.url}`);
+        logger.info(
+          `Browser: ${page.context().browser()?.browserType().name()}`
+        );
+        logger.info(
+          `Environment: CI=${process.env.CI}, NODE_ENV=${process.env.NODE_ENV}`
+        );
+
+        // Set user agent to match a real browser
+        await page.setExtraHTTPHeaders({
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          Accept:
+            'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'ko-KR,ko;q=0.8,en-US;q=0.5,en;q=0.3',
+          'Accept-Encoding': 'gzip, deflate',
+          DNT: '1',
+          Connection: 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',
+        });
+
         await handleMainMenuPage(page, crawlerInstance);
       } catch (error) {
         logger.error(`❌ Failed to process ${request.url}: ${error}`);
+        logger.error(
+          `Error stack: ${error instanceof Error ? error.stack : 'No stack trace'}`
+        );
+
+        // Add page content for debugging in CI
+        if (process.env.CI) {
+          try {
+            const pageContent = await page.content();
+            logger.error(`Page content length: ${pageContent.length}`);
+            logger.error(
+              `Page title: ${await page.title().catch(() => 'No title')}`
+            );
+          } catch (debugError) {
+            logger.error(`Failed to get debug info: ${String(debugError)}`);
+          }
+        }
 
         throw error;
       }
@@ -350,15 +418,36 @@ export const createTwosomeCrawler = () =>
 
 async function checkSiteAccessibility(url: string): Promise<boolean> {
   try {
+    logger.info(`🔍 Checking site accessibility: ${url}`);
     const response = await fetch(url, {
       method: 'HEAD',
       headers: {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        Accept:
+          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'ko-KR,ko;q=0.9',
       },
+      signal: AbortSignal.timeout(10_000), // 10 second timeout
     });
-    return response.ok || response.status === 403; // 403 might still allow crawler access
-  } catch {
+
+    logger.info(
+      `Site accessibility check: ${response.status} ${response.statusText}`
+    );
+    const isAccessible = response.ok || response.status === 403; // 403 might still allow crawler access
+
+    if (!isAccessible) {
+      logger.warn(
+        `Site returned non-ok status: ${response.status} ${response.statusText}`
+      );
+    }
+
+    return isAccessible;
+  } catch (error) {
+    logger.error(`Site accessibility check failed: ${error}`);
+    logger.error(
+      'This may indicate network issues or geo-restrictions in CI environment'
+    );
     return false;
   }
 }
@@ -370,17 +459,45 @@ export const runTwosomeCrawler = async () => {
     // Check if the URL is accessible
     const isAccessible = await checkSiteAccessibility(SITE_CONFIG.startUrl);
 
-    if (!isAccessible) {
+    if (isAccessible) {
+      logger.info('✅ Site accessibility check passed');
+    } else if (process.env.CI) {
+      // In CI, try to proceed anyway as some sites block HEAD requests but allow browser access
+      logger.warn(
+        '⚠️ Site accessibility check failed in CI, but attempting to proceed with browser crawl'
+      );
+    } else {
       throw new Error('Primary URL is not accessible');
     }
 
     logger.info(`🌐 Starting crawler with URL: ${SITE_CONFIG.startUrl}`);
+    logger.info(
+      `🔧 Crawler config: maxConcurrency=${CRAWLER_CONFIG.maxConcurrency}, requestHandlerTimeout=${CRAWLER_CONFIG.requestHandlerTimeoutSecs}s`
+    );
 
     await crawler.run([SITE_CONFIG.startUrl]);
     const dataset = await crawler.getData();
+
+    if (!dataset.items || dataset.items.length === 0) {
+      throw new Error('No data was extracted from the crawler');
+    }
+
+    logger.info(`📊 Extracted ${dataset.items.length} items from crawler`);
     await writeProductsToJson(dataset.items as Product[], 'twosome');
   } catch (error) {
-    logger.error('Twosome crawler failed:', error);
+    logger.error(`Twosome crawler failed: ${String(error)}`);
+
+    // Additional debugging information for CI
+    if (process.env.CI) {
+      logger.error('🔍 CI Environment debug info:');
+      logger.error(`- NODE_ENV: ${process.env.NODE_ENV}`);
+      logger.error(`- CI: ${process.env.CI}`);
+      logger.error(`- RUNNER_OS: ${process.env.RUNNER_OS}`);
+      logger.error(
+        `- Available memory: ${process.memoryUsage().heapTotal / 1024 / 1024}MB`
+      );
+    }
+
     throw error;
   }
 };
