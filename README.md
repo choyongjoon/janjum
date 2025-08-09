@@ -1,16 +1,16 @@
-# [잔점](janjum.com)
+# [잔점](https://janjum.com)
 
-janjum.com
+[janjum.com](https://janjum.com)
 
 ## 기술 스택
 
-* Tanstack Start (beta)
-* DaisyUI
-* Convex
-* Clerk
-* Ultracite
-* Crawlee
-* Posthog
+* [Tanstack Start (beta)](https://tanstack.com/start)
+* [DaisyUI](https://daisyui.com)
+* [Convex](https://convex.dev/referral/JOYONG4512)
+* [Clerk](https://clerk.com)
+* [Ultracite](https://ultracite.dev)
+* [Crawlee](https://crawlee.dev)
+* [Posthog](https://posthog.com)
 
 ## 기능
 
