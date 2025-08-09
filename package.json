@@ -10,7 +10,8 @@
     "crawl": "tsx actors/crawler/crawl.ts",
     "upload": "tsx actors/uploader/upload.ts",
     "categorize": "tsx actors/categorizer/categorize.ts",
-    "test": "vitest"
+    "test": "vitest",
+    "prepare": "husky"
   },
   "dependencies": {
     "@clerk/tanstack-react-start": "^0.21.5",
@@ -37,6 +38,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.1.2",
     "@clerk/backend": "^2.6.2",
     "@types/node": "^22.5.4",
     "@types/node-cron": "^3.0.11",
@@ -46,12 +48,15 @@
     "@vitest/ui": "^3.2.4",
     "autoprefixer": "^10.4.20",
     "dotenv": "^17.2.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.5",
     "pino-pretty": "^13.1.1",
     "postcss": "^8.5.1",
     "tailwindcss": "^4.1.11",
     "ts-node": "^10.9.2",
     "tsx": "^4.20.3",
     "typescript": "^5.7.2",
+    "ultracite": "5.1.2",
     "vite": "^6.3.5",
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^3.2.4"
@@ -63,5 +68,10 @@
       "module": "ESNext",
       "moduleResolution": "node"
     }
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,json,jsonc,css,scss,md,mdx}": [
+      "npx ultracite format"
+    ]
   }
 }
