@@ -1,4 +1,4 @@
-name: Cupscore / Daily Data Sync
+name: Daily Data Sync
 
 # Run daily at 9 AM KST (0 AM UTC) and allow manual trigger
 on:
@@ -29,7 +29,7 @@ jobs:
   setup:
     runs-on: ubuntu-latest
     name: Setup Dependencies & Browsers
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
