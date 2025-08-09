@@ -1,0 +1,30 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.1.2/schema.json",
+  "extends": ["ultracite"],
+  "files": {
+    "includes": ["**", "!**/_generated/**", "!**/*.gen.ts"]
+  },
+  "linter": {
+    "rules": {
+      "correctness": {
+        "noUnknownProperty": "off"
+      },
+      "performance": {
+        "noImgElement": "off"
+      },
+      "nursery": {
+        "noAwaitInLoop": "off",
+        "noUnknownAtRule": "off",
+        "noNoninteractiveElementInteractions": "off"
+      },
+      "style": {
+        "noHeadElement": "off",
+        "useFilenamingConvention": {
+          "options": {
+            "filenameCases": ["camelCase", "PascalCase", "kebab-case"]
+          }
+        }
+      }
+    }
+  }
+}

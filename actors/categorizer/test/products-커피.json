@@ -1,0 +1,58 @@
+[
+  {
+    "name": "아메리카노",
+    "externalCategory": "Coffee"
+  },
+  {
+    "name": "카페라떼",
+    "externalCategory": "Coffee"
+  },
+  {
+    "name": "카푸치노",
+    "externalCategory": "Coffee"
+  },
+  {
+    "name": "에스프레소",
+    "externalCategory": "Coffee"
+  },
+  {
+    "name": "마끼아또",
+    "externalCategory": "Coffee"
+  },
+  {
+    "name": "모카",
+    "externalCategory": "Coffee"
+  },
+  {
+    "name": "바닐라 라떼",
+    "externalCategory": "Coffee"
+  },
+  {
+    "name": "카라멜 마끼아또",
+    "externalCategory": "Coffee"
+  },
+  {
+    "name": "아이스 아메리카노",
+    "externalCategory": "Coffee"
+  },
+  {
+    "name": "아이스 라떼",
+    "externalCategory": "Coffee"
+  },
+  {
+    "name": "드립커피",
+    "externalCategory": "Coffee"
+  },
+  {
+    "name": "콜드브루",
+    "externalCategory": "Coffee"
+  },
+  {
+    "name": "콜드 브루",
+    "externalCategory": "Coffee"
+  },
+  {
+    "name": "카라멜 마키아토",
+    "externalCategory": "COFFEE"
+  }
+]

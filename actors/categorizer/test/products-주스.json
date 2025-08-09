@@ -1,0 +1,42 @@
+[
+  {
+    "name": "오렌지 주스",
+    "externalCategory": "Juice"
+  },
+  {
+    "name": "사과 주스",
+    "externalCategory": "Juice"
+  },
+  {
+    "name": "포도 주스",
+    "externalCategory": "Juice"
+  },
+  {
+    "name": "파인애플 주스",
+    "externalCategory": "Juice"
+  },
+  {
+    "name": "토마토 주스",
+    "externalCategory": "Juice"
+  },
+  {
+    "name": "자몽 주스",
+    "externalCategory": "Juice"
+  },
+  {
+    "name": "크랜베리 주스",
+    "externalCategory": "Juice"
+  },
+  {
+    "name": "당근 주스",
+    "externalCategory": "Juice"
+  },
+  {
+    "name": "석류 주스",
+    "externalCategory": "Juice"
+  },
+  {
+    "name": "복숭아 주스",
+    "externalCategory": "Juice"
+  }
+]

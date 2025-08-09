@@ -1,0 +1,36 @@
+@import url("https://fonts.googleapis.com/css2?family=Sunflower:wght@300&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@100..900&family=Sunflower:wght@300&display=swap");
+
+@import "tailwindcss";
+@plugin "daisyui" {
+  themes:
+    autumn --default,
+    business --prefersdark;
+}
+@plugin 'daisyui/theme' {
+  name: "autumn";
+  default: true;
+  --radius-selector: 0.25rem;
+  --radius-field: 0.25rem;
+  --radius-box: 0.25rem;
+}
+
+@plugin 'daisyui/theme' {
+  name: "business";
+  prefersdark: true;
+  --radius-selector: 0.25rem;
+  --radius-field: 0.25rem;
+  --radius-box: 0.25rem;
+}
+
+@layer base {
+  html,
+  body {
+    @apply bg-base-200;
+  }
+}
+
+@theme {
+  --font-sunflower: "Sunflower", sans-serif;
+  --font-sans: "Noto Sans KR", sans-serif;
+}

@@ -1,0 +1,70 @@
+[
+  {
+    "name": "그린티 라떼",
+    "externalCategory": "Tea"
+  },
+  {
+    "name": "얼그레이 티",
+    "externalCategory": "Tea"
+  },
+  {
+    "name": "말차 라떼",
+    "externalCategory": "Tea"
+  },
+  {
+    "name": "밀크티",
+    "externalCategory": "Tea"
+  },
+  {
+    "name": "로얄 밀크티",
+    "externalCategory": "Tea"
+  },
+  {
+    "name": "차이티",
+    "externalCategory": "Tea"
+  },
+  {
+    "name": "자스민 티",
+    "externalCategory": "Tea"
+  },
+  {
+    "name": "캐모마일 티",
+    "externalCategory": "Tea"
+  },
+  {
+    "name": "페퍼민트 티",
+    "externalCategory": "Tea"
+  },
+  {
+    "name": "아이스 그린티",
+    "externalCategory": "Tea"
+  },
+  {
+    "name": "홍차",
+    "externalCategory": "Tea"
+  },
+  {
+    "name": "우롱차",
+    "externalCategory": "Tea"
+  },
+  {
+    "name": "수박우롱티",
+    "externalCategory": "Tea"
+  },
+  {
+    "name": "밀크티라떼",
+    "externalCategory": "Tea"
+  },
+  {
+    "name": "쿨 민트 허브차",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "제주 한라봉 티",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "크림슨 펀치 과일차",
+    "externalCategory": "BEVERAGE"
+  }
+]

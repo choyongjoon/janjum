@@ -1,0 +1,82 @@
+[
+  {
+    "name": "치킨샐러드 샌드위치",
+    "externalCategory": "Food"
+  },
+  {
+    "name": "초콜릿 쿠키",
+    "externalCategory": "Dessert"
+  },
+  {
+    "name": "바닐라 아이스크림",
+    "externalCategory": "Ice Cream"
+  },
+  {
+    "name": "크로와상",
+    "externalCategory": "Bakery"
+  },
+  {
+    "name": "치즈케이크",
+    "externalCategory": "Dessert"
+  },
+  {
+    "name": "베이글",
+    "externalCategory": "Bakery"
+  },
+  {
+    "name": "프레첼",
+    "externalCategory": "Snack"
+  },
+  {
+    "name": "요거트",
+    "externalCategory": "Dairy"
+  },
+  {
+    "name": "그래놀라",
+    "externalCategory": "Breakfast"
+  },
+  {
+    "name": "탄산수",
+    "externalCategory": "Water"
+  },
+  {
+    "name": "망고 라떼",
+    "externalCategory": "Latte"
+  },
+  {
+    "name": "흑당라떼",
+    "externalCategory": "Latte"
+  },
+  {
+    "name": "레몬 얼그레이 스콘",
+    "externalCategory": "FOOD"
+  },
+  {
+    "name": "얼그레이 휘낭시에",
+    "externalCategory": "FOOD"
+  },
+  {
+    "name": "초코 라떼",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "딸기 크림 라떼",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "옥수수 라떼",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "고구마 라떼",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "콩가루 라떼",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "메론바나 라떼",
+    "externalCategory": "BEVERAGE"
+  }
+]
