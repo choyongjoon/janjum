@@ -12,6 +12,7 @@
     "categorize": "tsx actors/categorizer/categorize.ts",
     "data-sync-in-local": "scripts/dataSyncInLocal.sh",
     "test": "vitest",
+    "test:e2e": "playwright test",
     "prepare": "husky"
   },
   "dependencies": {
@@ -41,6 +42,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.1.2",
     "@clerk/backend": "^2.6.2",
+    "@playwright/test": "^1.54.2",
     "@types/node": "^22.5.4",
     "@types/node-cron": "^3.0.11",
     "@types/react": "^19.0.8",
