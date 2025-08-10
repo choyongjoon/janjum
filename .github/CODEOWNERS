@@ -1,0 +1,6 @@
+# Global code ownership
+# This file defines code ownership for the repository
+# All code is owned by the project maintainer
+
+# Global ownership - all files require approval from the repository owner
+* @choyongjoon
