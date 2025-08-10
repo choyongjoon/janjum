@@ -257,8 +257,7 @@ async function handleMainMenuPage(
   // Try to discover categories
   const categories = await extractMenuCategories(page);
   logger.info(
-    `Found ${categories.length} categories:`,
-    categories.map((c) => c.name)
+    `Found ${categories.length} categories: ${categories.map((c) => c.name).join(', ')}`
   );
 
   let currentPage = 1;
