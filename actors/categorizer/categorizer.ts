@@ -371,7 +371,10 @@ export class ProductCategorizer {
     this.rules.rules.push(newRule);
     this.saveRules();
 
-    logger.info(`Added custom rule: ${ruleId}`, newRule);
+    logger.info(
+      `Added custom rule: ${ruleId}`,
+      newRule as unknown as Record<string, unknown>
+    );
     return ruleId;
   }
 
