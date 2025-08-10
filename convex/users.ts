@@ -21,9 +21,10 @@ export const current = query({
 export const upsertFromClerk = internalMutation({
   args: { data: v.any() as Validator<UserJSON> }, // no runtime validation, trust Clerk
   async handler(ctx, { data }) {
+    const initialName = nanoid(8);
     const userAttributes = {
-      name: `${data.first_name} ${data.last_name}`,
-      handle: nanoid(8),
+      name: initialName,
+      handle: initialName,
       hasCompletedSetup: false, // New users need to complete setup
       externalId: data.id,
     };
