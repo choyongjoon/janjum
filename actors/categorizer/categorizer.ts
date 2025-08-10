@@ -154,8 +154,8 @@ export class ProductCategorizer {
     return this.rules.rules
       .filter((rule) => rule.type === 'pattern')
       .sort((a, b) => {
-        const priorityA = a.priority || 999;
-        const priorityB = b.priority || 999;
+        const priorityA = a.priority ?? 999;
+        const priorityB = b.priority ?? 999;
         return priorityA - priorityB;
       });
   }
