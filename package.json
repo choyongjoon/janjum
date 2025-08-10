@@ -10,6 +10,7 @@
     "crawl": "tsx actors/crawler/crawl.ts",
     "upload": "tsx actors/uploader/upload.ts",
     "categorize": "tsx actors/categorizer/categorize.ts",
+    "data-sync-in-local": "scripts/dataSyncInLocal.sh",
     "test": "vitest",
     "prepare": "husky"
   },

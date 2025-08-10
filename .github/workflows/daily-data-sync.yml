@@ -17,7 +17,7 @@ on:
           - 'mega'
           - 'paik'
           - 'ediya'
-          - 'twosome'
+          # - 'twosome' # blocked in CI
           - 'coffeebean'
           - 'hollys'
           - 'paulbassett'

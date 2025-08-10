@@ -27,6 +27,7 @@ yarn.lock
 
 # Environment files
 .env.local
+.env.prod-upload
 
 # Crawler files
 crawler/storage/
