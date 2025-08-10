@@ -133,6 +133,7 @@ export function ReviewCard({
             <div className="dropdown dropdown-end">
               <button
                 className="btn btn-ghost btn-circle btn-xs"
+                data-testid="review-menu"
                 tabIndex={0}
                 type="button"
               >

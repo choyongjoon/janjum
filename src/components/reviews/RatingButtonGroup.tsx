@@ -28,6 +28,7 @@ export function RatingButtonGroup({
           className={`join-item btn w-10 p-0 ${
             rating === r.value ? 'btn-primary' : 'btn-outline'
           }`}
+          data-testid="rating-button"
           key={r.value}
           name="options"
           onChange={() => onRatingChange?.(r.value)}

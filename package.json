@@ -13,6 +13,7 @@
     "data-sync-in-local": "scripts/dataSyncInLocal.sh",
     "test": "vitest",
     "test:e2e": "playwright test",
+    "test:e2e:reviews": "playwright test e2e/review-journey-simple.spec.ts",
     "prepare": "husky"
   },
   "dependencies": {

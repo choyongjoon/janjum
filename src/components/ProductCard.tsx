@@ -34,6 +34,7 @@ export function ProductCard({
   return (
     <Link
       className="card bg-base-100 shadow-md transition-shadow hover:shadow-lg"
+      data-testid="product-card"
       key={product._id}
       params={{ shortId: product.shortId }}
       to="/product/$shortId"
