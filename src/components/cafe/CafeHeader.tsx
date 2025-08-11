@@ -1,12 +1,10 @@
 import type { Doc } from 'convex/_generated/dataModel';
-import { api } from '../../../convex/_generated/api';
-import { ConvexImage } from '../ConvexImage';
 
 function CafeHeader({
   cafe,
   numProducts,
 }: {
-  cafe: Doc<'cafes'>;
+  cafe: Doc<'cafes'> & { imageUrl?: string };
   numProducts: number | undefined;
 }) {
   return (
@@ -14,12 +12,11 @@ function CafeHeader({
       <div className="container mx-auto px-4">
         <div className="flex items-center gap-6">
           <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary-content/20">
-            <ConvexImage
-              alt={cafe?.name}
-              className="h-full w-full object-cover"
-              fallbackImageUrl={cafe?.imageStorageId}
-              getImageUrl={api.products.getImageUrl}
-              imageStorageId={cafe?.imageStorageId}
+            <img
+              alt={cafe.name}
+              className="aspect-square w-full object-cover"
+              loading="lazy"
+              src={cafe.imageUrl}
             />
           </div>
           <div>
