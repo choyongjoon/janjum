@@ -1,7 +1,11 @@
 import type { Doc } from 'convex/_generated/dataModel';
 import { CafeCard } from '~/components/CafeCard';
 
-export function BrandCafeListSection({ cafes }: { cafes: Doc<'cafes'>[] }) {
+export function BrandCafeListSection({
+  cafes,
+}: {
+  cafes: (Doc<'cafes'> & { imageUrl?: string })[];
+}) {
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Cafe List Section */}

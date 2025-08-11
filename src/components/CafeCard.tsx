@@ -1,17 +1,10 @@
 import { Link } from '@tanstack/react-router';
-import { api } from 'convex/_generated/api';
-import type { Id } from 'convex/_generated/dataModel';
-import { ConvexImage } from './ConvexImage';
+import type { Doc } from 'convex/_generated/dataModel';
 
 export function CafeCard({
   cafe,
 }: {
-  cafe: {
-    _id: string;
-    name: string;
-    slug: string;
-    imageStorageId?: Id<'_storage'>;
-  };
+  cafe: Doc<'cafes'> & { imageUrl?: string };
 }) {
   return (
     <Link
@@ -20,11 +13,11 @@ export function CafeCard({
       to="/cafe/$slug"
     >
       <figure className="">
-        <ConvexImage
+        <img
           alt={cafe.name}
           className="aspect-square w-full object-cover"
-          getImageUrl={api.cafes.getImageUrl}
-          imageStorageId={cafe.imageStorageId}
+          loading="lazy"
+          src={cafe.imageUrl}
         />
       </figure>
       <div className="card-body items-center p-6 text-center">
