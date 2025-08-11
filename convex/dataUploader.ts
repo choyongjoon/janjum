@@ -125,13 +125,10 @@ export const uploadProductsFromJson = mutation({
 
     // After uploading, check for removed products
     const currentExternalIds = products.map((p) => p.externalId);
-    const removalResults = await ctx.runMutation(
-      api.products.markProductsAsRemoved,
-      {
-        cafeId: cafe._id,
-        currentExternalIds,
-      }
-    );
+    const removalResults = await ctx.runMutation(api.products.markAsRemoved, {
+      cafeId: cafe._id,
+      currentExternalIds,
+    });
 
     // Update results with removal information
     results.removed = removalResults.removed;

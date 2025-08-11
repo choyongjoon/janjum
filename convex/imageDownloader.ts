@@ -38,7 +38,7 @@ export const downloadAndStoreImageAction = action({
       const { storageId } = await uploadResponse.json();
 
       // Update the product with the storage ID
-      await ctx.runMutation(api.products.updateProductImage, {
+      await ctx.runMutation(api.products.updateImage, {
         productId,
         storageId: storageId as Id<'_storage'>,
       });
