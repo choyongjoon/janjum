@@ -19,7 +19,7 @@ export function NameSearchInput({
 
   // Get search suggestions for autocomplete
   const { data: suggestions } = useQuery(
-    convexQuery(api.products.getProductSuggestions, {
+    convexQuery(api.products.getSuggestions, {
       searchTerm: value,
       limit: 8,
     })

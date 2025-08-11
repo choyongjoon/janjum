@@ -4,13 +4,15 @@ import { Link } from '@tanstack/react-router';
 
 import { api } from '../../convex/_generated/api';
 import type { Doc } from '../../convex/_generated/dataModel';
-import { ConvexImage } from '../components/ConvexImage';
 import { RatingSummary } from '../components/RatingSummary';
 
 export function ProductCard({
   product,
 }: {
-  product: Doc<'products'> & { cafeName?: string };
+  product: Doc<'products'> & {
+    cafeName?: string;
+    imageUrl?: string;
+  };
 }) {
   const { data: reviewStats } = useQuery({
     ...convexQuery(api.reviews.getProductStats, { productId: product._id }),
@@ -39,12 +41,11 @@ export function ProductCard({
       to="/product/$shortId"
     >
       <figure className="">
-        <ConvexImage
+        <img
           alt={product.name}
           className="aspect-square w-full object-cover"
-          fallbackImageUrl={product.externalImageUrl}
-          getImageUrl={api.products.getImageUrl}
-          imageStorageId={product.imageStorageId}
+          loading="lazy"
+          src={product.imageUrl || product.externalImageUrl}
         />
       </figure>
       <div className="card-body overflow-hidden p-2 md:p-4">
