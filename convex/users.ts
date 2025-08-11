@@ -14,7 +14,17 @@ const HANDLE_REGEX = /^[a-zA-Z0-9_-]+$/;
 export const current = query({
   args: {},
   handler: async (ctx) => {
-    return await getCurrentUser(ctx);
+    const user = await getCurrentUser(ctx);
+    if (!user) {
+      return null;
+    }
+
+    return {
+      ...user,
+      imageUrl: user.imageStorageId
+        ? (await ctx.storage.getUrl(user.imageStorageId)) || undefined
+        : undefined,
+    };
   },
 });
 
@@ -146,12 +156,5 @@ export const generateUploadUrl = mutation({
 
     // Generate upload URL for profile image
     return await ctx.storage.generateUploadUrl();
-  },
-});
-
-export const getImageUrl = query({
-  args: { storageId: v.id('_storage') },
-  handler: async (ctx, { storageId }) => {
-    return await ctx.storage.getUrl(storageId);
   },
 });
