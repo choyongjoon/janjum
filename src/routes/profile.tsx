@@ -6,7 +6,6 @@ import { AuthWrapper } from '~/components/auth/AuthWrapper';
 import { MyReview } from '~/components/reviews/MyReview';
 import { UserRatingHistogram } from '~/components/reviews/UserRatingHistogram';
 import { api } from '../../convex/_generated/api';
-import type { Id } from '../../convex/_generated/dataModel';
 
 export const Route = createFileRoute('/profile')({
   component: AuthenticatedProfilePage,
@@ -43,14 +42,6 @@ function ProfilePage() {
     enabled: !!currentUser?._id,
   });
 
-  // Get current user's profile image URL from Convex storage
-  const { data: currentUserImageUrl } = useQuery({
-    ...convexQuery(api.users.getImageUrl, {
-      storageId: currentUser?.imageStorageId as Id<'_storage'>,
-    }),
-    enabled: !!currentUser?.imageStorageId,
-  });
-
   const isLoading = reviewsLoading || statsLoading;
 
   return (
@@ -59,13 +50,13 @@ function ProfilePage() {
       <div className="card mb-6 bg-base-100 shadow-md">
         <div className="card-body">
           <div className="flex items-center gap-4">
-            {currentUserImageUrl && (
+            {currentUser?.imageUrl && (
               <div className="avatar">
                 <div className="h-16 w-16 rounded-full">
                   <img
                     alt={currentUser?.name || '프로필'}
                     className="h-full w-full object-cover"
-                    src={currentUserImageUrl}
+                    src={currentUser?.imageUrl}
                   />
                 </div>
               </div>
