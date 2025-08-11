@@ -60,4 +60,17 @@ export default defineSchema({
     .index('byExternalId', ['externalId'])
     .index('byName', ['name'])
     .index('byHandle', ['handle']),
+  price_history: defineTable({
+    productId: v.id('products'),
+    oldPrice: v.optional(v.number()), // Previous price (null for initial price)
+    newPrice: v.number(), // New price
+    priceChange: v.optional(v.number()), // Change amount (newPrice - oldPrice)
+    priceChangePercent: v.optional(v.number()), // Change percentage
+    source: v.string(), // Source of price data (e.g., 'naver-map', 'official-website')
+    timestamp: v.number(), // When the price change was detected
+    createdAt: v.number(), // When this record was created
+  })
+    .index('by_product', ['productId'])
+    .index('by_timestamp', ['timestamp'])
+    .index('by_product_timestamp', ['productId', 'timestamp']),
 });

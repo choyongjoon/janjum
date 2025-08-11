@@ -299,6 +299,41 @@ export const updateImage = mutation({
   },
 });
 
+export const getByNameAndCafe = query({
+  args: { name: v.string(), cafeSlug: v.string() },
+  handler: async (ctx, args) => {
+    // First get the cafe
+    const cafe = await ctx.db
+      .query('cafes')
+      .withIndex('by_slug', (q) => q.eq('slug', args.cafeSlug))
+      .first();
+
+    if (!cafe) {
+      return null;
+    }
+
+    // Then find product by name and cafeId
+    return await ctx.db
+      .query('products')
+      .withIndex('by_cafe', (q) => q.eq('cafeId', cafe._id))
+      .filter((q) => q.eq(q.field('name'), args.name))
+      .first();
+  },
+});
+
+export const updatePrice = mutation({
+  args: {
+    productId: v.id('products'),
+    price: v.number(),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.patch(args.productId, {
+      price: args.price,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
 export const markAsRemoved = mutation({
   args: {
     cafeId: v.id('cafes'),

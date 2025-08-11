@@ -17,6 +17,7 @@ import type * as cafes from "../cafes.js";
 import type * as dataUploader from "../dataUploader.js";
 import type * as http from "../http.js";
 import type * as imageDownloader from "../imageDownloader.js";
+import type * as price_history from "../price_history.js";
 import type * as products from "../products.js";
 import type * as reviews from "../reviews.js";
 import type * as shortId from "../shortId.js";
@@ -36,6 +37,7 @@ declare const fullApi: ApiFromModules<{
   dataUploader: typeof dataUploader;
   http: typeof http;
   imageDownloader: typeof imageDownloader;
+  price_history: typeof price_history;
   products: typeof products;
   reviews: typeof reviews;
   shortId: typeof shortId;
