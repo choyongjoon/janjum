@@ -20,7 +20,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 8
+          version: latest
           
       - name: Get pnpm store directory
         shell: bash
@@ -36,7 +36,14 @@ jobs:
             ${{ runner.os }}-pnpm-store-
             
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: |
+          if [ -f "pnpm-lock.yaml" ]; then
+            echo "Lockfile found, installing with frozen lockfile"
+            pnpm install --frozen-lockfile
+          else
+            echo "No lockfile found, generating new one"
+            pnpm install
+          fi
         
       - name: Build project
         run: pnpm build
