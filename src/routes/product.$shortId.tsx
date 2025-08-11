@@ -5,7 +5,6 @@ import type { Id } from 'convex/_generated/dataModel';
 import { RatingSummary } from '~/components/RatingSummary';
 import { api } from '../../convex/_generated/api';
 import { BackLink } from '../components/BackLink';
-import { ConvexImage } from '../components/ConvexImage';
 import { ExternalLinkIcon } from '../components/icons';
 import { ProductCard } from '../components/ProductCard';
 import { ReviewSection } from '../components/reviews/ReviewSection';
@@ -14,7 +13,7 @@ export const Route = createFileRoute('/product/$shortId')({
   component: ProductPage,
   loader: async (opts) => {
     const product = await opts.context.queryClient.ensureQueryData(
-      convexQuery(api.products.getProductWithImageByShortId, {
+      convexQuery(api.products.getByShortId, {
         shortId: opts.params.shortId,
       })
     );
@@ -30,7 +29,7 @@ function ProductPage() {
   const { shortId } = Route.useParams();
 
   const { data: product } = useSuspenseQuery(
-    convexQuery(api.products.getProductWithImageByShortId, {
+    convexQuery(api.products.getByShortId, {
       shortId,
     })
   );
@@ -68,12 +67,11 @@ function ProductPage() {
           {/* Product Image */}
           <div className="flex justify-center">
             <div className="w-full max-w-md">
-              <ConvexImage
+              <img
                 alt={product.name}
-                className="aspect-square w-full rounded-lg bg-base-100 object-cover shadow-lg"
-                fallbackImageUrl={product.externalImageUrl}
-                getImageUrl={api.products.getImageUrl}
-                imageStorageId={product.imageStorageId}
+                className="aspect-square w-full object-cover"
+                loading="lazy"
+                src={product.imageUrl || product.externalImageUrl}
               />
             </div>
           </div>
