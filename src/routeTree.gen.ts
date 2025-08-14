@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as OauthCallbackRouteImport } from './routes/oauth-callback'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProductShortIdRouteImport } from './routes/product.$shortId'
@@ -30,6 +31,11 @@ const SearchRoute = SearchRouteImport.update({
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OauthCallbackRoute = OauthCallbackRouteImport.update({
@@ -56,6 +62,7 @@ const CafeSlugRoute = CafeSlugRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/oauth-callback': typeof OauthCallbackRoute
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
@@ -65,6 +72,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/oauth-callback': typeof OauthCallbackRoute
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
@@ -75,6 +83,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/oauth-callback': typeof OauthCallbackRoute
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
@@ -86,6 +95,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/oauth-callback'
+    | '/privacy'
     | '/profile'
     | '/search'
     | '/settings'
@@ -95,6 +105,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/oauth-callback'
+    | '/privacy'
     | '/profile'
     | '/search'
     | '/settings'
@@ -104,6 +115,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/oauth-callback'
+    | '/privacy'
     | '/profile'
     | '/search'
     | '/settings'
@@ -114,6 +126,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   OauthCallbackRoute: typeof OauthCallbackRoute
+  PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
   SearchRoute: typeof SearchRoute
   SettingsRoute: typeof SettingsRoute
@@ -142,6 +155,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/oauth-callback': {
@@ -178,6 +198,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   OauthCallbackRoute: OauthCallbackRoute,
+  PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
   SearchRoute: SearchRoute,
   SettingsRoute: SettingsRoute,
