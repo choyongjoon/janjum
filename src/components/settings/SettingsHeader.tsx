@@ -10,7 +10,7 @@ export function SettingsHeader({
       {!isInitialSetup && <BackLink to="/profile">프로필</BackLink>}
 
       <h1 className="font-bold text-3xl">
-        {isInitialSetup ? '환영합니다!' : '프로필 설정'}
+        {isInitialSetup ? '환영합니다!' : '설정'}
       </h1>
 
       <p className="mt-2 text-base-content/70">

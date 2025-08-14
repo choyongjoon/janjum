@@ -19,6 +19,7 @@ import { PostHogProvider } from 'posthog-js/react';
 import type * as React from 'react';
 import { NewUserRedirect } from '~/components/auth/NewUserRedirect';
 import { DefaultCatchBoundary } from '~/components/DefaultCatchBoundary.js';
+import { Footer } from '~/components/Footer';
 import { NavBar } from '~/components/NavBar';
 import { NotFound } from '~/components/NotFound.js';
 import appCss from '~/styles/app.css?url';
@@ -128,9 +129,12 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <head>
         <HeadContent />
       </head>
-      <body>
+      <body className="flex min-h-screen flex-col">
         <NavBar />
-        <NewUserRedirect>{children}</NewUserRedirect>
+        <main className="flex-1">
+          <NewUserRedirect>{children}</NewUserRedirect>
+        </main>
+        <Footer />
         <TanStackRouterDevtools position="bottom-right" />
         <Scripts />
       </body>
