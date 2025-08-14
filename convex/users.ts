@@ -43,11 +43,6 @@ export const upsertFromClerk = internalMutation({
     if (user === null) {
       // New user - create with hasCompletedSetup = false
       await ctx.db.insert('users', userAttributes);
-    } else {
-      // Existing user - don't override hasCompletedSetup
-      const { hasCompletedSetup: _hasCompletedSetup, ...updateAttributes } =
-        userAttributes;
-      await ctx.db.patch(user._id, updateAttributes);
     }
   },
 });
