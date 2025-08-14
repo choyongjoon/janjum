@@ -14,13 +14,6 @@ export function AccountInfo() {
 
         <div className="space-y-4">
           <div className="flex items-center justify-between border-base-300 border-b py-2">
-            <span className="font-medium">이메일</span>
-            <span className="text-base-content/70">
-              {user.primaryEmailAddress?.emailAddress || '이메일 없음'}
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between border-base-300 border-b py-2">
             <span className="font-medium">가입일</span>
             <span className="text-base-content/70">
               {user.createdAt
@@ -28,12 +21,6 @@ export function AccountInfo() {
                 : '알 수 없음'}
             </span>
           </div>
-        </div>
-
-        <div className="card-actions mt-6 justify-end">
-          <p className="text-base-content/50 text-sm">
-            이메일과 계정 설정은 Clerk에서 관리됩니다.
-          </p>
         </div>
       </div>
     </div>
