@@ -8,7 +8,6 @@ import {
   ProfileForm,
   ProfileImageUpload,
   SettingsHeader,
-  SSOConnections,
 } from '~/components/settings';
 import { useSettingsForm } from '~/hooks/useSettingsForm';
 
@@ -65,11 +64,6 @@ function SettingsPage() {
       </ProfileForm>
 
       <AccountInfo />
-
-      {/* SSO Connections */}
-      <div className="mt-8">
-        <SSOConnections />
-      </div>
 
       {/* Account Deletion - placed at the bottom */}
       <div className="mt-8">
