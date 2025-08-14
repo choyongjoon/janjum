@@ -2,11 +2,13 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { AuthWrapper } from '~/components/auth/AuthWrapper';
 import {
+  AccountDeletion,
   AccountInfo,
   AlertMessages,
   ProfileForm,
   ProfileImageUpload,
   SettingsHeader,
+  SSOConnections,
 } from '~/components/settings';
 import { useSettingsForm } from '~/hooks/useSettingsForm';
 
@@ -63,6 +65,16 @@ function SettingsPage() {
       </ProfileForm>
 
       <AccountInfo />
+
+      {/* SSO Connections */}
+      <div className="mt-8">
+        <SSOConnections />
+      </div>
+
+      {/* Account Deletion - placed at the bottom */}
+      <div className="mt-8">
+        <AccountDeletion />
+      </div>
     </div>
   );
 }

@@ -158,3 +158,37 @@ export const generateUploadUrl = mutation({
     return await ctx.storage.generateUploadUrl();
   },
 });
+
+export const deleteAccount = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const user = await getCurrentUserOrThrow(ctx);
+
+    // Delete all user's reviews first
+    const userReviews = await ctx.db
+      .query('reviews')
+      .withIndex('by_user', (q) => q.eq('userId', user.externalId))
+      .collect();
+
+    for (const review of userReviews) {
+      // Delete review images from storage
+      if (review.imageStorageIds) {
+        for (const imageId of review.imageStorageIds) {
+          await ctx.storage.delete(imageId);
+        }
+      }
+      // Delete the review
+      await ctx.db.delete(review._id);
+    }
+
+    // Delete user's profile image from storage
+    if (user.imageStorageId) {
+      await ctx.storage.delete(user.imageStorageId);
+    }
+
+    // Delete the user record
+    await ctx.db.delete(user._id);
+
+    return { success: true };
+  },
+});
