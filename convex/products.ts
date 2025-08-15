@@ -143,6 +143,9 @@ function hasProductChanges(
   existing: ExistingProduct,
   args: UpsertProductArgs
 ): boolean {
+  const wasActive = existing.isActive ?? true;
+  const willBeActive = args.isActive ?? true;
+
   return (
     existing.name !== args.name ||
     existing.category !== args.category ||
@@ -150,7 +153,9 @@ function hasProductChanges(
     existing.description !== args.description ||
     existing.externalImageUrl !== args.externalImageUrl ||
     existing.imageStorageId !== args.imageStorageId ||
-    (existing.isActive ?? true) !== (args.isActive ?? true)
+    wasActive !== willBeActive ||
+    // If becoming active and had removedAt, that's a change
+    (willBeActive && existing.removedAt !== undefined)
   );
 }
 
@@ -177,12 +182,12 @@ async function handleExistingProduct(
   const hasChanges = hasProductChanges(existing, args);
 
   if (hasChanges) {
+    const isNowActive = args.isActive ?? true;
     const updateData = {
       ...args,
       updatedAt: now,
-      isActive: args.isActive ?? true,
-      removedAt:
-        (args.isActive ?? true) ? undefined : (existing.removedAt ?? now),
+      isActive: isNowActive,
+      removedAt: isNowActive ? undefined : (existing.removedAt ?? now),
     };
     // Remove downloadImages flag from stored data
     const { downloadImages: _downloadImages, ...dataToStore } = updateData;
