@@ -1,4 +1,4 @@
-import { Link } from '@tanstack/react-router';
+import { Link, useLocation } from '@tanstack/react-router';
 import { Authenticated, Unauthenticated } from 'convex/react';
 import { useState } from 'react';
 import { SignInPage } from './auth/SignInPage';
@@ -7,8 +7,13 @@ import { BookmarkIcon, SearchIcon, UserIcon } from './icons';
 export function NavBar() {
   const [showSignIn, setShowSignIn] = useState(false);
 
+  const isBlog = useLocation().pathname.startsWith('/blog');
+
   return (
-    <div className="navbar bg-primary text-primary-content shadow-sm">
+    <div
+      className="navbar bg-primary text-primary-content shadow-sm"
+      data-theme={isBlog ? 'wireframe' : ''}
+    >
       <div className="navbar-start">
         {/* <div className="dropdown">
           <div className="btn btn-ghost btn-circle" role="button" tabIndex={0}>

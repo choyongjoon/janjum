@@ -1,8 +1,13 @@
-import { Link } from '@tanstack/react-router';
+import { Link, useLocation } from '@tanstack/react-router';
 
 export function Footer() {
+  const isBlog = useLocation().pathname.startsWith('/blog');
+
   return (
-    <footer className="mt-auto bg-base-200">
+    <footer
+      className="mt-auto bg-base-200"
+      data-theme={isBlog ? 'wireframe' : ''}
+    >
       <div className="container mx-auto px-4 py-8">
         <div className="flex flex-col items-center space-y-6">
           {/* Navigation Links */}
@@ -31,6 +36,12 @@ export function Footer() {
               to="/privacy"
             >
               개인정보처리방침
+            </Link>
+            <Link
+              className="text-base-content/70 text-sm transition-colors hover:text-primary"
+              to="/blog"
+            >
+              블로그
             </Link>
           </nav>
 
