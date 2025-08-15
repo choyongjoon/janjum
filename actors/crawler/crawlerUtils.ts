@@ -18,7 +18,7 @@ export interface Product {
 export const waitForLoad = async (page: Page, timeout = 30_000) => {
   try {
     await page.waitForLoadState('domcontentloaded', { timeout });
-    await page.waitForTimeout(200); // Reduced from 500ms to 200ms
+    // await page.waitForTimeout(200); // Reduced from 500ms to 200ms
   } catch {
     logger.warn(`⚠️ Page load timeout after ${timeout}ms, continuing anyway...`);
     // Don't throw - continue with whatever content is available
