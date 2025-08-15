@@ -40,7 +40,7 @@ const SELECTORS = {
     nameEn: '.myAssignZone > h4 > span',
     description: '.myAssignZone p.t1',
     category: '.cate',
-    image: '.elevatezoom-gallery > img:nth-child(1)',
+    image: '.elevatezoom-gallery > img:first-child',
   },
 } as const;
 
@@ -67,9 +67,9 @@ const maxRequestsInTestMode = isTestMode
 
 const CRAWLER_CONFIG = {
   maxConcurrency: 5, // Increased from 3 to 5
-  maxRequestsPerCrawl: isTestMode ? maxRequestsInTestMode : 100, // Reduced from 200 to 100
+  maxRequestsPerCrawl: isTestMode ? maxRequestsInTestMode : 300, // Increased to 300 to handle all products (183 found + buffer)
   maxRequestRetries: 2,
-  requestHandlerTimeoutSecs: isTestMode ? 20 : 30, // Reduced from 30/45 to 20/30
+  requestHandlerTimeoutSecs: isTestMode ? 20 : 45, // Increased timeout for better success rate
   launchOptions: {
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
@@ -109,7 +109,9 @@ async function extractProductData(page: Page): Promise<Product> {
       .then((text) => text?.trim() || ''),
     page
       .locator(SELECTORS.productDetails.image)
+      .first()
       .getAttribute('src')
+      .catch(() => '')
       .then((src) => src || ''),
     Promise.resolve(page.url()).then((url) => {
       const urlParams = new URLSearchParams(new URL(url).search);
