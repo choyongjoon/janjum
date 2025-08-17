@@ -1,6 +1,13 @@
 // Import markdown blog posts
 import startPostMd from '~/data/blog-posts/start.md?raw';
-import type { BlogPost } from '~/data/blogPosts';
+
+type BlogPost = {
+  id: string;
+  title: string;
+  excerpt: string;
+  content: string;
+  publishedAt: string;
+};
 
 // Regex for parsing frontmatter (moved to top level for performance)
 const FRONTMATTER_REGEX = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/;
