@@ -1,7 +1,12 @@
-import { convexQuery, useConvexMutation } from '@convex-dev/react-query';
+import {
+  convexQuery,
+  useConvexAction,
+  useConvexMutation,
+} from '@convex-dev/react-query';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
+import { usePostHogEvents } from '~/hooks/usePostHogEvents';
 import { api } from '../../convex/_generated/api';
 import type { Id } from '../../convex/_generated/dataModel';
 
@@ -12,6 +17,7 @@ interface FormData {
 
 export function useSettingsForm() {
   const router = useRouter();
+  const { trackProfileUpdate, trackImageUpload } = usePostHogEvents();
 
   // Get current user data from Convex
   const {
@@ -57,8 +63,8 @@ export function useSettingsForm() {
     mutationFn: useConvexMutation(api.users.generateUploadUrl),
   });
 
-  const updateProfileMutation = useMutation({
-    mutationFn: useConvexMutation(api.users.updateProfile),
+  const updateProfileAction = useMutation({
+    mutationFn: useConvexAction(api.users.updateProfile),
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -95,12 +101,53 @@ export function useSettingsForm() {
     return storageId;
   };
 
+  const getUpdatedFields = (imageStorageId?: Id<'_storage'>): string[] => {
+    const updatedFields: string[] = [];
+    if (currentUser?.name !== formData.name) {
+      updatedFields.push('name');
+    }
+    if (currentUser?.handle !== formData.handle) {
+      updatedFields.push('handle');
+    }
+    if (imageStorageId) {
+      updatedFields.push('image');
+    }
+    return updatedFields;
+  };
+
+  const trackSuccessfulUpdate = (
+    updatedFields: string[],
+    imageStorageId?: Id<'_storage'>
+  ) => {
+    trackProfileUpdate(updatedFields);
+    if (imageStorageId && selectedImage) {
+      trackImageUpload(true);
+    }
+  };
+
+  const trackFailedUpdate = (error: unknown) => {
+    if (selectedImage) {
+      const errorType =
+        error instanceof Error ? error.message : 'unknown_error';
+      trackImageUpload(false, errorType);
+    }
+  };
+
   const updateProfile = async (imageStorageId?: Id<'_storage'>) => {
-    await updateProfileMutation.mutateAsync({
-      name: formData.name,
-      handle: formData.handle,
-      ...(imageStorageId && { imageStorageId }),
-    });
+    const updatedFields = getUpdatedFields(imageStorageId);
+
+    try {
+      await updateProfileAction.mutateAsync({
+        name: formData.name,
+        handle: formData.handle,
+        ...(imageStorageId && { imageStorageId }),
+      });
+
+      trackSuccessfulUpdate(updatedFields, imageStorageId);
+    } catch (error) {
+      trackFailedUpdate(error);
+      throw error;
+    }
   };
 
   const handlePostUpdate = () => {

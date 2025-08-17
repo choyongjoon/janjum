@@ -1,7 +1,9 @@
-import type { UserJSON } from '@clerk/backend';
+import { createClerkClient, type UserJSON } from '@clerk/backend';
 import { type Validator, v } from 'convex/values';
 import { nanoid } from 'nanoid';
+import { internal } from './_generated/api';
 import {
+  action,
   internalMutation,
   mutation,
   type QueryCtx,
@@ -95,7 +97,8 @@ export const getById = query({
   },
 });
 
-export const updateProfile = mutation({
+// Internal mutation to update user profile in Convex database
+export const updateUserProfile = internalMutation({
   args: {
     name: v.string(),
     handle: v.string(),
@@ -131,13 +134,51 @@ export const updateProfile = mutation({
       throw new Error('핸들은 영문, 숫자, _, - 만 사용할 수 있습니다.');
     }
 
-    // Update user profile
+    // Update user profile in Convex
     await ctx.db.patch(user._id, {
       name: name.trim(),
       handle: handle.trim(),
       hasCompletedSetup: true, // Mark setup as completed
       ...(imageStorageId && { imageStorageId }),
     });
+
+    return { success: true, userId: user._id, externalId: user.externalId };
+  },
+});
+
+// Action to update both Convex and Clerk
+export const updateProfile = action({
+  args: {
+    name: v.string(),
+    handle: v.string(),
+    imageStorageId: v.optional(v.id('_storage')),
+  },
+  handler: async (ctx, { name, handle, imageStorageId }) => {
+    // Update user profile in Convex database
+    const result = await ctx.runMutation(internal.users.updateUserProfile, {
+      name,
+      handle,
+      imageStorageId,
+    });
+
+    // Update Clerk user with name as username and metadata
+    try {
+      const clerkClient = createClerkClient({
+        secretKey: process.env.CLERK_SECRET_KEY,
+      });
+
+      await clerkClient.users.updateUser(result.externalId, {
+        privateMetadata: {
+          name: name.trim(),
+          handle: handle.trim(),
+          convexUserId: result.userId,
+        },
+      });
+    } catch (error) {
+      // Log Clerk update error but don't fail the entire operation
+      // biome-ignore lint/suspicious/noConsole: Server-side error logging is acceptable
+      console.warn('Failed to update Clerk user:', error);
+    }
 
     return { success: true };
   },

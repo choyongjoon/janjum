@@ -2,6 +2,7 @@ import { convexQuery } from '@convex-dev/react-query';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useMemo, useState } from 'react';
+import { usePostHogEvents } from '~/hooks/usePostHogEvents';
 import { api } from '../../convex/_generated/api';
 import { SearchIcon } from '../components/icons';
 import { ProductCard } from '../components/ProductCard';
@@ -38,6 +39,7 @@ export const Route = createFileRoute('/search')({
 function SearchPage() {
   const navigate = useNavigate();
   const { searchTerm } = Route.useSearch();
+  const { trackSearch } = usePostHogEvents();
 
   // Local state for form inputs
   const [formState, setFormState] = useState({
@@ -68,10 +70,17 @@ function SearchPage() {
   const handleSearch = (e?: React.FormEvent) => {
     e?.preventDefault();
 
+    const trimmedSearchTerm = formState.searchTerm.trim();
+
+    if (trimmedSearchTerm) {
+      // Track search event
+      trackSearch(trimmedSearchTerm, searchResults?.length);
+    }
+
     navigate({
       to: '/search',
       search: {
-        searchTerm: formState.searchTerm.trim() || '',
+        searchTerm: trimmedSearchTerm || '',
         cafeId: '',
         category: '',
       },

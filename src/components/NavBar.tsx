@@ -1,7 +1,7 @@
 import { Link, useLocation } from '@tanstack/react-router';
 import { Authenticated, Unauthenticated } from 'convex/react';
 import { useState } from 'react';
-import { SignInPage } from './auth/SignInPage';
+import { SignInModal } from './auth/SignInModal';
 import { BookmarkIcon, SearchIcon, UserIcon } from './icons';
 
 export function NavBar() {
@@ -77,7 +77,7 @@ export function NavBar() {
           </button>
         </Unauthenticated>
 
-        {showSignIn && <SignInPage onClose={() => setShowSignIn(false)} />}
+        <SignInModal isOpen={showSignIn} onClose={() => setShowSignIn(false)} />
       </div>
     </div>
   );
