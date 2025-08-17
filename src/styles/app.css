@@ -5,7 +5,8 @@
 @plugin "daisyui" {
   themes:
     autumn --default,
-    business --prefersdark;
+    business --prefersdark,
+    wireframe;
 }
 @plugin 'daisyui/theme' {
   name: "autumn";

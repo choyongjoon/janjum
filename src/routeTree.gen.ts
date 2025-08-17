@@ -14,9 +14,12 @@ import { Route as SearchRouteImport } from './routes/search'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as OauthCallbackRouteImport } from './routes/oauth-callback'
+import { Route as BlogRouteImport } from './routes/blog'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as BlogIndexRouteImport } from './routes/blog.index'
 import { Route as ProductShortIdRouteImport } from './routes/product.$shortId'
 import { Route as CafeSlugRouteImport } from './routes/cafe.$slug'
+import { Route as BlogPostIdRouteImport } from './routes/blog.$postId'
 
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
@@ -43,10 +46,20 @@ const OauthCallbackRoute = OauthCallbackRouteImport.update({
   path: '/oauth-callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BlogRoute = BlogRouteImport.update({
+  id: '/blog',
+  path: '/blog',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const BlogIndexRoute = BlogIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => BlogRoute,
 } as any)
 const ProductShortIdRoute = ProductShortIdRouteImport.update({
   id: '/product/$shortId',
@@ -58,16 +71,24 @@ const CafeSlugRoute = CafeSlugRouteImport.update({
   path: '/cafe/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BlogPostIdRoute = BlogPostIdRouteImport.update({
+  id: '/$postId',
+  path: '/$postId',
+  getParentRoute: () => BlogRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/blog': typeof BlogRouteWithChildren
   '/oauth-callback': typeof OauthCallbackRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
+  '/blog/$postId': typeof BlogPostIdRoute
   '/cafe/$slug': typeof CafeSlugRoute
   '/product/$shortId': typeof ProductShortIdRoute
+  '/blog/': typeof BlogIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -76,31 +97,39 @@ export interface FileRoutesByTo {
   '/profile': typeof ProfileRoute
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
+  '/blog/$postId': typeof BlogPostIdRoute
   '/cafe/$slug': typeof CafeSlugRoute
   '/product/$shortId': typeof ProductShortIdRoute
+  '/blog': typeof BlogIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/blog': typeof BlogRouteWithChildren
   '/oauth-callback': typeof OauthCallbackRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
+  '/blog/$postId': typeof BlogPostIdRoute
   '/cafe/$slug': typeof CafeSlugRoute
   '/product/$shortId': typeof ProductShortIdRoute
+  '/blog/': typeof BlogIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/blog'
     | '/oauth-callback'
     | '/privacy'
     | '/profile'
     | '/search'
     | '/settings'
+    | '/blog/$postId'
     | '/cafe/$slug'
     | '/product/$shortId'
+    | '/blog/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -109,22 +138,28 @@ export interface FileRouteTypes {
     | '/profile'
     | '/search'
     | '/settings'
+    | '/blog/$postId'
     | '/cafe/$slug'
     | '/product/$shortId'
+    | '/blog'
   id:
     | '__root__'
     | '/'
+    | '/blog'
     | '/oauth-callback'
     | '/privacy'
     | '/profile'
     | '/search'
     | '/settings'
+    | '/blog/$postId'
     | '/cafe/$slug'
     | '/product/$shortId'
+    | '/blog/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  BlogRoute: typeof BlogRouteWithChildren
   OauthCallbackRoute: typeof OauthCallbackRoute
   PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
@@ -171,12 +206,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OauthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/blog': {
+      id: '/blog'
+      path: '/blog'
+      fullPath: '/blog'
+      preLoaderRoute: typeof BlogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/blog/': {
+      id: '/blog/'
+      path: '/'
+      fullPath: '/blog/'
+      preLoaderRoute: typeof BlogIndexRouteImport
+      parentRoute: typeof BlogRoute
     }
     '/product/$shortId': {
       id: '/product/$shortId'
@@ -192,11 +241,31 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CafeSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/blog/$postId': {
+      id: '/blog/$postId'
+      path: '/$postId'
+      fullPath: '/blog/$postId'
+      preLoaderRoute: typeof BlogPostIdRouteImport
+      parentRoute: typeof BlogRoute
+    }
   }
 }
 
+interface BlogRouteChildren {
+  BlogPostIdRoute: typeof BlogPostIdRoute
+  BlogIndexRoute: typeof BlogIndexRoute
+}
+
+const BlogRouteChildren: BlogRouteChildren = {
+  BlogPostIdRoute: BlogPostIdRoute,
+  BlogIndexRoute: BlogIndexRoute,
+}
+
+const BlogRouteWithChildren = BlogRoute._addFileChildren(BlogRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  BlogRoute: BlogRouteWithChildren,
   OauthCallbackRoute: OauthCallbackRoute,
   PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
