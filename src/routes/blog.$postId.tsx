@@ -1,5 +1,25 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { sampleBlogPosts } from '~/data/blogPosts';
+import { marked } from 'marked';
+import { getBlogPost } from '~/utils/blogData';
+
+// Configure marked options with post-processing
+const processMarkdown = (content: string) => {
+  // First, parse with marked (synchronous)
+  let html = marked.parse(content, {
+    breaks: true,
+    gfm: true,
+  }) as string;
+
+  // Add <br/> after paragraphs
+  html = html.replace(/<\/p>/g, '</p><br/>');
+
+  html = html.replace(/<p /g, '<p class="text-lg" ');
+
+  // Add link className to anchor tags
+  html = html.replace(/<a /g, '<a class="link" ');
+
+  return html;
+};
 
 export const Route = createFileRoute('/blog/$postId')({
   component: BlogPost,
@@ -7,7 +27,7 @@ export const Route = createFileRoute('/blog/$postId')({
 
 function BlogPost() {
   const { postId } = Route.useParams();
-  const post = sampleBlogPosts.find((p) => p.id === postId);
+  const post = getBlogPost(postId);
 
   if (!post) {
     return (
@@ -51,14 +71,9 @@ function BlogPost() {
             </h1>
 
             <div className="mb-6 flex items-center gap-6 text-base-content/70">
-              <div className="flex items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary font-bold text-primary-content text-sm">
-                  잔
-                </span>
-                <span>잔점 에디터</span>
-              </div>
+              <div className="flex items-center gap-2">조용준</div>
               <span>
-                📅 {new Date(post.publishedAt).toLocaleDateString('ko-KR')}
+                {new Date(post.publishedAt).toLocaleDateString('ko-KR')}
               </span>
             </div>
 
@@ -68,65 +83,13 @@ function BlogPost() {
           {/* Article Body */}
           <div className="prose prose-lg max-w-none">
             <div className="rounded-lg bg-base-100 p-8 shadow-sm">
-              <div className="whitespace-pre-line leading-relaxed">
-                {post.content.split('\n').map((line, index) => {
-                  // Handle markdown-style headers
-                  if (line.startsWith('# ')) {
-                    return (
-                      <h1 key={`h1-${index}`} className="mt-8 mb-4 font-bold text-3xl first:mt-0">
-                        {line.substring(2)}
-                      </h1>
-                    );
-                  }
-                  if (line.startsWith('## ')) {
-                    return (
-                      <h2 key={`h2-${index}`} className="mt-6 mb-3 font-bold text-2xl">
-                        {line.substring(3)}
-                      </h2>
-                    );
-                  }
-                  if (line.startsWith('### ')) {
-                    return (
-                      <h3 key={`h3-${index}`} className="mt-4 mb-2 font-bold text-xl">
-                        {line.substring(4)}
-                      </h3>
-                    );
-                  }
-
-                  // Handle bold text
-                  if (line.includes('**')) {
-                    const parts = line.split('**');
-                    return (
-                      <p key={`p-bold-${index}`} className="mb-4">
-                        {parts.map((part, i) =>
-                          i % 2 === 1 ? <strong key={`bold-${i}`}>{part}</strong> : part
-                        )}
-                      </p>
-                    );
-                  }
-
-                  // Handle lists
-                  if (line.startsWith('- ')) {
-                    return (
-                      <li key={`li-${index}`} className="mb-2 ml-4">
-                        {line.substring(2)}
-                      </li>
-                    );
-                  }
-
-                  // Handle empty lines
-                  if (line.trim() === '') {
-                    return <br key={`br-${index}`} />;
-                  }
-
-                  // Regular paragraphs
-                  return (
-                    <p key={`p-${index}`} className="mb-4">
-                      {line}
-                    </p>
-                  );
-                })}
-              </div>
+              <div
+                className="markdown-content prose prose-lg max-w-none"
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: Markdown content is sanitized by marked library
+                dangerouslySetInnerHTML={{
+                  __html: processMarkdown(post.content),
+                }}
+              />
             </div>
           </div>
 

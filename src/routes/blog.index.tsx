@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { sampleBlogPosts } from '~/data/blogPosts';
+import { getBlogPosts } from '~/utils/blogData';
 import { seo } from '~/utils/seo';
 
 export const Route = createFileRoute('/blog/')({
@@ -15,6 +15,8 @@ export const Route = createFileRoute('/blog/')({
 });
 
 function BlogIndex() {
+  const blogPosts = getBlogPosts();
+
   return (
     <div className="min-h-screen bg-base-200" data-theme="wireframe">
       {/* Hero Section */}
@@ -24,7 +26,7 @@ function BlogIndex() {
 
       {/* Blog Posts List */}
       <div className="container mx-auto space-y-8 px-4">
-        {sampleBlogPosts.map((post) => (
+        {blogPosts.map((post) => (
           <Link
             className="transition-colors hover:text-primary"
             key={post.id}
