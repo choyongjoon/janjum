@@ -22,6 +22,7 @@ import { DefaultCatchBoundary } from '~/components/DefaultCatchBoundary.js';
 import { Footer } from '~/components/Footer';
 import { NavBar } from '~/components/NavBar';
 import { NotFound } from '~/components/NotFound.js';
+import { usePostHogIdentify } from '~/hooks/usePostHogIdentify';
 import appCss from '~/styles/app.css?url';
 import { seo } from '~/utils/seo';
 
@@ -114,6 +115,7 @@ function RootComponent() {
           client={context.convexClient}
           useAuth={useAuth}
         >
+          <PostHogUserIdentifier />
           <RootDocument>
             <Outlet />
           </RootDocument>
@@ -121,6 +123,15 @@ function RootComponent() {
       </ClerkProvider>
     </PostHogProvider>
   );
+}
+
+/**
+ * Component that handles PostHog user identification
+ * Must be inside PostHog and Clerk providers
+ */
+function PostHogUserIdentifier() {
+  usePostHogIdentify();
+  return null;
 }
 
 function RootDocument({ children }: { children: React.ReactNode }) {

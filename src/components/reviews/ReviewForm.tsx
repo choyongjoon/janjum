@@ -2,6 +2,7 @@ import { convexQuery, useConvexMutation } from '@convex-dev/react-query';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Id } from 'convex/_generated/dataModel';
 import { useEffect, useState } from 'react';
+import { usePostHogEvents } from '~/hooks/usePostHogEvents';
 import { api } from '../../../convex/_generated/api';
 import { RatingButtonGroup } from './RatingButtonGroup';
 
@@ -18,6 +19,7 @@ export function ReviewForm({
 }: ReviewFormProps) {
   const { data: currentUser } = useQuery(convexQuery(api.users.current, {}));
   const queryClient = useQueryClient();
+  const { trackReviewSubmit } = usePostHogEvents();
   const [rating, setRating] = useState<number>(0);
   const [text, setText] = useState('');
   const [images, setImages] = useState<File[]>([]);
@@ -141,6 +143,9 @@ export function ReviewForm({
         imageStorageIds:
           allImageStorageIds.length > 0 ? allImageStorageIds : undefined,
       });
+
+      // Track successful review submission
+      trackReviewSubmit(productId, rating);
     } catch {
       alert('후기 등록에 실패했습니다. 다시 시도해주세요.');
     } finally {

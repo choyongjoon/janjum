@@ -2,6 +2,7 @@ import { convexQuery } from '@convex-dev/react-query';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { type ChangeEvent, type KeyboardEventHandler, useState } from 'react';
+import { usePostHogEvents } from '~/hooks/usePostHogEvents';
 import { api } from '../../../convex/_generated/api';
 
 export function NameSearchInput({
@@ -14,6 +15,7 @@ export function NameSearchInput({
   onKeyDown: KeyboardEventHandler<HTMLInputElement>;
 }) {
   const navigate = useNavigate();
+  const { trackSearch } = usePostHogEvents();
 
   const [showSuggestions, setShowSuggestions] = useState(false);
 
@@ -26,7 +28,13 @@ export function NameSearchInput({
   );
 
   // Handle suggestion click
-  const handleSuggestionClick = (suggestion: { shortId: string }) => {
+  const handleSuggestionClick = (suggestion: {
+    shortId: string;
+    name: string;
+  }) => {
+    // Track search suggestion click
+    trackSearch(suggestion.name, 1);
+
     navigate({
       to: '/product/$shortId',
       params: { shortId: suggestion.shortId },

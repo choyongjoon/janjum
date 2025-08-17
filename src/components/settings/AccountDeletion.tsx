@@ -1,14 +1,19 @@
 import { useAuth } from '@clerk/tanstack-react-start';
 import { useRouter } from '@tanstack/react-router';
 import { useState } from 'react';
+import { usePostHogEvents } from '~/hooks/usePostHogEvents';
 import { DeleteAccountDialog } from './DeleteAccountDialog';
 
 export function AccountDeletion() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const { signOut } = useAuth();
   const router = useRouter();
+  const { trackAccountDeletion } = usePostHogEvents();
 
   const handleDeleteAccount = async () => {
+    // Track deletion confirmation
+    trackAccountDeletion('confirmed');
+
     // Sign out the user from Clerk first
     await signOut();
     // Navigate to home page
@@ -26,7 +31,10 @@ export function AccountDeletion() {
         <div className="card-actions">
           <button
             className="btn btn-error btn-outline btn-sm"
-            onClick={() => setShowDeleteDialog(true)}
+            onClick={() => {
+              trackAccountDeletion('initiated');
+              setShowDeleteDialog(true);
+            }}
             type="button"
           >
             회원탈퇴
@@ -37,7 +45,10 @@ export function AccountDeletion() {
       {/* Delete Account Dialog */}
       <DeleteAccountDialog
         isOpen={showDeleteDialog}
-        onClose={() => setShowDeleteDialog(false)}
+        onClose={() => {
+          trackAccountDeletion('cancelled');
+          setShowDeleteDialog(false);
+        }}
         onConfirm={handleDeleteAccount}
       />
     </div>
