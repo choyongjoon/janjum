@@ -58,7 +58,7 @@ const CRAWLER_CONFIG = {
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox'] as string[],
   },
-  maxItemsPerCategory: isTestMode ? maxProductsInTestMode : 20,
+  maxItemsPerCategory: isTestMode ? maxProductsInTestMode : 200,
 };
 
 // ================================================

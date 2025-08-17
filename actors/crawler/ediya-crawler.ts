@@ -32,6 +32,9 @@ const SELECTORS = {
   // Product listing selectors
   productContainers: '#menu_ul > li',
 
+  // Pagination selectors
+  loadMoreButton: ['a:has-text("더보기")'],
+
   // Product data selectors
   productData: {
     name: '.menu_tt > a > span',
@@ -58,12 +61,110 @@ const CRAWLER_CONFIG = {
   maxConcurrency: 2,
   maxRequestsPerCrawl: isTestMode ? maxRequestsInTestMode : 50,
   maxRequestRetries: 2,
-  requestHandlerTimeoutSecs: isTestMode ? 30 : 60,
+  requestHandlerTimeoutSecs: isTestMode ? 30 : 120, // Increased timeout for pagination
   launchOptions: {
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox'] as string[],
   },
 };
+
+// ================================================
+// PAGINATION FUNCTIONS
+// ================================================
+
+async function clickLoadMoreButton(page: Page): Promise<boolean> {
+  let loadMoreButton: import('playwright').Locator | null = null;
+  let usedSelector = '';
+
+  // Try to find the load more button using multiple selectors
+  for (const selector of SELECTORS.loadMoreButton) {
+    try {
+      const button = page.locator(selector);
+      const count = await button.count();
+
+      if (count > 0) {
+        // Check if the button is visible and enabled
+        const isVisible = await button.first().isVisible();
+        const isEnabled = await button.first().isEnabled();
+
+        if (isVisible && isEnabled) {
+          loadMoreButton = button.first();
+          usedSelector = selector;
+          break;
+        }
+      }
+    } catch {
+      // Continue to next selector if this one fails
+    }
+  }
+
+  if (!loadMoreButton) {
+    logger.debug('No load more button found');
+    return false;
+  }
+
+  try {
+    logger.info(`🔄 Clicking load more button: ${usedSelector}`);
+
+    // Get current product count before clicking
+    const beforeCount = await page.locator(SELECTORS.productContainers).count();
+
+    // Click the button
+    await loadMoreButton.click();
+
+    // Wait for new content to load
+    await page.waitForTimeout(1000);
+
+    // Check if new products were loaded
+    const afterCount = await page.locator(SELECTORS.productContainers).count();
+
+    if (afterCount > beforeCount) {
+      logger.info(
+        `✅ Loaded ${afterCount - beforeCount} more products (total: ${afterCount})`
+      );
+      return true;
+    }
+    logger.debug('No new products loaded after clicking load more button');
+    return false;
+  } catch (error) {
+    logger.debug(`⚠️ Failed to click load more button: ${error}`);
+    return false;
+  }
+}
+
+async function loadAllProducts(page: Page): Promise<number> {
+  let totalProducts = await page.locator(SELECTORS.productContainers).count();
+  let clickCount = 0;
+  const maxClicks = 20; // Prevent infinite loops
+
+  logger.info(`📄 Initial product count: ${totalProducts}`);
+
+  while (clickCount < maxClicks) {
+    const hasMore = await clickLoadMoreButton(page);
+
+    if (!hasMore) {
+      break;
+    }
+
+    clickCount++;
+    totalProducts = await page.locator(SELECTORS.productContainers).count();
+
+    // Small delay between clicks to be respectful
+    await page.waitForTimeout(1000);
+  }
+
+  if (clickCount >= maxClicks) {
+    logger.warn(
+      `⚠️ Reached maximum click limit (${maxClicks}). Final product count: ${totalProducts}`
+    );
+  } else {
+    logger.info(
+      `🎯 Finished loading all products. Total clicks: ${clickCount}, Final product count: ${totalProducts}`
+    );
+  }
+
+  return totalProducts;
+}
 
 // ================================================
 // DATA EXTRACTION FUNCTIONS
@@ -210,7 +311,10 @@ async function extractProductsFromPage(
 
     await waitForLoad(page);
 
-    // Find product containers
+    // Load all products by clicking "더보기" buttons
+    await loadAllProducts(page);
+
+    // Find product containers after loading all products
     const containers = await page.locator(SELECTORS.productContainers).all();
 
     if (containers.length === 0) {
@@ -221,7 +325,7 @@ async function extractProductsFromPage(
     }
 
     logger.info(
-      `🔍 Found ${containers.length} product containers in ${categoryName}`
+      `🔍 Found ${containers.length} product containers in ${categoryName} (after loading all products)`
     );
 
     // Limit products in test mode
