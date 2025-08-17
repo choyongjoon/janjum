@@ -8,6 +8,7 @@ import {
   ProfileForm,
   ProfileImageUpload,
   SettingsHeader,
+  SocialConnections,
 } from '~/components/settings';
 import { useSettingsForm } from '~/hooks/useSettingsForm';
 
@@ -64,6 +65,11 @@ function SettingsPage() {
       </ProfileForm>
 
       <AccountInfo />
+
+      {/* Social Connections */}
+      <div className="mt-8">
+        <SocialConnections />
+      </div>
 
       {/* Account Deletion - placed at the bottom */}
       <div className="mt-8">
