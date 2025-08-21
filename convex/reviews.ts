@@ -420,3 +420,39 @@ export const getRecentReviews = query({
     return reviewsWithProducts;
   },
 });
+
+export const getAllWithImages = query({
+  args: {},
+  handler: async (ctx) => {
+    const reviews = await ctx.db
+      .query('reviews')
+      .filter((q) => q.neq(q.field('imageStorageIds'), undefined))
+      .collect();
+
+    return reviews;
+  },
+});
+
+export const updateImages = mutation({
+  args: {
+    reviewId: v.id('reviews'),
+    imageStorageIds: v.array(v.id('_storage')),
+    uploadSecret: v.optional(v.string()),
+  },
+  handler: async (ctx, { reviewId, imageStorageIds, uploadSecret }) => {
+    // Verify upload secret for protected operations
+    const expectedSecret = process.env.CONVEX_UPLOAD_SECRET;
+    if (expectedSecret && uploadSecret !== expectedSecret) {
+      throw new Error('Unauthorized: Invalid upload secret');
+    }
+
+    const now = Date.now();
+
+    await ctx.db.patch(reviewId, {
+      imageStorageIds,
+      updatedAt: now,
+    });
+
+    return { success: true };
+  },
+});
