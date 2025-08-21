@@ -1,8 +1,9 @@
 import type { WebhookEvent } from '@clerk/backend';
 import { httpRouter } from 'convex/server';
+import { v } from 'convex/values';
 import { Webhook } from 'svix';
 import { internal } from './_generated/api';
-import { httpAction } from './_generated/server';
+import { httpAction, mutation, query } from './_generated/server';
 
 const http = httpRouter();
 
@@ -57,5 +58,26 @@ async function validateRequest(req: Request): Promise<WebhookEvent | null> {
     return null;
   }
 }
+
+// Additional functions for image optimization
+export const generateUploadUrl = mutation({
+  args: { uploadSecret: v.optional(v.string()) },
+  handler: async (ctx, { uploadSecret }) => {
+    // Verify upload secret for protected operations
+    const expectedSecret = process.env.CONVEX_UPLOAD_SECRET;
+    if (expectedSecret && uploadSecret !== expectedSecret) {
+      throw new Error('Unauthorized: Invalid upload secret');
+    }
+
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
+export const getStorageUrl = query({
+  args: { storageId: v.id('_storage') },
+  handler: async (ctx, { storageId }) => {
+    return await ctx.storage.getUrl(storageId);
+  },
+});
 
 export default http;
