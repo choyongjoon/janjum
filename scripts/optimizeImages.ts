@@ -50,7 +50,11 @@ class ImageOptimizer {
       this.stats.totalSizeBefore += imageBuffer.byteLength;
       this.stats.totalSizeAfter += optimizedBuffer.byteLength;
 
-      return optimizedBuffer;
+      // Convert Buffer to ArrayBuffer
+      const arrayBuffer = new ArrayBuffer(optimizedBuffer.byteLength);
+      const view = new Uint8Array(arrayBuffer);
+      view.set(optimizedBuffer);
+      return arrayBuffer;
     } catch (error) {
       logger.error('Error optimizing image:', error);
       throw error;
