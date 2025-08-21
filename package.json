@@ -10,7 +10,8 @@
     "crawl": "tsx actors/crawler/crawl.ts",
     "upload": "tsx actors/uploader/upload.ts",
     "categorize": "tsx actors/categorizer/categorize.ts",
-    "data-sync-in-local": "scripts/dataSyncInLocal.sh",
+    "optimize-images:prod": "dotenv -e .env.prod-upload -- tsx scripts/optimizeImages.ts",
+    "data-sync:prod": "scripts/dataSyncInLocal.sh",
     "test": "vitest",
     "test:e2e": "playwright test",
     "prepare": "husky"
@@ -36,6 +37,7 @@
     "posthog-js": "^1.258.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "sharp": "0.34.3",
     "svix": "^1.70.0",
     "tailwind-merge": "^2.6.0",
     "zod": "^3.24.2"

@@ -1,5 +1,5 @@
 import { v } from 'convex/values';
-import { query } from './_generated/server';
+import { mutation, query } from './_generated/server';
 
 export const list = query({
   args: {},
@@ -42,5 +42,38 @@ export const getById = query({
   args: { cafeId: v.id('cafes') },
   handler: async (ctx, { cafeId }) => {
     return await ctx.db.get(cafeId);
+  },
+});
+
+export const getAllWithImages = query({
+  args: {},
+  handler: async (ctx) => {
+    const cafes = await ctx.db
+      .query('cafes')
+      .filter((q) => q.neq(q.field('imageStorageId'), undefined))
+      .collect();
+
+    return cafes;
+  },
+});
+
+export const updateImage = mutation({
+  args: {
+    cafeId: v.id('cafes'),
+    storageId: v.id('_storage'),
+    uploadSecret: v.optional(v.string()),
+  },
+  handler: async (ctx, { cafeId, storageId, uploadSecret }) => {
+    // Verify upload secret for protected operations
+    const expectedSecret = process.env.CONVEX_UPLOAD_SECRET;
+    if (expectedSecret && uploadSecret !== expectedSecret) {
+      throw new Error('Unauthorized: Invalid upload secret');
+    }
+
+    await ctx.db.patch(cafeId, {
+      imageStorageId: storageId,
+    });
+
+    return { success: true };
   },
 });

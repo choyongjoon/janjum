@@ -291,8 +291,15 @@ export const updateImage = mutation({
   args: {
     productId: v.id('products'),
     storageId: v.id('_storage'),
+    uploadSecret: v.optional(v.string()),
   },
-  handler: async (ctx, { productId, storageId }) => {
+  handler: async (ctx, { productId, storageId, uploadSecret }) => {
+    // Verify upload secret for protected operations
+    const expectedSecret = process.env.CONVEX_UPLOAD_SECRET;
+    if (expectedSecret && uploadSecret !== expectedSecret) {
+      throw new Error('Unauthorized: Invalid upload secret');
+    }
+
     const now = Date.now();
 
     await ctx.db.patch(productId, {
@@ -301,6 +308,18 @@ export const updateImage = mutation({
     });
 
     return { success: true };
+  },
+});
+
+export const getAllWithImages = query({
+  args: {},
+  handler: async (ctx) => {
+    const products = await ctx.db
+      .query('products')
+      .filter((q) => q.neq(q.field('imageStorageId'), undefined))
+      .collect();
+
+    return products;
   },
 });
 

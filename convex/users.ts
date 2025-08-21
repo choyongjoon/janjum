@@ -195,6 +195,39 @@ export const generateUploadUrl = mutation({
   },
 });
 
+export const getAllWithImages = query({
+  args: {},
+  handler: async (ctx) => {
+    const users = await ctx.db
+      .query('users')
+      .filter((q) => q.neq(q.field('imageStorageId'), undefined))
+      .collect();
+
+    return users;
+  },
+});
+
+export const updateImage = mutation({
+  args: {
+    userId: v.id('users'),
+    storageId: v.id('_storage'),
+    uploadSecret: v.optional(v.string()),
+  },
+  handler: async (ctx, { userId, storageId, uploadSecret }) => {
+    // Verify upload secret for protected operations
+    const expectedSecret = process.env.CONVEX_UPLOAD_SECRET;
+    if (expectedSecret && uploadSecret !== expectedSecret) {
+      throw new Error('Unauthorized: Invalid upload secret');
+    }
+
+    await ctx.db.patch(userId, {
+      imageStorageId: storageId,
+    });
+
+    return { success: true };
+  },
+});
+
 export const deleteAccount = mutation({
   args: {},
   handler: async (ctx) => {
