@@ -8,11 +8,32 @@ export default defineConfig({
   server: {
     port: 3000,
   },
+  build: {
+    // Disable sourcemaps in production for smaller bundles
+    sourcemap: process.env.NODE_ENV !== 'production',
+
+    // Simple chunk splitting for better caching
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('convex')) {
+              return 'vendor-convex';
+            }
+            return 'vendor';
+          }
+        },
+      },
+    },
+  },
   plugins: [
     tsConfigPaths({
       projects: ['./tsconfig.json'],
     }),
-    tanstackStart({ customViteReactPlugin: true, target: 'netlify' }),
+    tanstackStart({
+      customViteReactPlugin: true,
+      target: 'netlify',
+    }),
     viteReact(),
     tailwindcss(),
   ],
