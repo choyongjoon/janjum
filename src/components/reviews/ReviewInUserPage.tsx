@@ -6,14 +6,13 @@ import type { Doc, Id } from 'convex/_generated/dataModel';
 
 import { RatingText } from './RatingText';
 
-interface MyReview extends Doc<'reviews'> {
+export interface Review extends Doc<'reviews'> {
   product: Doc<'products'> | null;
   ratingText: string | undefined;
   imageUrls: string[] | undefined;
-  text?: string;
 }
 
-export function MyReview({ review }: { review: MyReview }) {
+export function ReviewInUserPage({ review }: { review: Review }) {
   const { data: cafe } = useSuspenseQuery(
     convexQuery(api.cafes.getById, {
       cafeId: review.product?.cafeId as Id<'cafes'>,

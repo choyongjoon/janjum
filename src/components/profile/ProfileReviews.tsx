@@ -1,10 +1,8 @@
 import { Link } from '@tanstack/react-router';
-import { MyReview } from '~/components/reviews/MyReview';
-
-interface Review {
-  _id: string;
-  [key: string]: unknown;
-}
+import {
+  type Review,
+  ReviewInUserPage,
+} from '~/components/reviews/ReviewInUserPage';
 
 interface ProfileReviewsProps {
   userReviews: Review[] | undefined;
@@ -43,7 +41,7 @@ export function ProfileReviews({
       return (
         <div className="space-y-4">
           {userReviews.map((review) => (
-            <MyReview key={review._id} review={review} />
+            <ReviewInUserPage key={review._id} review={review} />
           ))}
         </div>
       );

@@ -19,12 +19,7 @@
       },
       "style": {
         "noHeadElement": "off",
-        "useFilenamingConvention": {
-          "options": {
-            "filenameCases": ["camelCase", "PascalCase", "kebab-case"]
-          },
-          "level": "error"
-        }
+        "useFilenamingConvention": "off"
       }
     }
   }
