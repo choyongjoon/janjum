@@ -9,8 +9,6 @@ function getManualChunks(id: string) {
   if (id.includes('node_modules')) {
     return getVendorChunk(id);
   }
-
-  return getComponentChunk(id);
 }
 
 function getVendorChunk(id: string) {
@@ -32,18 +30,6 @@ function getVendorChunk(id: string) {
   return 'vendor';
 }
 
-function getComponentChunk(id: string) {
-  if (id.includes('/components/auth/')) {
-    return 'components-auth';
-  }
-  if (id.includes('/components/reviews/')) {
-    return 'components-reviews';
-  }
-  if (id.includes('/components/settings/')) {
-    return 'components-settings';
-  }
-}
-
 export default defineConfig({
   server: {
     port: 3000,
@@ -51,16 +37,6 @@ export default defineConfig({
   build: {
     // Disable sourcemaps in production for smaller bundles
     sourcemap: process.env.NODE_ENV !== 'production',
-
-    // Optimize bundle size
-    target: 'es2020',
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true,
-      },
-    },
 
     // Advanced chunk splitting for better caching and loading
     rollupOptions: {
