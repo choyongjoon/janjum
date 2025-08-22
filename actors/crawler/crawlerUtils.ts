@@ -15,6 +15,10 @@ export interface Product {
   externalUrl: string;
 }
 
+export const waitFor = async (ms: number) => {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+};
+
 export const waitForLoad = async (page: Page, timeout = 30_000) => {
   try {
     await page.waitForLoadState('domcontentloaded', { timeout });
