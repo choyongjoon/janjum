@@ -41,7 +41,7 @@ export function ProfileHeader({
             <p className="text-base-content/60 text-sm">@{user.handle}</p>
           </div>
           {isCurrentUser && (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Link className="btn btn-outline btn-sm" to="/settings">
                 프로필 수정
               </Link>
