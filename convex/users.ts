@@ -97,6 +97,27 @@ export const getById = query({
   },
 });
 
+export const getByHandle = query({
+  args: { handle: v.string() },
+  handler: async (ctx, { handle }) => {
+    const user = await ctx.db
+      .query('users')
+      .withIndex('byHandle', (q) => q.eq('handle', handle))
+      .unique();
+
+    if (!user) {
+      return null;
+    }
+
+    return {
+      ...user,
+      imageUrl: user.imageStorageId
+        ? (await ctx.storage.getUrl(user.imageStorageId)) || undefined
+        : undefined,
+    };
+  },
+});
+
 // Internal mutation to update user profile in Convex database
 export const updateUserProfile = internalMutation({
   args: {
