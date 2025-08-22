@@ -17,6 +17,7 @@ import { Route as OauthCallbackRouteImport } from './routes/oauth-callback'
 import { Route as BlogRouteImport } from './routes/blog'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BlogIndexRouteImport } from './routes/blog.index'
+import { Route as UserHandleRouteImport } from './routes/user.$handle'
 import { Route as ProductShortIdRouteImport } from './routes/product.$shortId'
 import { Route as CafeSlugRouteImport } from './routes/cafe.$slug'
 import { Route as BlogPostIdRouteImport } from './routes/blog.$postId'
@@ -61,6 +62,11 @@ const BlogIndexRoute = BlogIndexRouteImport.update({
   path: '/',
   getParentRoute: () => BlogRoute,
 } as any)
+const UserHandleRoute = UserHandleRouteImport.update({
+  id: '/user/$handle',
+  path: '/user/$handle',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProductShortIdRoute = ProductShortIdRouteImport.update({
   id: '/product/$shortId',
   path: '/product/$shortId',
@@ -88,6 +94,7 @@ export interface FileRoutesByFullPath {
   '/blog/$postId': typeof BlogPostIdRoute
   '/cafe/$slug': typeof CafeSlugRoute
   '/product/$shortId': typeof ProductShortIdRoute
+  '/user/$handle': typeof UserHandleRoute
   '/blog/': typeof BlogIndexRoute
 }
 export interface FileRoutesByTo {
@@ -100,6 +107,7 @@ export interface FileRoutesByTo {
   '/blog/$postId': typeof BlogPostIdRoute
   '/cafe/$slug': typeof CafeSlugRoute
   '/product/$shortId': typeof ProductShortIdRoute
+  '/user/$handle': typeof UserHandleRoute
   '/blog': typeof BlogIndexRoute
 }
 export interface FileRoutesById {
@@ -114,6 +122,7 @@ export interface FileRoutesById {
   '/blog/$postId': typeof BlogPostIdRoute
   '/cafe/$slug': typeof CafeSlugRoute
   '/product/$shortId': typeof ProductShortIdRoute
+  '/user/$handle': typeof UserHandleRoute
   '/blog/': typeof BlogIndexRoute
 }
 export interface FileRouteTypes {
@@ -129,6 +138,7 @@ export interface FileRouteTypes {
     | '/blog/$postId'
     | '/cafe/$slug'
     | '/product/$shortId'
+    | '/user/$handle'
     | '/blog/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -141,6 +151,7 @@ export interface FileRouteTypes {
     | '/blog/$postId'
     | '/cafe/$slug'
     | '/product/$shortId'
+    | '/user/$handle'
     | '/blog'
   id:
     | '__root__'
@@ -154,6 +165,7 @@ export interface FileRouteTypes {
     | '/blog/$postId'
     | '/cafe/$slug'
     | '/product/$shortId'
+    | '/user/$handle'
     | '/blog/'
   fileRoutesById: FileRoutesById
 }
@@ -167,6 +179,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   CafeSlugRoute: typeof CafeSlugRoute
   ProductShortIdRoute: typeof ProductShortIdRoute
+  UserHandleRoute: typeof UserHandleRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -227,6 +240,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BlogIndexRouteImport
       parentRoute: typeof BlogRoute
     }
+    '/user/$handle': {
+      id: '/user/$handle'
+      path: '/user/$handle'
+      fullPath: '/user/$handle'
+      preLoaderRoute: typeof UserHandleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/product/$shortId': {
       id: '/product/$shortId'
       path: '/product/$shortId'
@@ -273,6 +293,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   CafeSlugRoute: CafeSlugRoute,
   ProductShortIdRoute: ProductShortIdRoute,
+  UserHandleRoute: UserHandleRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
