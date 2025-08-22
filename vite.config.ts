@@ -32,7 +32,7 @@ export default defineConfig({
     }),
     tanstackStart({
       customViteReactPlugin: true,
-      target: 'netlify',
+      target: 'vercel',
     }),
     viteReact(),
     tailwindcss(),
