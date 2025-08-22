@@ -18,12 +18,12 @@ import type {
 const categorizer = new ProductCategorizer();
 
 // Parse command line arguments
-function parseArgs(): { options: CategorizeOptions; filePath?: string } {
+function parseArgs(): { options: CategorizeOptions; cafeSlugs: string[] } {
   const args = process.argv.slice(2);
   const options: CategorizeOptions = {};
-  let filePath: string | undefined;
+  const cafeSlugs: string[] = [];
 
-  // Parse flags
+  // Parse flags and cafe slugs
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
 
@@ -48,21 +48,31 @@ function parseArgs(): { options: CategorizeOptions; filePath?: string } {
       case '--force':
         options.force = true;
         break;
-      case '--file':
-        filePath = args[i + 1];
-        i++; // Skip next argument
-        break;
       case '--help':
         printHelp();
         process.exit(0);
         break;
       default:
-        // Ignore unknown arguments - no need to warn since we removed cafe support
+        // Check if it's a valid cafe slug
+        if (arg in AVAILABLE_CAFES) {
+          cafeSlugs.push(arg);
+        } else if (!arg.startsWith('--')) {
+          logger.error(`Invalid cafe slug: ${arg}`);
+          logger.info(
+            `Available cafes: ${Object.keys(AVAILABLE_CAFES).join(', ')}`
+          );
+          process.exit(1);
+        }
         break;
     }
   }
 
-  return { options, filePath };
+  // If no cafes specified, use all cafes
+  if (cafeSlugs.length === 0) {
+    cafeSlugs.push(...Object.keys(AVAILABLE_CAFES));
+  }
+
+  return { options, cafeSlugs };
 }
 
 // Print help information
@@ -72,15 +82,20 @@ function printHelp(): void {
 
 Usage:
   pnpm categorize                           # Process most recent JSON file for each cafe
-  pnpm categorize --file <path>             # Process specific JSON file
+  pnpm categorize starbucks                 # Process only Starbucks categorization
+  pnpm categorize starbucks compose         # Process Starbucks and Compose categorizations
+
+Available Cafes:
+${Object.entries(AVAILABLE_CAFES)
+  .map(([key, cafe]) => `  ${key.padEnd(10)} - ${cafe.name}`)
+  .join('\n')}
 
 Description:
   Categorizes products from crawler JSON files. Runs between crawl and upload commands.
   Assigns Korean categories: 커피, 차, 블렌디드, 스무디, 주스, 에이드, 그 외
-  Can process either the most recent crawler files for each cafe or a specific file.
+  Processes the most recent crawler files for specified cafes.
 
 Options:
-  --file <path>          Process a specific JSON file instead of auto-discovery
   --dry-run              Preview changes without updating files
   --interactive          Ask for human input on uncertain categorizations
   --verbose              Show detailed output during categorization
@@ -91,7 +106,7 @@ Options:
 
 Examples:
   pnpm categorize                           # Process most recent files for all cafes
-  pnpm categorize --file test-products.json # Process specific file
+  pnpm categorize starbucks                 # Process only Starbucks
   pnpm categorize --dry-run --verbose       # Preview categorization with detailed output
   pnpm categorize --interactive             # Interactive mode for learning
   pnpm categorize --confidence low          # Only process low confidence items
@@ -127,8 +142,8 @@ function findLatestFileForCafe(cafeSlug: string): string | null {
   return files.length > 0 ? files[0].path : null;
 }
 
-// Find the most recent file for each available cafe
-function findRecentCrawlerFiles(): string[] {
+// Find the most recent files for specified cafes
+function findRecentCrawlerFiles(cafeSlugs: string[]): string[] {
   const outputDir = path.join(
     process.cwd(),
     'actors',
@@ -143,16 +158,14 @@ function findRecentCrawlerFiles(): string[] {
 
   try {
     const recentFiles: string[] = [];
-    const cafeKeys = Object.keys(
-      AVAILABLE_CAFES
-    ) as (keyof typeof AVAILABLE_CAFES)[];
 
-    for (const cafeKey of cafeKeys) {
-      const cafe = AVAILABLE_CAFES[cafeKey];
-      const latestFile = findLatestFileForCafe(cafe.slug);
+    for (const cafeSlug of cafeSlugs) {
+      const latestFile = findLatestFileForCafe(cafeSlug);
 
       if (latestFile) {
         recentFiles.push(latestFile);
+      } else {
+        logger.warn(`No crawler output found for cafe: ${cafeSlug}`);
       }
     }
 
@@ -278,7 +291,7 @@ async function processProduct(
       stats
     );
     updateCategoryStats(result, stats);
-    await handleCategoryUpdate(product, finalCategory, result, options, stats);
+    handleCategoryUpdate(product, finalCategory, result, options, stats);
   } catch (error) {
     stats.errors++;
     logger.error(`Error processing product "${product.name}":`, error);
@@ -392,7 +405,7 @@ async function processJsonProducts(
 ): Promise<ProductForCategorize[]> {
   logger.info(`📁 Processing products from JSON file: ${filePath}`);
 
-  const products = await getProductsFromJson(filePath, options.limit);
+  const products = getProductsFromJson(filePath, options.limit);
   logger.info(`📦 Found ${products.length} products`);
 
   for (const product of products) {
@@ -455,7 +468,7 @@ function printSummary(
 // Main categorization function
 async function categorizeProducts(
   options: CategorizeOptions,
-  specifiedFilePath?: string
+  cafeSlugs: string[]
 ): Promise<void> {
   const stats: CategorizeStats = {
     processed: 0,
@@ -469,28 +482,15 @@ async function categorizeProducts(
   const startTime = Date.now();
 
   try {
-    let filesToProcess: string[] = [];
+    // Process recent crawler JSON files for specified cafes
+    logger.info(
+      `🤖 Processing most recent crawler files for cafes: ${cafeSlugs.join(', ')}`
+    );
+    const filesToProcess = findRecentCrawlerFiles(cafeSlugs);
 
-    if (specifiedFilePath) {
-      // Process specific file
-      const resolvedPath = path.resolve(specifiedFilePath);
-      if (!fs.existsSync(resolvedPath)) {
-        throw new Error(`Specified file does not exist: ${resolvedPath}`);
-      }
-      filesToProcess = [resolvedPath];
-      logger.info(
-        `📁 Processing specified file: ${path.basename(resolvedPath)}`
-      );
-    } else {
-      // Process all recent crawler JSON files (most recent per cafe)
-      logger.info('🤖 Processing most recent crawler files for each cafe');
-      const recentFiles = findRecentCrawlerFiles();
-
-      if (recentFiles.length === 0) {
-        logger.warn('⚠️  No recent crawler files found. Run crawlers first.');
-        return;
-      }
-      filesToProcess = recentFiles;
+    if (filesToProcess.length === 0) {
+      logger.warn('⚠️  No recent crawler files found. Run crawlers first.');
+      return;
     }
 
     // Process each file
@@ -508,7 +508,7 @@ async function categorizeProducts(
 
         // Always write back to file unless dry-run
         if (!options.dryRun) {
-          await writeProductsToJson(filePath, processedProducts);
+          writeProductsToJson(filePath, processedProducts);
         }
       } catch (error) {
         logger.error(
@@ -529,15 +529,13 @@ async function categorizeProducts(
 // Main execution function
 async function main() {
   try {
-    const { options, filePath } = parseArgs();
+    const { options, cafeSlugs } = parseArgs();
 
     logger.info('🏷️  Product Categorizer Starting');
-
-    if (filePath) {
-      logger.info(`📁 Will process specific file: ${path.basename(filePath)}`);
-    } else {
-      logger.info('🤖 Will process most recent crawler file for each cafe');
-    }
+    logger.info(`🏪 Will process cafes: ${cafeSlugs.join(', ')}`);
+    logger.info(
+      '🤖 Will process most recent crawler file for each specified cafe'
+    );
 
     logger.info(
       '💾 Categories will be written back to JSON files automatically'
@@ -557,7 +555,7 @@ async function main() {
 
     logger.info('='.repeat(50));
 
-    await categorizeProducts(options, filePath);
+    await categorizeProducts(options, cafeSlugs);
 
     logger.info('🎉 Categorization completed successfully!');
   } catch (error) {
