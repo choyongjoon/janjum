@@ -4,6 +4,7 @@ import { logger } from '../../shared/logger';
 import {
   type Product,
   takeDebugScreenshot,
+  waitFor,
   waitForLoad,
   writeProductsToJson,
 } from './crawlerUtils';
@@ -82,7 +83,7 @@ async function extractCategoriesFromMenu(
 
     // Click on "커피/음료" to expand the category
     await page.getByText(SELECTORS.coffeeBeverage, { exact: true }).click();
-    await waitForLoad(page);
+    await waitFor(1000);
 
     // Get category items
     const categoryElements = await page.locator(SELECTORS.categoryItems).all();
