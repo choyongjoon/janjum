@@ -137,8 +137,12 @@ function CafePage() {
                   </div>
                 </div>
               ))
-            : filteredProducts?.map((product) => (
-                <ProductCard key={product._id} product={product} />
+            : filteredProducts?.map((product, index) => (
+                <ProductCard
+                  key={product._id}
+                  priority={index < 8}
+                  product={product}
+                />
               ))}
         </div>
 

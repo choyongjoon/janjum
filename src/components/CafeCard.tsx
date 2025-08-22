@@ -16,7 +16,7 @@ export function CafeCard({
         <img
           alt={cafe.name}
           className="aspect-square w-full object-cover"
-          loading="lazy"
+          loading="eager"
           src={cafe.imageUrl}
         />
       </figure>
