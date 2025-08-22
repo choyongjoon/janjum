@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import type { Id } from 'convex/_generated/dataModel';
 import { api } from '../../../convex/_generated/api';
+import { showToast } from '../../utils/toast';
 import { RatingText } from './RatingText';
 
 function useUserProfile(userId: string) {
@@ -159,50 +160,86 @@ export function ReviewCard({
           </div>
 
           {/* Action Menu */}
-          {isOwner && (
-            <div className="dropdown dropdown-end">
-              <button
-                className="btn btn-ghost btn-circle btn-xs"
-                tabIndex={0}
-                type="button"
+          <div className="flex items-center gap-2">
+            {/* Share Button */}
+            <button
+              className="btn btn-ghost btn-circle btn-xs"
+              onClick={() => {
+                const reviewUrl = `${window.location.origin}/review/${review._id}`;
+                navigator.clipboard
+                  .writeText(reviewUrl)
+                  .then(() => {
+                    showToast('후기 링크가 복사되었습니다!', 'success');
+                  })
+                  .catch(() => {
+                    showToast('링크 복사에 실패했습니다.', 'error');
+                  });
+              }}
+              title="후기 링크 복사"
+              type="button"
+            >
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+                <title>Share review</title>
+                <path
+                  d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                />
+              </svg>
+            </button>
+
+            {/* Owner Action Menu */}
+            {isOwner && (
+              <div className="dropdown dropdown-end">
+                <button
+                  className="btn btn-ghost btn-circle btn-xs"
+                  tabIndex={0}
+                  type="button"
                 >
-                  <title>Menu options</title>
-                  <path
-                    d="M12 5v.01M12 12v.01M12 19v.01"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                  />
-                </svg>
-              </button>
-              <ul className="dropdown-content menu z-[1] w-32 rounded-box bg-base-100 p-2 shadow">
-                {onEdit && (
-                  <li>
-                    <button onClick={onEdit} type="button">
-                      수정
-                    </button>
-                  </li>
-                )}
-                {onDelete && (
-                  <li>
-                    <button
-                      className="text-error"
-                      onClick={onDelete}
-                      type="button"
-                    >
-                      삭제
-                    </button>
-                  </li>
-                )}
-              </ul>
-            </div>
-          )}
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <title>Menu options</title>
+                    <path
+                      d="M12 5v.01M12 12v.01M12 19v.01"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                    />
+                  </svg>
+                </button>
+                <ul className="dropdown-content menu z-[1] w-32 rounded-box bg-base-100 p-2 shadow">
+                  {onEdit && (
+                    <li>
+                      <button onClick={onEdit} type="button">
+                        수정
+                      </button>
+                    </li>
+                  )}
+                  {onDelete && (
+                    <li>
+                      <button
+                        className="text-error"
+                        onClick={onDelete}
+                        type="button"
+                      >
+                        삭제
+                      </button>
+                    </li>
+                  )}
+                </ul>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Review Text with left margin matching profile image */}
@@ -231,11 +268,17 @@ export function ReviewCard({
 
         {/* Date */}
         <div className="mt-3 text-right text-base-content/60 text-sm">
-          {wasEdited ? (
-            <>{updatedDate.toLocaleDateString('ko-KR')} (수정됨)</>
-          ) : (
-            createdDate.toLocaleDateString('ko-KR')
-          )}
+          <Link
+            className="link link-hover"
+            params={{ reviewId: review._id }}
+            to="/review/$reviewId"
+          >
+            {wasEdited ? (
+              <>{updatedDate.toLocaleDateString('ko-KR')} (수정됨)</>
+            ) : (
+              createdDate.toLocaleDateString('ko-KR')
+            )}
+          </Link>
         </div>
       </div>
     </div>

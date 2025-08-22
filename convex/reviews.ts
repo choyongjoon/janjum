@@ -421,6 +421,48 @@ export const getRecentReviews = query({
   },
 });
 
+/**
+ * Get individual review by ID with product context
+ */
+export const getById = query({
+  args: { reviewId: v.id('reviews') },
+  handler: async (ctx, { reviewId }) => {
+    const review = await ctx.db.get(reviewId);
+
+    if (!review || review.isVisible === false) {
+      return null;
+    }
+
+    // Get product information
+    const product = await ctx.db.get(review.productId);
+    if (!product) {
+      return null;
+    }
+
+    // Get cafe information
+    const cafe = await ctx.db.get(product.cafeId);
+
+    // Add image URLs
+    let imageUrls: string[] = [];
+    if (review.imageStorageIds) {
+      imageUrls = await Promise.all(
+        review.imageStorageIds.map(async (storageId) => {
+          return (await ctx.storage.getUrl(storageId)) || '';
+        })
+      );
+    }
+
+    return {
+      ...review,
+      product,
+      cafe,
+      imageUrls,
+      ratingText:
+        RATING_TEXTS[review.rating as keyof typeof RATING_TEXTS] || '',
+    };
+  },
+});
+
 export const getAllWithImages = query({
   args: {},
   handler: async (ctx) => {
