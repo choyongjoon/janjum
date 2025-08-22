@@ -8,11 +8,13 @@ import { RatingSummary } from '../components/RatingSummary';
 
 export function ProductCard({
   product,
+  priority = false,
 }: {
   product: Doc<'products'> & {
     cafeName?: string;
     imageUrl?: string;
   };
+  priority?: boolean;
 }) {
   const { data: reviewStats } = useQuery({
     ...convexQuery(api.reviews.getProductStats, { productId: product._id }),
@@ -44,7 +46,7 @@ export function ProductCard({
         <img
           alt={product.name}
           className="aspect-square w-full object-cover"
-          loading="lazy"
+          loading={priority ? 'eager' : 'lazy'}
           src={product.imageUrl || product.externalImageUrl}
         />
       </figure>
