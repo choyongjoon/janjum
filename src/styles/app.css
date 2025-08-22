@@ -1,5 +1,5 @@
-@import url("https://fonts.googleapis.com/css2?family=Sunflower:wght@300&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@100..900&family=Sunflower:wght@300&display=swap");
+/* Optimized single font import combining all fonts with display=swap for performance */
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Sunflower:wght@300&display=swap");
 
 @import "tailwindcss";
 @plugin "daisyui" {
