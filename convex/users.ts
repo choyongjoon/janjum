@@ -93,7 +93,17 @@ async function userByExternalId(ctx: QueryCtx, externalId: string) {
 export const getById = query({
   args: { userId: v.id('users') },
   handler: async (ctx, { userId }) => {
-    return await ctx.db.get(userId);
+    const user = await ctx.db.get(userId);
+    if (!user) {
+      return null;
+    }
+
+    return {
+      ...user,
+      imageUrl: user.imageStorageId
+        ? (await ctx.storage.getUrl(user.imageStorageId)) || undefined
+        : undefined,
+    };
   },
 });
 

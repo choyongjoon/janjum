@@ -1,5 +1,6 @@
 import { convexQuery } from '@convex-dev/react-query';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import type { Id } from 'convex/_generated/dataModel';
 import { api } from '../../../convex/_generated/api';
 import { RatingText } from './RatingText';
@@ -12,10 +13,10 @@ function useUserProfile(userId: string) {
   });
 
   const displayName = fetchedUser?.name || '익명 사용자';
-  // TODO
-  const imageUrl = undefined;
+  const handle = fetchedUser?.handle;
+  const imageUrl = fetchedUser?.imageUrl;
 
-  return { displayName, imageUrl };
+  return { displayName, handle, imageUrl };
 }
 
 function ReviewImageModal({
@@ -82,7 +83,7 @@ export function ReviewCard({
   onEdit,
   onDelete,
 }: ReviewCardProps) {
-  const { displayName, imageUrl } = useUserProfile(review.userId);
+  const { displayName, handle, imageUrl } = useUserProfile(review.userId);
 
   const isOwner = currentUserId === review.userId;
   const createdDate = new Date(review.createdAt);
@@ -97,25 +98,54 @@ export function ReviewCard({
           <div className="flex items-start gap-3">
             {/* Profile Image */}
             <div className="avatar">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                {imageUrl && (
-                  <img
-                    alt={displayName}
-                    className="h-full w-full rounded-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
-                    src={imageUrl}
-                  />
-                )}
-              </div>
+              {handle ? (
+                <Link
+                  className="flex h-10 w-10 items-center justify-center rounded-full border border-neutral-content border-solid transition-opacity hover:opacity-80"
+                  params={{ handle }}
+                  to="/user/$handle"
+                >
+                  {imageUrl && (
+                    <img
+                      alt={displayName}
+                      className="h-full w-full rounded-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                      src={imageUrl}
+                    />
+                  )}
+                </Link>
+              ) : (
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                  {imageUrl && (
+                    <img
+                      alt={displayName}
+                      className="h-full w-full rounded-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                      src={imageUrl}
+                    />
+                  )}
+                </div>
+              )}
             </div>
 
             {/* User Info Column */}
             <div className="flex-1">
               {/* User Name and Edit Status */}
               <div className="mb-1 flex items-center gap-2">
-                <span className="font-medium text-sm">{displayName}</span>
+                {handle ? (
+                  <Link
+                    className="hover:link font-medium text-sm"
+                    params={{ handle }}
+                    to="/user/$handle"
+                  >
+                    {displayName}
+                  </Link>
+                ) : (
+                  <span className="font-medium text-sm">{displayName}</span>
+                )}
               </div>
 
               {/* Rating Label */}
