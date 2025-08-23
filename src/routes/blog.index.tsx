@@ -7,7 +7,9 @@ export const Route = createFileRoute('/blog/')({
     meta: [
       ...seo({
         title: '블로그 | 잔점',
-        description: '잔점 블로그',
+        description: '카페 음료와 잔점에 관한 이야기를 담은 블로그입니다.',
+        image: '/android-chrome-512x512.png',
+        keywords: '잔점 블로그, 카페, 음료, 후기, 커피',
       }),
     ],
   }),

@@ -25,8 +25,9 @@ export const Route = createFileRoute('/cafe/$slug')({
   head: ({ loaderData }) => ({
     meta: [
       ...seo({
-        title: `잔점 | ${loaderData?.cafe?.name || '카페'}`,
+        title: `${loaderData?.cafe?.name || '카페'} | 잔점`,
         description: `${loaderData?.cafe?.name || '카페'} 음료 정보를 확인하세요.`,
+        image: '/android-chrome-512x512.png',
       }),
     ],
   }),

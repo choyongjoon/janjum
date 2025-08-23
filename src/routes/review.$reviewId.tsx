@@ -4,6 +4,7 @@ import { createFileRoute, Link, redirect } from '@tanstack/react-router';
 import type { Id } from 'convex/_generated/dataModel';
 import { api } from '../../convex/_generated/api';
 import { ReviewCard } from '../components/reviews/ReviewCard';
+import { seo } from '../utils/seo';
 
 export const Route = createFileRoute('/review/$reviewId')({
   component: ReviewPage,
@@ -23,6 +24,19 @@ export const Route = createFileRoute('/review/$reviewId')({
 
     return review;
   },
+  head: ({ loaderData }) => ({
+    meta: [
+      ...seo({
+        title: `${loaderData?.user?.name || '익명 사용자'}님의 후기 | 잔점`,
+        description:
+          loaderData?.text ||
+          `${loaderData?.product?.name || '상품'}에 대한 후기입니다.`,
+        image:
+          loaderData?.product?.externalImageUrl ||
+          '/android-chrome-512x512.png',
+      }),
+    ],
+  }),
 });
 
 function ReviewPage() {

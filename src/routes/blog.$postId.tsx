@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { marked } from 'marked';
 import { getBlogPost } from '~/utils/blogData';
+import { seo } from '~/utils/seo';
 
 // Configure marked options with post-processing
 const processMarkdown = (content: string) => {
@@ -23,6 +24,20 @@ const processMarkdown = (content: string) => {
 
 export const Route = createFileRoute('/blog/$postId')({
   component: BlogPost,
+  loader: (opts) => {
+    const post = getBlogPost(opts.params.postId);
+    return { post };
+  },
+  head: ({ loaderData }) => ({
+    meta: [
+      ...seo({
+        title: `${loaderData?.post?.title || '블로그 포스트'} | 잔점`,
+        description: loaderData?.post?.excerpt || '잔점 블로그 포스트입니다.',
+        image: '/android-chrome-512x512.png',
+        keywords: '잔점 블로그, 카페, 음료',
+      }),
+    ],
+  }),
 });
 
 function BlogPost() {
