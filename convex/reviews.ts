@@ -442,6 +442,12 @@ export const getById = query({
     // Get cafe information
     const cafe = await ctx.db.get(product.cafeId);
 
+    // Get user information
+    const user = await ctx.db
+      .query('users')
+      .withIndex('byExternalId', (q) => q.eq('externalId', review.userId))
+      .unique();
+
     // Add image URLs
     let imageUrls: string[] = [];
     if (review.imageStorageIds) {
@@ -456,6 +462,7 @@ export const getById = query({
       ...review,
       product,
       cafe,
+      user,
       imageUrls,
       ratingText:
         RATING_TEXTS[review.rating as keyof typeof RATING_TEXTS] || '',

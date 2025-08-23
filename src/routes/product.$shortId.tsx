@@ -8,6 +8,7 @@ import { BackLink } from '../components/BackLink';
 import { ExternalLinkIcon } from '../components/icons';
 import { ProductCard } from '../components/ProductCard';
 import { ReviewSection } from '../components/reviews/ReviewSection';
+import { seo } from '../utils/seo';
 
 export const Route = createFileRoute('/product/$shortId')({
   component: ProductPage,
@@ -22,7 +23,21 @@ export const Route = createFileRoute('/product/$shortId')({
         cafeId: product?.cafeId as Id<'cafes'>,
       })
     );
+    return { product };
   },
+  head: ({ loaderData }) => ({
+    meta: [
+      ...seo({
+        title: `${loaderData?.product?.name || '상품'} | 잔점`,
+        description:
+          loaderData?.product?.description ||
+          `${loaderData?.product?.name || '상품'} 정보를 확인하세요.`,
+        image:
+          loaderData?.product?.externalImageUrl ||
+          '/android-chrome-512x512.png',
+      }),
+    ],
+  }),
 });
 
 function ProductPage() {
