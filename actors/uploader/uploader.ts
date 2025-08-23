@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ConvexClient } from 'convex/browser';
 import dotenv from 'dotenv';
+import sharp from 'sharp';
 import { api } from '../../convex/_generated/api';
 import { logger } from '../../shared/logger';
 
@@ -17,6 +18,14 @@ interface UploadOptions {
   dryRun?: boolean;
   verbose?: boolean;
   downloadImages?: boolean;
+  optimizeImages?: boolean;
+}
+
+interface ProductData {
+  name?: string;
+  imageUrl?: string;
+  imageData?: string;
+  [key: string]: string | number | boolean | null | undefined;
 }
 
 interface UploadResult {
@@ -59,6 +68,7 @@ class ProductUploader {
       dryRun = false,
       verbose = false,
       downloadImages = false,
+      optimizeImages = false,
     } = options;
 
     const filePath = this.resolveFilePath(file);
@@ -75,7 +85,8 @@ class ProductUploader {
         products,
         cafeSlug,
         dryRun,
-        downloadImages
+        downloadImages,
+        optimizeImages
       );
       this.handleUploadResult(result, verbose, dryRun);
       return result;
@@ -98,9 +109,12 @@ class ProductUploader {
     return filePath;
   }
 
-  private readAndValidateFile(filePath: string, _verbose: boolean): unknown[] {
+  private readAndValidateFile(
+    filePath: string,
+    _verbose: boolean
+  ): ProductData[] {
     const fileContent = fs.readFileSync(filePath, 'utf-8');
-    let products: unknown[];
+    let products: ProductData[];
 
     try {
       products = JSON.parse(fileContent);
@@ -126,23 +140,195 @@ class ProductUploader {
   }
 
   private async performUpload(
-    products: unknown[],
+    products: ProductData[],
     cafeSlug: string,
     dryRun: boolean,
-    downloadImages: boolean
+    downloadImages: boolean,
+    optimizeImages: boolean
   ): Promise<UploadResult> {
     const uploadSecret = process.env.CONVEX_UPLOAD_SECRET;
     if (!uploadSecret) {
       throw new Error('CONVEX_UPLOAD_SECRET environment variable is required');
     }
 
+    // If image optimization is enabled, preprocess the products
+    let processedProducts = products;
+    if (optimizeImages && downloadImages) {
+      logger.info(
+        'Image optimization enabled - processing images before upload...'
+      );
+      processedProducts = await this.optimizeProductImages(products);
+    }
+
     return await this.client.mutation(api.dataUploader.uploadProductsFromJson, {
-      products,
+      products: processedProducts,
       cafeSlug,
       dryRun,
       downloadImages,
       uploadSecret,
     });
+  }
+
+  /**
+   * Optimize images in product data before upload
+   * Downloads images, optimizes them using Sharp (same approach as imageOptimizer), and returns base64 data
+   */
+  private async optimizeProductImages(
+    products: ProductData[]
+  ): Promise<ProductData[]> {
+    const optimizedProducts: ProductData[] = [];
+    const stats = { optimizedCount: 0, totalSizeBefore: 0, totalSizeAfter: 0 };
+
+    for (const [index, product] of products.entries()) {
+      const result = await this.processProductImage(
+        product,
+        index + 1,
+        products.length,
+        stats
+      );
+      optimizedProducts.push(result);
+
+      // Add small delay to avoid overwhelming servers
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+
+    this.logOptimizationResults(stats);
+    return optimizedProducts;
+  }
+
+  /**
+   * Process a single product's image optimization
+   */
+  private async processProductImage(
+    product: ProductData,
+    currentIndex: number,
+    totalCount: number,
+    stats: {
+      optimizedCount: number;
+      totalSizeBefore: number;
+      totalSizeAfter: number;
+    }
+  ): Promise<ProductData> {
+    logger.info(
+      `Processing product ${currentIndex}/${totalCount}: ${product.name || 'Unknown'}`
+    );
+
+    const optimizedProduct = { ...product };
+
+    if (!product.imageUrl || typeof product.imageUrl !== 'string') {
+      return optimizedProduct;
+    }
+
+    try {
+      const imageResult = await this.downloadAndOptimizeImage(
+        product.imageUrl,
+        product.name
+      );
+      if (imageResult) {
+        stats.totalSizeBefore += imageResult.originalSize;
+        stats.totalSizeAfter += imageResult.optimizedSize;
+        if (imageResult.wasOptimized) {
+          stats.optimizedCount++;
+        }
+
+        optimizedProduct.imageData = imageResult.base64Data;
+        optimizedProduct.imageUrl = undefined;
+      }
+    } catch (error) {
+      logger.error(`Failed to optimize image for ${product.name}:`, error);
+    }
+
+    return optimizedProduct;
+  }
+
+  /**
+   * Download and optimize a single image
+   */
+  private async downloadAndOptimizeImage(
+    imageUrl: string,
+    productName: string
+  ): Promise<{
+    originalSize: number;
+    optimizedSize: number;
+    base64Data: string;
+    wasOptimized: boolean;
+  } | null> {
+    const response = await fetch(imageUrl);
+    if (!response.ok) {
+      logger.warn(
+        `Failed to download image for ${productName}: ${response.statusText}`
+      );
+      return null;
+    }
+
+    const imageBuffer = Buffer.from(await response.arrayBuffer());
+    const originalSize = imageBuffer.length;
+
+    // Check if already WebP
+    const metadata = await sharp(imageBuffer).metadata();
+    if (metadata.format === 'webp') {
+      logger.info(`Image for ${productName} is already WebP format`);
+      return {
+        originalSize,
+        optimizedSize: originalSize,
+        base64Data: `data:image/webp;base64,${imageBuffer.toString('base64')}`,
+        wasOptimized: false,
+      };
+    }
+
+    // Optimize using Sharp
+    const optimizedBuffer = await sharp(imageBuffer)
+      .webp({ quality: 85, effort: 6 })
+      .toBuffer();
+
+    const optimizedSize = optimizedBuffer.length;
+    const reduction = (
+      ((originalSize - optimizedSize) / originalSize) *
+      100
+    ).toFixed(1);
+
+    logger.info(
+      `Optimized ${productName}: ${originalSize} bytes → ${optimizedSize} bytes (${reduction}% reduction)`
+    );
+
+    return {
+      originalSize,
+      optimizedSize,
+      base64Data: `data:image/webp;base64,${optimizedBuffer.toString('base64')}`,
+      wasOptimized: true,
+    };
+  }
+
+  /**
+   * Log optimization results
+   */
+  private logOptimizationResults(stats: {
+    optimizedCount: number;
+    totalSizeBefore: number;
+    totalSizeAfter: number;
+  }): void {
+    if (stats.optimizedCount === 0) {
+      return;
+    }
+
+    const totalReduction =
+      stats.totalSizeBefore > 0
+        ? (
+            ((stats.totalSizeBefore - stats.totalSizeAfter) /
+              stats.totalSizeBefore) *
+            100
+          ).toFixed(1)
+        : '0';
+    const sizeMB = (bytes: number) => (bytes / 1024 / 1024).toFixed(2);
+
+    logger.info('=== Image Optimization Results ===');
+    logger.info(`Images optimized: ${stats.optimizedCount}`);
+    logger.info(`Total size before: ${sizeMB(stats.totalSizeBefore)} MB`);
+    logger.info(`Total size after: ${sizeMB(stats.totalSizeAfter)} MB`);
+    logger.info(`Total reduction: ${totalReduction}%`);
+    logger.info(
+      `Space saved: ${sizeMB(stats.totalSizeBefore - stats.totalSizeAfter)} MB`
+    );
   }
 
   private handleUploadResult(
@@ -283,7 +469,8 @@ async function main() {
       cafeSlug: '',
       dryRun: args.includes('--dry-run'),
       verbose: args.includes('--verbose') || args.includes('-v'),
-      downloadImages: args.includes('--download-images'),
+      downloadImages: !args.includes('--no-download-images'), // Default to true
+      optimizeImages: !args.includes('--no-optimize-images'), // Default to true
     };
 
     // Parse file option
