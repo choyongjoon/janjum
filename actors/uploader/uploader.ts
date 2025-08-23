@@ -22,7 +22,7 @@ interface UploadOptions {
 }
 
 interface ProductData {
-  name?: string;
+  name: string;
   imageUrl?: string;
   imageData?: string;
   [key: string]: string | number | boolean | null | undefined;
