@@ -1,4 +1,4 @@
-# Cupscore Project Rules
+# janjum Project Rules
 
 ## Package Management
 
