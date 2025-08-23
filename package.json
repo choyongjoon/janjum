@@ -34,13 +34,6 @@
     "tailwind-merge": "^2.6.0"
   },
   "devDependencies": {
-    "crawlee": "^3.14.0",
-    "nanoid": "^5.1.5",
-    "pino": "^9.7.0",
-    "sharp": "0.34.3",
-    "svix": "^1.70.0",
-    "zod": "^3.24.2",
-    "playwright": "^1.54.1",
     "@biomejs/biome": "2.1.2",
     "@clerk/backend": "^2.6.2",
     "@playwright/test": "^1.54.2",
@@ -49,10 +42,16 @@
     "@types/react-dom": "^19.0.3",
     "@vitejs/plugin-react": "^4.6.0",
     "@vitest/ui": "^3.2.4",
+    "crawlee": "^3.14.0",
     "dotenv": "^17.2.1",
     "husky": "^9.1.7",
     "lint-staged": "^16.1.5",
+    "nanoid": "^5.1.5",
+    "pino": "^9.7.0",
     "pino-pretty": "^13.1.1",
+    "playwright": "^1.54.1",
+    "sharp": "0.34.3",
+    "svix": "^1.70.0",
     "tailwindcss": "^4.1.11",
     "ts-node": "^10.9.2",
     "tsx": "^4.20.3",
@@ -60,7 +59,8 @@
     "ultracite": "5.1.2",
     "vite": "^6.3.5",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "zod": "^3.24.2"
   },
   "ts-node": {
     "esm": true,

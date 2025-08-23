@@ -1,19 +1,19 @@
 # Product Categorizer
 
-A smart categorization system for cupscore products that learns from human input and improves over time.
+A smart categorization system for janjum products that learns from human input and improves over time.
 
 ## Overview
 
 The categorizer automatically assigns categories to products based on:
 - **Direct mapping**: `externalCategory` → `category` exact matches
-- **Pattern matching**: Product name contains specific keywords  
+- **Pattern matching**: Product name contains specific keywords
 - **Human learning**: Stores user decisions for future automation
 - **Fallback**: Defaults to '그 외' for unmatched items
 
 ## Categories
 
 - 커피 (Coffee)
-- 차 (Tea) 
+- 차 (Tea)
 - 블렌디드 (Blended)
 - 스무디 (Smoothie)
 - 주스 (Juice)
@@ -28,7 +28,7 @@ The categorizer automatically assigns categories to products based on:
 # Categorize all products (dry run)
 pnpm categorize --dry-run
 
-# Categorize all products 
+# Categorize all products
 pnpm categorize
 
 # Categorize specific cafe
@@ -40,7 +40,7 @@ pnpm categorize --verbose
 # Interactive mode for learning
 pnpm categorize --interactive
 
-# Process only low confidence items  
+# Process only low confidence items
 pnpm categorize --confidence low
 
 # Limit number of products
@@ -54,7 +54,7 @@ pnpm categorize --force
 
 - `--dry-run`: Preview changes without updating database
 - `--interactive`: Ask for human input on uncertain categorizations
-- `--verbose`: Show detailed output during categorization  
+- `--verbose`: Show detailed output during categorization
 - `--confidence <level>`: Process only specific confidence levels (all|low|medium)
 - `--limit <number>`: Limit number of products to process
 - `--force`: Override all categories, even if they match current rules
@@ -63,7 +63,7 @@ pnpm categorize --force
 ### Available Cafes
 
 - `starbucks` - 스타벅스
-- `compose` - 컴포즈커피  
+- `compose` - 컴포즈커피
 - `mega` - 메가커피
 - `paik` - 빽다방
 
@@ -75,7 +75,7 @@ If `externalCategory` exactly matches a known category:
 externalCategory: "커피" → category: "커피"
 ```
 
-### 2. Pattern Matching (High/Medium Confidence)  
+### 2. Pattern Matching (High/Medium Confidence)
 Searches product name for keywords:
 ```
 name: "아이스 아메리카노" → category: "커피" (contains "아메리카노")
@@ -105,7 +105,7 @@ Contains categorization rules and statistics:
   "rules": [
     {
       "id": "direct-coffee",
-      "type": "direct", 
+      "type": "direct",
       "condition": { "externalCategory": "커피" },
       "targetCategory": "커피",
       "confidence": "high"
@@ -114,7 +114,7 @@ Contains categorization rules and statistics:
       "id": "pattern-coffee-keywords",
       "type": "pattern",
       "condition": { "nameContains": ["아메리카노", "라떼"] },
-      "targetCategory": "커피", 
+      "targetCategory": "커피",
       "confidence": "high"
     }
   ],
@@ -149,7 +149,7 @@ pnpm categorize --dry-run --verbose
 Shows what would be updated without making changes.
 
 ### Interactive Learning
-```bash  
+```bash
 pnpm categorize --interactive --confidence low
 ```
 Asks human input for low confidence categorizations and learns from decisions.
@@ -178,14 +178,14 @@ The categorizer provides detailed statistics:
 ```
 📊 CATEGORIZATION SUMMARY
 📦 Processed: 250 products
-✅ Updated: 45 products  
+✅ Updated: 45 products
 ➡️  Unchanged: 200 products
 ❌ Errors: 5 products
 ⏱️  Total time: 12 seconds
 
 🎯 Confidence Breakdown:
   High: 180
-  Medium: 50  
+  Medium: 50
   Low: 20
 
 🔧 Source Breakdown:
@@ -219,7 +219,7 @@ npx tsx actors/categorizer/test-categorizer.ts
 ## Architecture
 
 - **`categorizer.ts`**: Core categorization engine with rules and learning
-- **`categorize.ts`**: CLI interface with Convex integration  
+- **`categorize.ts`**: CLI interface with Convex integration
 - **`types.ts`**: TypeScript interfaces and types
 - **`categorizer-rules.json`**: Rules configuration and statistics
 - **`test-categorizer.ts`**: Testing utility
@@ -228,5 +228,5 @@ npx tsx actors/categorizer/test-categorizer.ts
 
 The categorizer integrates with:
 - **Convex Database**: Reads products, updates categories
-- **Pino Logger**: Consistent logging with other cupscore components
+- **Pino Logger**: Consistent logging with other janjum components
 - **CLI Pattern**: Follows same pattern as `upload.ts` and `crawl.ts`
