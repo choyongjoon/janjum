@@ -35,6 +35,8 @@ export function ProductCard({
     },
   };
 
+  const { isActive } = product;
+
   return (
     <Link
       className="card bg-base-100 shadow-md transition-shadow hover:shadow-lg"
@@ -54,7 +56,16 @@ export function ProductCard({
         {product.cafeName && (
           <p className="text-base-content/60 text-sm">{product.cafeName}</p>
         )}
-        <h3 className="card-title break-keep">{product.name}</h3>
+        {!isActive && (
+          <div className="badge badge-soft badge-warning badge-sm">단종</div>
+        )}
+        <div className="flex items-start justify-between gap-2">
+          <h3
+            className={`card-title break-keep ${isActive ? '' : 'text-base-content/50'}`}
+          >
+            {product.name}
+          </h3>
+        </div>
         <RatingSummary reviewStats={reviewStats || defaultReviewStats} />
         <div className="flex items-center justify-between">
           <div className="space-y-1">

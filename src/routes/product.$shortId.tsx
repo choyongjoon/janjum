@@ -72,6 +72,8 @@ function ProductPage() {
     );
   }
 
+  const { isActive } = product;
+
   return (
     <div className="min-h-screen bg-base-200">
       {/* Product Details */}
@@ -94,7 +96,18 @@ function ProductPage() {
           {/* Product Information */}
           <div className="space-y-6">
             <div>
-              <h1 className="mb-2 font-bold text-3xl">{product.name}</h1>
+              <div className="mb-2 flex items-start justify-between gap-4">
+                <h1
+                  className={`font-bold text-3xl ${isActive ? '' : 'text-base-content/50'}`}
+                >
+                  {product.name}
+                </h1>
+                {!isActive && (
+                  <div className="badge badge-soft badge-warning badge-lg shrink-0">
+                    단종
+                  </div>
+                )}
+              </div>
               {product.nameEn && (
                 <p className="mb-4 text-base-content/70 text-lg">
                   {product.nameEn}
