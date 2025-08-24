@@ -17,8 +17,8 @@ export const Route = createFileRoute('/user/$handle')({
   head: ({ loaderData }) => ({
     meta: [
       ...seo({
-        title: `${loaderData?.handle || '사용자'}님의 프로필 | 잔점`,
-        description: `${loaderData?.handle || '사용자'}님의 카페 음료 후기와 프로필을 확인하세요.`,
+        title: `@${loaderData?.handle || '사용자'}님의 프로필 | 잔점`,
+        description: `@${loaderData?.handle || '사용자'}님의 카페 음료 후기와 프로필을 확인하세요.`,
         image: '/android-chrome-512x512.png',
         keywords: '사용자 프로필, 후기, 잔점',
       }),

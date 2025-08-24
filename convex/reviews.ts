@@ -445,7 +445,7 @@ export const getById = query({
     // Get user information
     const user = await ctx.db
       .query('users')
-      .withIndex('byExternalId', (q) => q.eq('externalId', review.userId))
+      .withIndex('by_id', (q) => q.eq('_id', review.userId as Id<'users'>))
       .unique();
 
     // Add image URLs
