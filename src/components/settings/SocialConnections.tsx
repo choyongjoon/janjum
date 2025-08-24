@@ -46,20 +46,18 @@ function ProviderCard({
           {provider.icon}
         </div>
         <div>
-          <p className="font-medium">
-            {provider.name}{' '}
-            {connectedAccount && (
-              <span
-                className={`badge badge-sm ${getVerificationStatus(connectedAccount).className}`}
-              >
-                {getVerificationStatus(connectedAccount).text}
-              </span>
-            )}
-          </p>
+          <p className="font-medium">{provider.name}</p>
         </div>
       </div>
 
       <div className="flex items-center gap-2">
+        {connectedAccount && (
+          <span
+            className={`badge badge-sm ${getVerificationStatus(connectedAccount).className}`}
+          >
+            {getVerificationStatus(connectedAccount).text}
+          </span>
+        )}
         {connectedAccount ? (
           <div
             className="tooltip"
@@ -251,8 +249,6 @@ export function SocialConnections() {
             );
           })}
         </div>
-
-        <div className="divider my-2" />
 
         <div className="text-base-content/60 text-xs">
           <p>• 마지막 남은 로그인 방법은 해제할 수 없습니다.</p>
