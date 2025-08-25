@@ -54,8 +54,10 @@ export const search = query({
 
     // Filter by search term if specified
     if (searchTerm?.trim()) {
-      const term = searchTerm.toLowerCase();
-      products = products.filter((p) => p.name.toLowerCase().includes(term));
+      const term = searchTerm.toLowerCase().replace(/\s+/g, '');
+      products = products.filter((p) =>
+        p.name.toLowerCase().replace(/\s+/g, '').includes(term)
+      );
     }
 
     // Get cafe information for each product
@@ -90,15 +92,15 @@ export const getSuggestions = query({
     }
 
     const products = await ctx.db.query('products').collect();
-    const term = searchTerm.toLowerCase();
+    const term = searchTerm.toLowerCase().replace(/\s+/g, '');
 
     // Filter active products and search in name/nameEn
     const matches = products
       .filter((p) => p.isActive)
       .filter(
         (p) =>
-          p.name.toLowerCase().includes(term) ||
-          p.nameEn?.toLowerCase().includes(term)
+          p.name.toLowerCase().replace(/\s+/g, '').includes(term) ||
+          p.nameEn?.toLowerCase().replace(/\s+/g, '').includes(term)
       )
       .map((p) => ({
         id: p._id,

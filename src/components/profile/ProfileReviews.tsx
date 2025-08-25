@@ -55,11 +55,7 @@ export function ProfileReviews({
             : '작성된 후기가 없습니다.'}
         </p>
         {isCurrentUser && (
-          <Link
-            className="btn btn-primary"
-            search={{ searchTerm: '', cafeId: '', category: '' }}
-            to="/search"
-          >
+          <Link className="btn btn-primary" to="/search">
             상품 찾아보기
           </Link>
         )}
