@@ -20,8 +20,8 @@ export function CafeCard({
           src={cafe.imageUrl}
         />
       </figure>
-      <div className="card-body items-center p-6 text-center">
-        <h3 className="card-title text-xl">{cafe.name}</h3>
+      <div className="card-body items-center px-1 py-4 text-center">
+        <h3 className="card-title text-lg">{cafe.name}</h3>
       </div>
     </Link>
   );

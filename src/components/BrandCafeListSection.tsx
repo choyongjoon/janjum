@@ -16,7 +16,7 @@ export function BrandCafeListSection({
         </p>
       </div>
 
-      <div className="mx-auto grid max-w-4xl grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="mx-auto grid max-w-4xl grid-cols-3 gap-4 md:grid-cols-4">
         {cafes?.map((cafe) => (
           <CafeCard cafe={cafe} key={cafe._id} />
         ))}
