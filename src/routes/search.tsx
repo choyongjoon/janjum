@@ -10,16 +10,12 @@ import { NameSearchInput } from '../components/search/NameSearchForm';
 
 interface SearchFilters {
   searchTerm: string;
-  cafeId: string;
-  category: string;
 }
 
 export const Route = createFileRoute('/search')({
   component: SearchPage,
   validateSearch: (search: Record<string, unknown>): SearchFilters => ({
     searchTerm: (search.searchTerm as string) || '',
-    cafeId: (search.cafeId as string) || '',
-    category: (search.category as string) || '',
   }),
   loader: async (opts) => {
     const searchFilters = opts.location.search as SearchFilters;
@@ -81,8 +77,6 @@ function SearchPage() {
       to: '/search',
       search: {
         searchTerm: trimmedSearchTerm || '',
-        cafeId: '',
-        category: '',
       },
     });
   };
