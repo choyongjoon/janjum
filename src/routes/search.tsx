@@ -9,7 +9,7 @@ import { ProductCard } from '../components/ProductCard';
 import { NameSearchInput } from '../components/search/NameSearchForm';
 
 interface SearchFilters {
-  searchTerm: string;
+  searchTerm?: string;
 }
 
 export const Route = createFileRoute('/search')({

@@ -14,7 +14,6 @@ export function Footer() {
           <nav className="flex flex-wrap justify-center gap-6">
             <Link
               className="text-base-content/70 text-sm transition-colors hover:text-primary"
-              search={{ searchTerm: '', cafeId: '', category: '' }}
               to="/search"
             >
               검색

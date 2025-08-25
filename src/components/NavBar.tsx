@@ -55,11 +55,7 @@ export function NavBar() {
         </Link>
       </div>
       <div className="navbar-end">
-        <Link
-          className="btn btn-ghost btn-circle"
-          search={{ searchTerm: '', cafeId: '', category: '' }}
-          to="/search"
-        >
+        <Link className="btn btn-ghost btn-circle" to="/search">
           <SearchIcon aria-label="Search" />
         </Link>
         <Authenticated>
