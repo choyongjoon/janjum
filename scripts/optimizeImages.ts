@@ -359,7 +359,7 @@ async function main(): Promise<void> {
     logger.info('Starting image optimization process...');
 
     // Process all image types
-    await optimizer.optimizeProductImages();
+    // await optimizer.optimizeProductImages();
     await optimizer.optimizeCafeImages();
     await optimizer.optimizeUserImages();
     await optimizer.optimizeReviewImages();

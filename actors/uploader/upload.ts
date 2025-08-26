@@ -15,7 +15,6 @@ type CafeSlug = keyof typeof AVAILABLE_CAFES;
 
 interface UploadOptions {
   dryRun?: boolean;
-  downloadImages?: boolean;
   verbose?: boolean;
   file?: string;
 }
@@ -44,9 +43,6 @@ function parseArgs(): { cafeSlugs: CafeSlug[]; options: UploadOptions } {
     switch (arg) {
       case '--dry-run':
         options.dryRun = true;
-        break;
-      case '--download-images':
-        options.downloadImages = true;
         break;
       case '--verbose':
         options.verbose = true;
@@ -130,9 +126,7 @@ function uploadCafe(cafeSlug: CafeSlug, options: UploadOptions): Promise<void> {
       args.push('--dry-run');
     }
 
-    if (options.downloadImages) {
-      args.push('--download-images');
-    }
+    // Images are always downloaded and optimized by default
 
     if (options.verbose) {
       args.push('--verbose');
@@ -176,11 +170,12 @@ ${Object.entries(AVAILABLE_CAFES)
   .join('\n')}
 
 Options:
-  --dry-run          Preview changes without uploading to database
-  --download-images  Download external images to Convex storage during upload
-  --verbose, -v      Show detailed output during upload
-  --file <path>      Use specific file instead of latest from crawler-outputs/
-  --help, -h         Show this help message
+  --dry-run         Preview changes without uploading to database
+  --verbose, -v     Show detailed output during upload
+  --file <path>     Use specific file instead of latest from crawler-outputs/
+  --help, -h        Show this help message
+
+Note: Images are automatically downloaded and optimized (PNG/JPG → WebP) during upload.
 `);
 }
 
