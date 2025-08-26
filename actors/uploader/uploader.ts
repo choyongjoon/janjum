@@ -67,8 +67,8 @@ class ProductUploader {
       cafeSlug,
       dryRun = false,
       verbose = false,
-      downloadImages = false,
-      optimizeImages = false,
+      downloadImages = true,
+      optimizeImages = true,
     } = options;
 
     const filePath = this.resolveFilePath(file);
@@ -209,20 +209,20 @@ class ProductUploader {
       totalSizeAfter: number;
     }
   ): Promise<ProductData> {
+    const imageUrl = product.imageUrl || product.externalImageUrl;
     logger.info(
-      `Processing product ${currentIndex}/${totalCount}: ${product.name || 'Unknown'}`
+      `Processing product ${currentIndex}/${totalCount}: ${product.name || 'Unknown'} (Image: ${imageUrl ? 'Yes' : 'No'})`
     );
 
     const optimizedProduct = { ...product };
-
-    if (!product.imageUrl || typeof product.imageUrl !== 'string') {
+    if (!imageUrl || typeof imageUrl !== 'string') {
       return optimizedProduct;
     }
 
     try {
       const imageResult = await this.downloadAndOptimizeImage(
-        product.imageUrl,
-        product.name
+        imageUrl,
+        product.name || 'Unknown'
       );
       if (imageResult) {
         stats.totalSizeBefore += imageResult.originalSize;
@@ -232,7 +232,9 @@ class ProductUploader {
         }
 
         optimizedProduct.imageData = imageResult.base64Data;
+        // Clear the original image URL fields since we now have base64 data
         optimizedProduct.imageUrl = undefined;
+        optimizedProduct.externalImageUrl = undefined;
       }
     } catch (error) {
       logger.error(`Failed to optimize image for ${product.name}:`, error);
@@ -253,10 +255,11 @@ class ProductUploader {
     base64Data: string;
     wasOptimized: boolean;
   } | null> {
+    logger.info(`Downloading image for ${productName}: ${imageUrl}`);
     const response = await fetch(imageUrl);
     if (!response.ok) {
       logger.warn(
-        `Failed to download image for ${productName}: ${response.statusText}`
+        `Failed to download image for ${productName}: ${response.status} ${response.statusText}`
       );
       return null;
     }
@@ -469,8 +472,12 @@ async function main() {
       cafeSlug: '',
       dryRun: args.includes('--dry-run'),
       verbose: args.includes('--verbose') || args.includes('-v'),
-      downloadImages: !args.includes('--no-download-images'), // Default to true
-      optimizeImages: !args.includes('--no-optimize-images'), // Default to true
+      downloadImages:
+        args.includes('--download-images') ||
+        !args.includes('--no-download-images'), // Default to true
+      optimizeImages:
+        args.includes('--optimize-images') ||
+        !args.includes('--no-optimize-images'), // Default to true
     };
 
     // Parse file option

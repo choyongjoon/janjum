@@ -11,7 +11,7 @@
     "upload": "tsx actors/uploader/upload.ts",
     "categorize": "tsx actors/categorizer/categorize.ts",
     "optimize-images:prod": "dotenv -e .env.prod-upload -- tsx scripts/optimizeImages.ts",
-    "data-sync:prod": "scripts/dataSyncInLocal.sh",
+    "data-sync:prod": "scripts/dataSyncProd.sh",
     "test": "vitest",
     "test:e2e": "playwright test",
     "prepare": "husky"
