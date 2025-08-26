@@ -17,8 +17,6 @@ interface UploadOptions {
   cafeSlug: string;
   dryRun?: boolean;
   verbose?: boolean;
-  downloadImages?: boolean;
-  optimizeImages?: boolean;
 }
 
 interface ProductData {
@@ -62,14 +60,11 @@ class ProductUploader {
   }
 
   async uploadFromFile(options: UploadOptions): Promise<UploadResult> {
-    const {
-      file,
-      cafeSlug,
-      dryRun = false,
-      verbose = false,
-      downloadImages = true,
-      optimizeImages = true,
-    } = options;
+    const { file, cafeSlug, dryRun = false, verbose = false } = options;
+
+    // Images are always downloaded and optimized
+    const downloadImages = true;
+    const optimizeImages = true;
 
     const filePath = this.resolveFilePath(file);
     const products = this.readAndValidateFile(filePath, verbose);
@@ -472,12 +467,6 @@ async function main() {
       cafeSlug: '',
       dryRun: args.includes('--dry-run'),
       verbose: args.includes('--verbose') || args.includes('-v'),
-      downloadImages:
-        args.includes('--download-images') ||
-        !args.includes('--no-download-images'), // Default to true
-      optimizeImages:
-        args.includes('--optimize-images') ||
-        !args.includes('--no-optimize-images'), // Default to true
     };
 
     // Parse file option
