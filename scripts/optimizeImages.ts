@@ -74,6 +74,37 @@ class ImageOptimizer {
     }
   }
 
+  /**
+   * Check if stored image needs optimization by checking its metadata
+   */
+  async checkIfStorageNeedsOptimization(
+    storageId: Id<'_storage'>
+  ): Promise<boolean> {
+    try {
+      const metadata = await convex.query(api.http.getStorageMetadata, {
+        storageId,
+      });
+
+      if (!metadata) {
+        logger.warn(`No metadata found for storage ID: ${storageId}`);
+        return true; // Re-download if we can't get metadata
+      }
+
+      // Check if the stored file is already WebP
+      const contentType = metadata.contentType;
+      const isWebP = contentType === 'image/webp';
+
+      logger.debug(
+        `Storage ${storageId} metadata: ${contentType}, isWebP: ${isWebP}`
+      );
+
+      return !isWebP; // Return true if needs optimization (not WebP)
+    } catch (error) {
+      logger.error(`Error checking storage metadata for ${storageId}:`, error);
+      return true; // Re-download on error
+    }
+  }
+
   async uploadOptimizedImage(
     imageBuffer: ArrayBuffer
   ): Promise<Id<'_storage'>> {
@@ -110,6 +141,14 @@ class ImageOptimizer {
     storageId: Id<'_storage'>
   ): Promise<Id<'_storage'> | null> {
     try {
+      // First check metadata without downloading to see if already WebP
+      const needsOptimization =
+        await this.checkIfStorageNeedsOptimization(storageId);
+      if (!needsOptimization) {
+        logger.info(`Image ${storageId} is already optimized (WebP), skipping`);
+        return null;
+      }
+
       // Get the image URL from storage
       const imageUrl = await convex.query(api.http.getStorageUrl, {
         storageId,
@@ -122,10 +161,12 @@ class ImageOptimizer {
       // Download the original image
       const originalImageBuffer = await this.downloadImage(imageUrl);
 
-      // Check if it's already optimized (WebP)
+      // Double-check format after download (fallback safety check)
       const imageFormat = await sharp(originalImageBuffer).metadata();
       if (imageFormat.format === 'webp') {
-        logger.info(`Image ${storageId} is already in WebP format`);
+        logger.info(
+          `Image ${storageId} is already in WebP format (detected after download)`
+        );
         return null;
       }
 
@@ -359,7 +400,7 @@ async function main(): Promise<void> {
     logger.info('Starting image optimization process...');
 
     // Process all image types
-    // await optimizer.optimizeProductImages();
+    await optimizer.optimizeProductImages();
     await optimizer.optimizeCafeImages();
     await optimizer.optimizeUserImages();
     await optimizer.optimizeReviewImages();
@@ -372,7 +413,7 @@ async function main(): Promise<void> {
 }
 
 // Run the script
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1]?.endsWith('optimizeImages.ts')) {
   main().catch((error) => {
     logger.error('Unhandled error:', error);
     process.exit(1);

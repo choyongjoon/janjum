@@ -5,6 +5,7 @@ import { ConvexClient } from 'convex/browser';
 import dotenv from 'dotenv';
 import sharp from 'sharp';
 import { api } from '../../convex/_generated/api';
+import type { Id } from '../../convex/_generated/dataModel';
 import { logger } from '../../shared/logger';
 
 // Load environment variables from .env.local
@@ -212,13 +213,79 @@ class ProductUploader {
     }
   ): Promise<ProductData> {
     const imageUrl = product.externalImageUrl;
+    const existingStorageId = product.imageStorageId;
     logger.info(
-      `Processing product ${currentIndex}/${totalCount}: ${product.name || 'Unknown'} (Image: ${imageUrl ? 'Yes' : 'No'})`
+      `Processing product ${currentIndex}/${totalCount}: ${product.name || 'Unknown'} (Image: ${imageUrl ? 'Yes' : 'No'}, Storage: ${existingStorageId ? 'Yes' : 'No'})`
     );
 
     const optimizedProduct = { ...product };
+
+    // Try to process existing storage first
+    if (existingStorageId) {
+      const result = await this.processExistingStorage(
+        existingStorageId,
+        product.name || 'Unknown',
+        stats
+      );
+      if (result) {
+        return { ...optimizedProduct, imageStorageId: result.storageId };
+      }
+    }
+
+    // Fallback to downloading from external URL
+    return await this.processExternalImage(optimizedProduct, imageUrl, stats);
+  }
+
+  private async processExistingStorage(
+    storageId: string,
+    productName: string,
+    stats: {
+      optimizedCount: number;
+      totalSizeBefore: number;
+      totalSizeAfter: number;
+    }
+  ): Promise<{ storageId: string } | null> {
+    try {
+      const needsOptimization =
+        await this.checkIfStorageNeedsOptimization(storageId);
+      if (!needsOptimization) {
+        logger.info(
+          `Image for ${productName} is already optimized (WebP), skipping`
+        );
+        return { storageId };
+      }
+
+      logger.info(
+        `Image for ${productName} needs optimization, processing stored image...`
+      );
+      const imageResult = await this.downloadAndOptimizeStoredImage(
+        storageId,
+        productName
+      );
+
+      if (imageResult) {
+        this.updateStats(stats, imageResult);
+        return { storageId: imageResult.storageId };
+      }
+    } catch (error) {
+      logger.warn(
+        `Failed to optimize stored image for ${productName}, will re-download: ${error}`
+      );
+    }
+    return null;
+  }
+
+  private async processExternalImage(
+    product: ProductData,
+    imageUrl: string | null,
+    stats: {
+      optimizedCount: number;
+      totalSizeBefore: number;
+      totalSizeAfter: number;
+    }
+  ): Promise<ProductData> {
     if (!imageUrl || typeof imageUrl !== 'string') {
-      return optimizedProduct;
+      return product;
     }
 
     try {
@@ -227,19 +294,101 @@ class ProductUploader {
         product.name || 'Unknown'
       );
       if (imageResult) {
-        stats.totalSizeBefore += imageResult.originalSize;
-        stats.totalSizeAfter += imageResult.optimizedSize;
-        if (imageResult.wasOptimized) {
-          stats.optimizedCount++;
-        }
-
-        optimizedProduct.imageStorageId = imageResult.storageId;
+        this.updateStats(stats, imageResult);
+        return { ...product, imageStorageId: imageResult.storageId };
       }
     } catch (error) {
       logger.error(`Failed to optimize image for ${product.name}:`, error);
     }
 
-    return optimizedProduct;
+    return product;
+  }
+
+  private updateStats(
+    stats: {
+      optimizedCount: number;
+      totalSizeBefore: number;
+      totalSizeAfter: number;
+    },
+    imageResult: {
+      originalSize: number;
+      optimizedSize: number;
+      wasOptimized: boolean;
+    }
+  ): void {
+    stats.totalSizeBefore += imageResult.originalSize;
+    stats.totalSizeAfter += imageResult.optimizedSize;
+    if (imageResult.wasOptimized) {
+      stats.optimizedCount++;
+    }
+  }
+
+  /**
+   * Check if stored image needs optimization by checking its metadata
+   */
+  private async checkIfStorageNeedsOptimization(
+    storageId: string
+  ): Promise<boolean> {
+    try {
+      const metadata = await this.client.query(api.http.getStorageMetadata, {
+        storageId: storageId as Id<'_storage'>,
+      });
+
+      if (!metadata) {
+        logger.warn(`No metadata found for storage ID: ${storageId}`);
+        return true; // Re-download if we can't get metadata
+      }
+
+      // Check if the stored file is already WebP
+      const contentType = metadata.contentType;
+      const isWebP = contentType === 'image/webp';
+
+      logger.debug(
+        `Storage ${storageId} metadata: ${contentType}, isWebP: ${isWebP}`
+      );
+
+      return !isWebP; // Return true if needs optimization (not WebP)
+    } catch (error) {
+      logger.error(`Error checking storage metadata for ${storageId}:`, error);
+      return true; // Re-download on error
+    }
+  }
+
+  /**
+   * Download and optimize an existing stored image
+   */
+  private async downloadAndOptimizeStoredImage(
+    storageId: string,
+    productName: string
+  ): Promise<{
+    originalSize: number;
+    optimizedSize: number;
+    storageId: string;
+    wasOptimized: boolean;
+  } | null> {
+    try {
+      logger.info(
+        `Downloading stored image for optimization: ${productName} (${storageId})`
+      );
+
+      // Get URL for the stored image
+      const imageUrl = await this.client.query(api.http.getStorageUrl, {
+        storageId: storageId as Id<'_storage'>,
+      });
+
+      if (!imageUrl) {
+        throw new Error(`No URL found for storage ID: ${storageId}`);
+      }
+
+      // Download and optimize the stored image
+      return await this.downloadAndOptimizeImage(imageUrl, productName);
+    } catch (error) {
+      logger.error(
+        `Failed to download and optimize stored image ${storageId}:`,
+        error
+      );
+      return null;
+    }
   }
 
   /**
