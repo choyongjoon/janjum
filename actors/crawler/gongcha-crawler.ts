@@ -13,37 +13,13 @@ import {
 // ================================================
 
 const SITE_CONFIG = {
-  baseUrl: 'https://brand.gong-cha.co.kr',
-  startUrl: 'https://brand.gong-cha.co.kr/m/brand/menu/product.php?c=001001',
+  baseUrl: 'https://www.gong-cha.co.kr',
+  startUrl: 'https://www.gong-cha.co.kr/brand/menu/product?category=001001',
 } as const;
 
 // ================================================
 // CSS SELECTORS
 // ================================================
-
-const SELECTORS = {
-  // Category selectors
-  categories: '.lnb > li > a',
-
-  // Product item selectors
-  productItems: '.pro_list_wrap a',
-
-  // Product container selectors (better for extracting individual products)
-  productContainers:
-    '.pro_list_wrap > div, .pro_list_wrap li, .pro_item, [class*="product"]',
-
-  // Product data extraction from list
-  productData: {
-    image: 'img',
-    name: '', // Will be extracted from img alt or text content
-  },
-
-  // Product detail modal selectors
-  productDetails: {
-    description: '.product p.txt',
-    modalContainer: '.product', // For checking if modal is open
-  },
-} as const;
 
 // ================================================
 // CRAWLER CONFIGURATION
@@ -75,18 +51,14 @@ const CRAWLER_CONFIG = {
 
 // Regex patterns for performance
 const FILE_EXTENSION_REGEX = /\.[^.]*$/;
-const CATEGORY_PARAM_REGEX = /.*c=/;
 
 async function extractBasicProductInfo(container: Locator) {
   const imageElement = container.locator('img').first();
   const imageSrc = await imageElement.getAttribute('src').catch(() => '');
-  const imageAlt = await imageElement.getAttribute('alt').catch(() => '');
 
-  let productName = imageAlt || '';
-  if (!productName) {
-    const containerText = (await container.textContent().catch(() => '')) || '';
-    productName = containerText.replace(/\s+/g, ' ').trim();
-  }
+  // Get product name from container text content
+  const containerText = (await container.textContent().catch(() => '')) || '';
+  const productName = containerText.replace(/\s+/g, ' ').trim();
 
   if (!productName) {
     return null;
@@ -95,7 +67,7 @@ async function extractBasicProductInfo(container: Locator) {
   return { name: productName, imageSrc };
 }
 
-async function extractDescriptionFromModal(
+async function extractDescriptionFromDetailPage(
   page: Page,
   productLink: Locator,
   productName: string
@@ -104,64 +76,52 @@ async function extractDescriptionFromModal(
     const href = await productLink.getAttribute('href').catch(() => '');
     logger.info(`Extracting description for: ${productName} (href: ${href})`);
 
-    // Ensure any existing modal is closed first
-    await closeAnyOpenModal(page);
-
     await productLink.scrollIntoViewIfNeeded();
     await page.waitForTimeout(500);
 
     await productLink.click({ timeout: 8000 });
-    await page.waitForTimeout(1000); // Wait for modal to load
+    await page.waitForTimeout(1000); // Wait for page to load
 
     // Only take screenshot in test mode for debugging
     if (isTestMode) {
       await takeDebugScreenshot(
         page,
-        `gongcha-modal-${productName.replace(/\s+/g, '_')}`
+        `gongcha-detail-${productName.replace(/\s+/g, '_')}`
       );
     }
 
-    const modalSelector = '.product p.txt';
-    const descElement = page.locator(modalSelector);
+    // Look for description paragraphs on the detail page
+    const descElements = page.locator('p');
+    const descCount = await descElements.count();
 
-    const description = (await descElement.textContent()) || '';
-    const trimmed = description.trim();
-    logger.info(
-      `Found description with selector "${modalSelector}": "${trimmed.substring(0, 50)}..."`
-    );
+    let description = '';
+    for (let i = 0; i < descCount; i++) {
+      const text = (await descElements.nth(i).textContent()) || '';
+      const trimmed = text.trim();
 
-    if (trimmed && trimmed.length > 5) {
-      // Ensure we have meaningful content
-      return trimmed;
+      // Look for meaningful product descriptions (longer than 20 chars, not navigation text)
+      if (
+        trimmed.length > 20 &&
+        !trimmed.includes('Follow us') &&
+        !trimmed.includes('Menu') &&
+        !trimmed.includes('공차') &&
+        trimmed.includes('티')
+      ) {
+        description = trimmed;
+        break;
+      }
+    }
+
+    if (description) {
+      logger.info(`Found description: "${description.substring(0, 50)}..."`);
+      return description;
     }
 
     logger.warn(`No description found for ${productName}`);
     return '';
   } catch (error) {
-    logger.error(`Click failed for ${productName}: ${error}`);
+    logger.error(`Navigation failed for ${productName}: ${error}`);
     return '';
-  } finally {
-    await closeAnyOpenModal(page);
-  }
-}
-
-async function closeAnyOpenModal(page: Page): Promise<void> {
-  try {
-    const closeSelector = '.layer_close';
-    const closeButton = page.locator(closeSelector).first();
-    if (await closeButton.isVisible({ timeout: 300 })) {
-      await closeButton.click();
-      await page.waitForTimeout(300);
-      return; // Exit early if successful
-    }
-
-    // Final fallback: click outside
-    await page.mouse.click(50, 50).catch(() => {
-      // Ignore click errors
-    });
-    await page.waitForTimeout(300);
-  } catch (error) {
-    logger.debug(`Error closing modal: ${error}`);
   }
 }
 
@@ -191,13 +151,21 @@ async function extractProductFromContainer(
     }
 
     const { name: productName, imageSrc } = basicInfo;
-    const productLink = container.locator('a').first();
+    const productLink = container.locator('a[href*="detail"]').first();
 
-    const description = await extractDescriptionFromModal(
+    // Store current page URL to navigate back
+    const currentUrl = page.url();
+
+    const description = await extractDescriptionFromDetailPage(
       page,
       productLink,
       productName
     );
+
+    // Navigate back to the category page
+    await page.goto(currentUrl);
+    await page.waitForTimeout(1000);
+
     const externalId = generateExternalId(imageSrc || '');
 
     const product: Product = {
@@ -209,7 +177,7 @@ async function extractProductFromContainer(
       externalImageUrl: imageSrc
         ? new URL(imageSrc, SITE_CONFIG.baseUrl).href
         : '',
-      externalUrl: page.url(),
+      externalUrl: currentUrl,
       price: null,
       category: categoryName,
     };
@@ -226,22 +194,23 @@ async function extractProductFromContainer(
 // ================================================
 
 async function extractCategoryName(page: Page): Promise<string> {
-  // Try to get category name from active navigation
   try {
-    const activeCategory = await page
-      .locator('.lnb li.on a, .lnb li.active a')
+    // First try to get the active tab name (subcategory)
+    const activeTabText = await page
+      .locator('.tabWrap ul li.active a')
       .textContent()
       .catch(() => '');
-    if (activeCategory?.trim()) {
-      const categoryName = activeCategory.trim();
-      logger.info(`Category name from active navigation: ${categoryName}`);
+
+    if (activeTabText?.trim()) {
+      const categoryName = activeTabText.trim();
+      logger.info(`Category name from active tab: ${categoryName}`);
       return categoryName;
     }
   } catch (error) {
     logger.warn(`Could not extract category name from page: ${error}`);
   }
 
-  return 'Tea'; // Default fallback
+  return 'New 시즌 메뉴'; // Default fallback
 }
 
 async function extractProductsFromPage(
@@ -250,13 +219,16 @@ async function extractProductsFromPage(
 ): Promise<Product[]> {
   const products: Product[] = [];
 
-  // Try to extract products using containers first, then fallback to links
-  let productContainers = await page.locator(SELECTORS.productContainers).all();
+  // Wait for products to load
+  await page.waitForTimeout(1000);
 
-  if (productContainers.length === 0) {
-    // Fallback to direct links
-    productContainers = await page.locator(SELECTORS.productItems).all();
-  }
+  // Find product containers - look for list items that contain product detail links
+  const productContainers = await page
+    .locator('li')
+    .filter({
+      has: page.locator('a[href*="detail"]'),
+    })
+    .all();
 
   logger.info(
     `Found ${productContainers.length} product containers in category: ${categoryName}`
@@ -279,7 +251,7 @@ async function extractProductsFromPage(
     }
 
     // Small delay between products to avoid overwhelming the server
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(1000);
   }
 
   return products;
@@ -290,7 +262,7 @@ async function handleStartPage(
   crawlerInstance: PlaywrightCrawler
 ): Promise<void> {
   logger.info(
-    'Processing Gongcha start page - extracting category URLs and processing current page products'
+    'Processing Gongcha start page - extracting all subcategory URLs and processing current page products'
   );
 
   await waitForLoad(page);
@@ -321,28 +293,28 @@ async function handleStartPage(
       `Processed ${productsToProcess.length} products from start page (${categoryName})`
     );
 
-    // Then extract category URLs and add remaining categories to queue
-    const categoryUrls = await extractCategoryUrlsFromPage(page);
+    // Get all subcategory URLs
+    const categoryUrls = extractCategoryUrlsFromPage(page);
 
     if (categoryUrls.length === 0) {
-      logger.error('No category URLs found on start page');
+      logger.error('No category URLs found');
       return;
     }
 
     const currentUrl = page.url();
 
-    // Add all category URLs to the request queue, except the current one since we already processed it
+    // Add all subcategory URLs to the request queue, except the current one since we already processed it
     for (const url of categoryUrls) {
       if (url !== currentUrl) {
         await crawlerInstance.addRequests([{ url, label: 'category' }]);
-        logger.info(`Added category URL to queue: ${url}`);
+        logger.info(`Added subcategory URL to queue: ${url}`);
       } else {
         logger.info(`Skipping current URL (already processed): ${url}`);
       }
     }
 
     logger.info(
-      `Successfully queued ${categoryUrls.filter((url) => url !== currentUrl).length} additional category pages`
+      `Successfully queued ${categoryUrls.filter((url) => url !== currentUrl).length} additional subcategory pages`
     );
   } catch (error) {
     logger.error(`Error processing start page: ${error}`);
@@ -353,10 +325,10 @@ async function handleCategoryPage(
   page: Page,
   crawlerInstance: PlaywrightCrawler
 ): Promise<void> {
-  logger.info('Processing Gongcha category page');
+  logger.info('Processing Gongcha subcategory page');
 
   await waitForLoad(page);
-  await takeDebugScreenshot(page, 'gongcha-category');
+  await takeDebugScreenshot(page, 'gongcha-subcategory');
 
   try {
     const categoryName = await extractCategoryName(page);
@@ -379,10 +351,10 @@ async function handleCategoryPage(
     }
 
     logger.info(
-      `Processed ${productsToProcess.length} products from Gongcha category`
+      `Processed ${productsToProcess.length} products from Gongcha subcategory: ${categoryName}`
     );
   } catch (error) {
-    logger.error(`Error extracting products from category page: ${error}`);
+    logger.error(`Error extracting products from subcategory page: ${error}`);
   }
 }
 
@@ -390,40 +362,44 @@ async function handleCategoryPage(
 // CATEGORY URL EXTRACTION
 // ================================================
 
-async function extractCategoryUrlsFromPage(page: Page): Promise<string[]> {
+function extractAllCategoryUrls(): { url: string; name: string }[] {
+  // Pre-defined list of all subcategories based on the site structure
+  const allCategories = [
+    // 음료 subcategories
+    { categoryCode: '001001', name: 'New 시즌 메뉴', mainCategory: '음료' },
+    { categoryCode: '001002', name: '베스트셀러', mainCategory: '음료' },
+    { categoryCode: '001006', name: '밀크티', mainCategory: '음료' },
+    { categoryCode: '001010', name: '스무디', mainCategory: '음료' },
+    { categoryCode: '001003', name: '오리지널 티', mainCategory: '음료' },
+    { categoryCode: '001015', name: '프룻티&모어', mainCategory: '음료' },
+    { categoryCode: '001011', name: '커피', mainCategory: '음료' },
+    // 푸드 subcategories
+    { categoryCode: '002001', name: '베이커리', mainCategory: '푸드' },
+    { categoryCode: '002004', name: '스낵', mainCategory: '푸드' },
+    { categoryCode: '002006', name: '아이스크림', mainCategory: '푸드' },
+    // MD상품 subcategories
+    { categoryCode: '003001', name: '비식품', mainCategory: 'MD상품' },
+    { categoryCode: '003002', name: '식품', mainCategory: 'MD상품' },
+  ];
+
+  return allCategories.map((cat) => ({
+    url: `${SITE_CONFIG.baseUrl}/brand/menu/product?category=${cat.categoryCode}`,
+    name: cat.name,
+  }));
+}
+
+function extractCategoryUrlsFromPage(_page: Page): string[] {
   try {
-    logger.info('Extracting category URLs from navigation menu...');
+    logger.info('Using pre-defined subcategory URLs...');
 
-    // Wait for navigation to load
-    await page.waitForSelector('.lnb', { timeout: 10_000 });
+    const allCategories = extractAllCategoryUrls();
+    const categoryUrls = allCategories.map((cat) => cat.url);
 
-    // Get all category links from navigation
-    const categoryLinks = await page.locator('.lnb > li > a').all();
-    const categoryUrls: string[] = [];
-
-    for (const link of categoryLinks) {
-      const href = await link.getAttribute('href').catch(() => '');
-      const text = await link.textContent().catch(() => '');
-
-      if (href && text?.trim()) {
-        let fullUrl: string;
-
-        if (href.startsWith('http')) {
-          fullUrl = href;
-        } else {
-          // Construct the mobile menu URL with the category parameter
-          const categoryParam = href.includes('?')
-            ? href.split('?')[1]
-            : href.replace(CATEGORY_PARAM_REGEX, 'c=');
-          fullUrl = `${SITE_CONFIG.baseUrl}/m/brand/menu/product.php?${categoryParam}`;
-        }
-
-        categoryUrls.push(fullUrl);
-        logger.info(`Found category: ${text.trim()} -> ${fullUrl}`);
-      }
+    logger.info(`Total subcategories: ${categoryUrls.length}`);
+    for (const cat of allCategories) {
+      logger.info(`Category: ${cat.name} -> ${cat.url}`);
     }
 
-    logger.info(`Extracted ${categoryUrls.length} category URLs from page`);
     return categoryUrls;
   } catch (error) {
     logger.error(`Error extracting category URLs: ${error}`);
@@ -461,20 +437,20 @@ export const createGongchaCrawler = () =>
 
 export const runGongchaCrawler = async () => {
   try {
-    logger.info('🚀 Starting Gongcha crawler with dynamic category extraction');
+    logger.info('🚀 Starting Gongcha crawler with all subcategories');
 
     // Step 1: Create crawler and start with the initial URL
     const crawler = createGongchaCrawler();
 
     // Step 2: Start crawling from the main menu page
-    // The crawler will first extract category URLs, then crawl each category
+    // The crawler will extract all subcategory URLs, then crawl each subcategory
     await crawler.run([SITE_CONFIG.startUrl]);
 
     const dataset = await crawler.getData();
     await writeProductsToJson(dataset.items as Product[], 'gongcha');
 
     logger.info(
-      `✅ Successfully crawled all categories: ${dataset.items.length} total products`
+      `✅ Successfully crawled all subcategories: ${dataset.items.length} total products`
     );
   } catch (error) {
     logger.error('Gongcha crawler failed:', error);

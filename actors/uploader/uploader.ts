@@ -404,74 +404,103 @@ class ProductUploader {
     wasOptimized: boolean;
   } | null> {
     logger.info(`Downloading image for ${productName}: ${imageUrl}`);
-    const response = await fetch(imageUrl);
-    if (!response.ok) {
-      logger.warn(
-        `Failed to download image for ${productName}: ${response.status} ${response.statusText}`
-      );
-      return null;
+
+    // Handle SSL certificate issues with Gongcha website
+    const originalRejectUnauthorized = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
+    try {
+      // Extract the domain from the image URL to set appropriate referer
+      const imageUrlObj = new URL(imageUrl);
+      const refererUrl = `${imageUrlObj.protocol}//${imageUrlObj.hostname}/`;
+
+      const response = await fetch(imageUrl, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          Accept: 'image/webp,image/apng,image/*,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9,ko;q=0.8',
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+          Referer: refererUrl,
+        },
+      });
+
+      if (!response.ok) {
+        logger.warn(
+          `Failed to download image for ${productName}: ${response.status} ${response.statusText}`
+        );
+        return null;
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const imageBuffer = Buffer.from(arrayBuffer);
+      const originalSize = imageBuffer.length;
+
+      // Check if already WebP
+      const metadata = await sharp(imageBuffer).metadata();
+      let finalBuffer: Buffer = imageBuffer;
+      let wasOptimized = false;
+      let finalSize = originalSize;
+
+      if (metadata.format !== 'webp') {
+        // Optimize using Sharp
+        finalBuffer = Buffer.from(
+          await sharp(imageBuffer).webp({ quality: 85, effort: 6 }).toBuffer()
+        );
+        finalSize = finalBuffer.length;
+        wasOptimized = true;
+
+        const reduction = (
+          ((originalSize - finalSize) / originalSize) *
+          100
+        ).toFixed(1);
+
+        logger.info(
+          `Optimized ${productName}: ${originalSize} bytes → ${finalSize} bytes (${reduction}% reduction)`
+        );
+      } else {
+        logger.info(`Image for ${productName} is already WebP format`);
+      }
+
+      // Upload to Convex storage
+      const uploadSecret = process.env.CONVEX_UPLOAD_SECRET;
+      const uploadUrl = await this.client.mutation(api.http.generateUploadUrl, {
+        uploadSecret,
+      });
+
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'image/webp',
+        },
+        body: new Uint8Array(finalBuffer),
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error(
+          `Failed to upload optimized image: ${uploadResponse.statusText}`
+        );
+      }
+
+      const { storageId } = await uploadResponse.json();
+
+      logger.info(`Uploaded ${productName} image to storage: ${storageId}`);
+
+      return {
+        originalSize,
+        optimizedSize: finalSize,
+        storageId: storageId as string,
+        wasOptimized,
+      };
+    } finally {
+      // Restore original SSL setting
+      if (originalRejectUnauthorized !== undefined) {
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalRejectUnauthorized;
+      } else {
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = undefined;
+      }
     }
-
-    const arrayBuffer = await response.arrayBuffer();
-    const imageBuffer = Buffer.from(arrayBuffer);
-    const originalSize = imageBuffer.length;
-
-    // Check if already WebP
-    const metadata = await sharp(imageBuffer).metadata();
-    let finalBuffer: Buffer = imageBuffer;
-    let wasOptimized = false;
-    let finalSize = originalSize;
-
-    if (metadata.format !== 'webp') {
-      // Optimize using Sharp
-      finalBuffer = Buffer.from(
-        await sharp(imageBuffer).webp({ quality: 85, effort: 6 }).toBuffer()
-      );
-      finalSize = finalBuffer.length;
-      wasOptimized = true;
-
-      const reduction = (
-        ((originalSize - finalSize) / originalSize) *
-        100
-      ).toFixed(1);
-
-      logger.info(
-        `Optimized ${productName}: ${originalSize} bytes → ${finalSize} bytes (${reduction}% reduction)`
-      );
-    } else {
-      logger.info(`Image for ${productName} is already WebP format`);
-    }
-
-    // Upload to Convex storage
-    const uploadSecret = process.env.CONVEX_UPLOAD_SECRET;
-    const uploadUrl = await this.client.mutation(api.http.generateUploadUrl, {
-      uploadSecret,
-    });
-
-    const uploadResponse = await fetch(uploadUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'image/webp',
-      },
-      body: new Uint8Array(finalBuffer),
-    });
-
-    if (!uploadResponse.ok) {
-      throw new Error(
-        `Failed to upload optimized image: ${uploadResponse.statusText}`
-      );
-    }
-
-    const { storageId } = await uploadResponse.json();
-
-    logger.info(`Uploaded ${productName} image to storage: ${storageId}`);
-
-    return {
-      originalSize,
-      optimizedSize: finalSize,
-      storageId: storageId as string,
-      wasOptimized,
-    };
   }
 
   /**
