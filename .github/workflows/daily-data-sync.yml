@@ -3,27 +3,27 @@ name: Daily Data Sync
 # Run daily at 9 AM KST (0 AM UTC) and allow manual trigger
 on:
   schedule:
-    - cron: '0 0 * * *' # Daily at midnight UTC (9 AM KST)
+    - cron: "0 0 * * *" # Daily at midnight UTC (9 AM KST)
   workflow_dispatch:
     inputs:
       target_cafe:
-        description: 'Target specific cafe (optional)'
+        description: "Target specific cafe (optional)"
         required: false
         type: choice
         options:
-          - 'all'
-          - 'starbucks'
-          - 'compose'
-          - 'mega'
-          - 'paik'
-          - 'ediya'
+          - "all"
+          - "starbucks"
+          - "compose"
+          - "mega"
+          - "paik"
+          - "ediya"
           # - 'twosome' # blocked in CI
-          - 'coffeebean'
-          - 'hollys'
-          - 'paulbassett'
-          - 'mammoth'
-          - 'gongcha'
-        default: 'all'
+          - "coffeebean"
+          - "hollys"
+          - "paulbassett"
+          - "mammoth"
+          - "gongcha"
+        default: "all"
 
 jobs:
   # Job 0: Setup dependencies and browsers (shared across all jobs)
@@ -43,9 +43,9 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'pnpm'
-          cache-dependency-path: 'pnpm-lock.yaml'
+          node-version: "22"
+          cache: "pnpm"
+          cache-dependency-path: "pnpm-lock.yaml"
 
       - name: Install dependencies
         run: pnpm install
@@ -89,9 +89,9 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'pnpm'
-          cache-dependency-path: 'pnpm-lock.yaml'
+          node-version: "22"
+          cache: "pnpm"
+          cache-dependency-path: "pnpm-lock.yaml"
 
       - name: Restore node_modules cache
         uses: actions/cache/restore@v4
@@ -170,9 +170,9 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'pnpm'
-          cache-dependency-path: 'pnpm-lock.yaml'
+          node-version: "22"
+          cache: "pnpm"
+          cache-dependency-path: "pnpm-lock.yaml"
 
       - name: Restore node_modules cache
         uses: actions/cache/restore@v4
@@ -253,9 +253,9 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'pnpm'
-          cache-dependency-path: 'pnpm-lock.yaml'
+          node-version: "22"
+          cache: "pnpm"
+          cache-dependency-path: "pnpm-lock.yaml"
 
       - name: Restore node_modules cache
         uses: actions/cache/restore@v4
@@ -291,7 +291,7 @@ jobs:
 
       - name: Run upload for ${{ matrix.cafe }}
         if: steps.check_data.outputs.has_data == 'true'
-        run: pnpm run upload ${{ matrix.cafe }} --download-images
+        run: pnpm run upload ${{ matrix.cafe }}
         env:
           VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL }}
           CONVEX_UPLOAD_SECRET: ${{ secrets.CONVEX_UPLOAD_SECRET }}
