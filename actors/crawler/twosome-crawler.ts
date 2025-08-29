@@ -1,6 +1,7 @@
 import { PlaywrightCrawler } from 'crawlee';
 import type { Locator, Page } from 'playwright';
 import { logger } from '../../shared/logger';
+import type { Nutritions } from '../../shared/nutritions';
 import {
   type Product,
   takeDebugScreenshot,
@@ -72,6 +73,217 @@ const CRAWLER_CONFIG = {
 // ================================================
 // DATA EXTRACTION FUNCTIONS
 // ================================================
+
+// Regex patterns for nutrition extraction
+const NUTRITION_PATTERNS = {
+  servingSize: /(\d+)\s*(ml|mL|ML|g|gram)/i,
+  calories: /(\d+)\s*(kcal|칼로리|열량)/i,
+  protein: /단백질.*?(\d+(?:\.\d+)?)\s*(g|gram)/i,
+  fat: /지방.*?(\d+(?:\.\d+)?)\s*(g|gram)/i,
+  carbohydrates: /탄수화물.*?(\d+(?:\.\d+)?)\s*(g|gram)/i,
+  sugar: /당류.*?(\d+(?:\.\d+)?)\s*(g|gram)/i,
+  sodium: /나트륨.*?(\d+(?:\.\d+)?)\s*(mg|milligram)/i,
+  caffeine: /카페인.*?(\d+(?:\.\d+)?)\s*(mg|milligram)/i,
+} as const;
+
+function parseNutritionValue(match: RegExpMatchArray | null): number | null {
+  if (!match?.[1]) {
+    return null;
+  }
+  const value = Number.parseFloat(match[1]);
+  return Number.isNaN(value) ? null : value;
+}
+
+function createNutritionObject(values: Record<string, number | null>, matches: Record<string, RegExpMatchArray | null>): Nutritions {
+  return {
+    servingSize: values.servingSize,
+    servingSizeUnit: values.servingSize !== null 
+      ? (matches.servingSize?.[2]?.toLowerCase().includes('ml') ? 'ml' : 'g')
+      : null,
+    calories: values.calories,
+    caloriesUnit: values.calories !== null ? 'kcal' : null,
+    carbohydrates: values.carbohydrates,
+    carbohydratesUnit: values.carbohydrates !== null ? 'g' : null,
+    sugar: values.sugar,
+    sugarUnit: values.sugar !== null ? 'g' : null,
+    protein: values.protein,
+    proteinUnit: values.protein !== null ? 'g' : null,
+    fat: values.fat,
+    fatUnit: values.fat !== null ? 'g' : null,
+    transFat: null,
+    transFatUnit: null,
+    saturatedFat: null,
+    saturatedFatUnit: null,
+    natrium: values.sodium,
+    natriumUnit: values.sodium !== null ? 'mg' : null,
+    cholesterol: null,
+    cholesterolUnit: null,
+    caffeine: values.caffeine,
+    caffeineUnit: values.caffeine !== null ? 'mg' : null,
+  };
+}
+
+function extractNutritionFromText(nutritionText: string): Nutritions | null {
+  try {
+    // Parse nutrition values using pre-defined patterns
+    const matches = {
+      servingSize: nutritionText.match(NUTRITION_PATTERNS.servingSize),
+      calories: nutritionText.match(NUTRITION_PATTERNS.calories),
+      protein: nutritionText.match(NUTRITION_PATTERNS.protein),
+      fat: nutritionText.match(NUTRITION_PATTERNS.fat),
+      carbohydrates: nutritionText.match(NUTRITION_PATTERNS.carbohydrates),
+      sugar: nutritionText.match(NUTRITION_PATTERNS.sugar),
+      sodium: nutritionText.match(NUTRITION_PATTERNS.sodium),
+      caffeine: nutritionText.match(NUTRITION_PATTERNS.caffeine),
+    };
+
+    const values = {
+      servingSize: parseNutritionValue(matches.servingSize),
+      calories: parseNutritionValue(matches.calories),
+      protein: parseNutritionValue(matches.protein),
+      fat: parseNutritionValue(matches.fat),
+      carbohydrates: parseNutritionValue(matches.carbohydrates),
+      sugar: parseNutritionValue(matches.sugar),
+      sodium: parseNutritionValue(matches.sodium),
+      caffeine: parseNutritionValue(matches.caffeine),
+    };
+
+    // Only return nutrition data if we found at least some values
+    if (values.servingSize !== null || values.calories !== null || values.protein !== null || values.fat !== null) {
+      return createNutritionObject(values, matches);
+    }
+  } catch (error) {
+    logger.debug('Failed to parse nutrition data from text:', error);
+  }
+  return null;
+}
+
+// Extract nutrition data from product detail page
+async function extractNutritionDataFromDetailPage(page: Page, menuCode: string): Promise<Nutritions | null> {
+  try {
+    // Navigate to product detail page
+    const detailUrl = `${SITE_CONFIG.productUrlTemplate}${menuCode}`;
+    logger.info(`📄 Navigating to detail page: ${detailUrl}`);
+    await page.goto(detailUrl);
+    await waitForLoad(page);
+
+    // Take a screenshot for debugging (only in test mode)
+    if (process.env.CRAWLER_TEST_MODE === 'true') {
+      await takeDebugScreenshot(page, `twosome-detail-${menuCode}`);
+    }
+
+    // Look for nutrition data in the .menu-detail-dl selector
+    const nutritionElement = page.locator('.menu-detail-dl');
+    
+    // Check if nutrition element exists
+    const nutritionElementCount = await nutritionElement.count();
+    logger.info(`📊 Found ${nutritionElementCount} .menu-detail-dl elements for ${menuCode}`);
+    
+    // Debug: also check for any dl elements and their classes
+    const allDlElements = page.locator('dl');
+    const dlCount = await allDlElements.count();
+    logger.info(`📊 Found ${dlCount} dl elements total`);
+    
+    // Debug: log all dl element classes to find the correct selector
+    for (let i = 0; i < Math.min(dlCount, 5); i++) {
+      const dlElement = allDlElements.nth(i);
+      const className = await dlElement.getAttribute('class');
+      const textContent = await dlElement.textContent();
+      logger.info(`📋 dl[${i}] class: "${className}" - text preview: "${textContent?.slice(0, 100)}..."`);
+    }
+    
+    if (nutritionElementCount === 0) {
+      // Try alternative selectors if .menu-detail-dl doesn't exist
+      logger.info(`🔍 Trying alternative selectors for nutrition data`);
+      
+      // Try multiple selectors for nutrition information
+      const alternativeSelectors = [
+        'div:has-text("제품 영양정보")',  // Section with nutrition info
+        'div:has-text("영양성분")',      // Alternative nutrition info
+        'div:has-text("영양정보")',      // Another nutrition info variant
+        'div:has-text("칼로리")',        // Section with calories
+        '.nutrition-info',              // Common nutrition class
+        '.product-nutrition',           // Product nutrition class
+        '[class*="nutrition"]',         // Any element with nutrition in class
+        '[class*="영양"]'               // Any element with 영양 in class
+      ];
+      
+      for (const selector of alternativeSelectors) {
+        try {
+          const elements = page.locator(selector);
+          const count = await elements.count();
+          if (count > 0) {
+            logger.info(`📋 Found ${count} elements with selector: ${selector}`);
+            for (let i = 0; i < Math.min(count, 3); i++) {
+              const element = elements.nth(i);
+              const textContent = await element.textContent();
+              logger.info(`📝 Content preview: "${textContent?.slice(0, 150)}..."`);
+              
+              if (textContent && (
+                textContent.includes('칼로리') || 
+                textContent.includes('kcal') || 
+                textContent.includes('영양') ||
+                textContent.includes('단백질') ||
+                textContent.includes('지방') ||
+                textContent.includes('탄수화물')
+              )) {
+                logger.info(`📋 Found nutrition data with selector: ${selector}[${i}]`);
+                const result = extractNutritionFromText(textContent);
+                if (result) {
+                  logger.info(`📊 Successfully extracted nutrition data for ${menuCode}`);
+                  return result;
+                }
+              }
+            }
+          }
+        } catch (selectorError) {
+          logger.debug(`Selector ${selector} failed:`, selectorError);
+        }
+      }
+      
+      // Try just 'dl' elements that might contain nutrition info
+      for (let i = 0; i < dlCount; i++) {
+        const dlElement = allDlElements.nth(i);
+        const textContent = await dlElement.textContent();
+        if (textContent && (textContent.includes('칼로리') || textContent.includes('kcal') || textContent.includes('영양'))) {
+          logger.info(`📋 Found potential nutrition data in dl[${i}]`);
+          const result = extractNutritionFromText(textContent);
+          logger.info(`📊 Alternative nutrition extraction result for ${menuCode}: ${result ? 'found data' : 'no data'}`);
+          if (result) return result;
+        }
+      }
+      
+      // Try to find any element that contains nutrition-related text
+      logger.info(`🔍 Searching entire page for nutrition keywords`);
+      const bodyText = await page.locator('body').textContent();
+      if (bodyText && (bodyText.includes('칼로리') || bodyText.includes('kcal'))) {
+        logger.info(`📋 Found nutrition keywords in page body`);
+        const result = extractNutritionFromText(bodyText);
+        if (result) {
+          logger.info(`📊 Extracted nutrition data from page body for ${menuCode}`);
+          return result;
+        }
+      }
+      
+      return null;
+    }
+
+    // Extract the text content from the nutrition element
+    const nutritionText = await nutritionElement.textContent().catch(() => '');
+    logger.info(`📝 Nutrition text for ${menuCode}: ${nutritionText?.substring(0, 200) || 'empty'}`);
+    
+    if (!nutritionText) {
+      return null;
+    }
+
+    const result = extractNutritionFromText(nutritionText);
+    logger.info(`📊 Nutrition extraction result for ${menuCode}: ${result ? 'found data' : 'no data'}`);
+    return result;
+  } catch (error) {
+    logger.debug(`Failed to extract nutrition data for menuCode ${menuCode}:`, error);
+    return null;
+  }
+}
 
 async function extractCategoriesFromMenu(
   page: Page
@@ -235,7 +447,8 @@ async function extractProductsFromListing(
 
 function createBasicProduct(
   productInfo: { name: string; menuCode: string; imageUrl: string },
-  categoryName: string
+  categoryName: string,
+  nutritions: Nutritions | null = null
 ): Product {
   const externalId = `twosome_${productInfo.menuCode}`;
 
@@ -249,6 +462,7 @@ function createBasicProduct(
     externalCategory: categoryName,
     externalId,
     externalUrl: `${SITE_CONFIG.productUrlTemplate}${productInfo.menuCode}`,
+    nutritions,
   };
 }
 
@@ -293,10 +507,28 @@ async function handleMainMenuPage(
 
       const products = await extractProductsFromListing(page, category.name);
 
-      // Create products directly from listing page info (avoid timeout issues)
-      const createdProducts = products.map((product) =>
-        createBasicProduct(product, category.name)
-      );
+      // Extract nutrition data for each product
+      const createdProducts = [];
+      for (const product of products) {
+        try {
+          logger.info(`🔍 Extracting nutrition data for: ${product.name} (${product.menuCode})`);
+          
+          // Extract nutrition data from product detail page
+          const nutritions = await extractNutritionDataFromDetailPage(page, product.menuCode);
+          
+          // Create product with nutrition data
+          const createdProduct = createBasicProduct(product, category.name, nutritions);
+          createdProducts.push(createdProduct);
+          
+          logger.info(`✅ Processed: ${product.name}${nutritions ? ' with nutrition data' : ' (no nutrition data found)'}`);
+        } catch (error) {
+          // If nutrition extraction fails, create product without nutrition data
+          logger.warn(`⚠️ Failed to extract nutrition for ${product.name}:`, error);
+          const createdProduct = createBasicProduct(product, category.name, null);
+          createdProducts.push(createdProduct);
+          logger.info(`✅ Processed: ${product.name} (nutrition extraction failed)`);
+        }
+      }
 
       // Push products to crawler dataset in smaller batches to avoid blocking
       const batchSize = 10;

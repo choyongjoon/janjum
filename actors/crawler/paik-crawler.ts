@@ -1,6 +1,7 @@
 import { PlaywrightCrawler, type Request } from 'crawlee';
 import type { Locator, Page } from 'playwright';
 import { logger } from '../../shared/logger';
+import type { Nutritions } from '../../shared/nutritions';
 import {
   type Product,
   takeDebugScreenshot,
@@ -64,6 +65,123 @@ const CRAWLER_CONFIG = {
 // ================================================
 // DATA EXTRACTION FUNCTIONS
 // ================================================
+
+// Regex patterns for nutrition extraction
+const NUTRITION_PATTERNS = {
+  servingSize: /(\d+)\s*(ml|mL|ML|g|gram)/i,
+  calories: /(\d+)\s*(kcal|칼로리|열량)/i,
+  protein: /단백질.*?(\d+(?:\.\d+)?)\s*(g|gram)/i,
+  fat: /지방.*?(\d+(?:\.\d+)?)\s*(g|gram)/i,
+  carbohydrates: /탄수화물.*?(\d+(?:\.\d+)?)\s*(g|gram)/i,
+  sugar: /당류.*?(\d+(?:\.\d+)?)\s*(g|gram)/i,
+  sodium: /나트륨.*?(\d+(?:\.\d+)?)\s*(mg|milligram)/i,
+  caffeine: /카페인.*?(\d+(?:\.\d+)?)\s*(mg|milligram)/i,
+} as const;
+
+function parseNutritionValue(match: RegExpMatchArray | null): number | null {
+  if (!match?.[1]) {
+    return null;
+  }
+  const value = Number.parseFloat(match[1]);
+  return Number.isNaN(value) ? null : value;
+}
+
+// Extract nutrition data from .ingredient_table_box selector
+async function extractNutritionData(
+  menuItem: Locator
+): Promise<Nutritions | null> {
+  try {
+    // Look for nutrition data in the ingredient table box
+    const nutritionBox = menuItem.locator('.ingredient_table_box');
+
+    // Check if nutrition box exists
+    const nutritionBoxCount = await nutritionBox.count();
+    if (nutritionBoxCount === 0) {
+      return null;
+    }
+
+    // Extract the text content from the nutrition box
+    const nutritionText = await nutritionBox.textContent().catch(() => '');
+
+    if (!nutritionText) {
+      return null;
+    }
+
+    return extractNutritionFromText(nutritionText);
+  } catch (error) {
+    logger.debug(
+      'Failed to extract nutrition data from Paik menu item:',
+      error
+    );
+    return null;
+  }
+}
+
+// Parse nutrition values from text content
+function extractNutritionFromText(nutritionText: string): Nutritions | null {
+  try {
+    // Parse nutrition values using pre-defined patterns
+    const matches = {
+      servingSize: nutritionText.match(NUTRITION_PATTERNS.servingSize),
+      calories: nutritionText.match(NUTRITION_PATTERNS.calories),
+      protein: nutritionText.match(NUTRITION_PATTERNS.protein),
+      fat: nutritionText.match(NUTRITION_PATTERNS.fat),
+      carbohydrates: nutritionText.match(NUTRITION_PATTERNS.carbohydrates),
+      sugar: nutritionText.match(NUTRITION_PATTERNS.sugar),
+      sodium: nutritionText.match(NUTRITION_PATTERNS.sodium),
+      caffeine: nutritionText.match(NUTRITION_PATTERNS.caffeine),
+    };
+
+    const values = {
+      servingSize: parseNutritionValue(matches.servingSize),
+      calories: parseNutritionValue(matches.calories),
+      protein: parseNutritionValue(matches.protein),
+      fat: parseNutritionValue(matches.fat),
+      carbohydrates: parseNutritionValue(matches.carbohydrates),
+      sugar: parseNutritionValue(matches.sugar),
+      sodium: parseNutritionValue(matches.sodium),
+      caffeine: parseNutritionValue(matches.caffeine),
+    };
+
+    // Only return nutrition data if we found at least some values
+    if (
+      values.servingSize !== null ||
+      values.calories !== null ||
+      values.protein !== null ||
+      values.fat !== null
+    ) {
+      return {
+        servingSize: values.servingSize,
+        servingSizeUnit: values.servingSize !== null
+          ? (matches.servingSize?.[2]?.toLowerCase().includes('ml') ? 'ml' : 'g')
+          : null,
+        calories: values.calories,
+        caloriesUnit: values.calories !== null ? 'kcal' : null,
+        carbohydrates: values.carbohydrates,
+        carbohydratesUnit: values.carbohydrates !== null ? 'g' : null,
+        sugar: values.sugar,
+        sugarUnit: values.sugar !== null ? 'g' : null,
+        protein: values.protein,
+        proteinUnit: values.protein !== null ? 'g' : null,
+        fat: values.fat,
+        fatUnit: values.fat !== null ? 'g' : null,
+        transFat: null,
+        transFatUnit: null,
+        saturatedFat: null,
+        saturatedFatUnit: null,
+        natrium: values.sodium,
+        natriumUnit: values.sodium !== null ? 'mg' : null,
+        cholesterol: null,
+        cholesterolUnit: null,
+        caffeine: values.caffeine,
+        caffeineUnit: values.caffeine !== null ? 'mg' : null,
+      };
+    }
+  } catch (error) {
+    logger.debug('Failed to parse nutrition data from text:', error);
+  }
+  return null;
+}
 
 // Extract category URLs from the main menu page
 async function extractCategoryUrls(
@@ -194,7 +312,8 @@ function createProduct(
   imageUrl: string,
   description: string,
   category: string,
-  pageUrl: string
+  pageUrl: string,
+  nutritions: Nutritions | null = null
 ): Product {
   const externalId = `paik_${category}_${name}`;
 
@@ -208,6 +327,7 @@ function createProduct(
     externalCategory: category,
     externalId,
     externalUrl: pageUrl,
+    nutritions,
   };
 }
 
@@ -261,10 +381,11 @@ async function extractProductsFromPage(
       try {
         const menuItem = menuItems[i];
 
-        const [name, imageUrl, description] = await Promise.all([
+        const [name, imageUrl, description, nutritions] = await Promise.all([
           extractProductName(menuItem),
           extractProductImage(menuItem),
           extractProductDescription(menuItem, page),
+          extractNutritionData(menuItem),
         ]);
 
         if (isValidProductName(name)) {
@@ -273,13 +394,16 @@ async function extractProductsFromPage(
             imageUrl,
             description,
             categoryName,
-            page.url()
+            page.url(),
+            nutritions
           );
 
           // Check for duplicates
           if (!products.some((p) => p.externalId === product.externalId)) {
             products.push(product);
-            logger.info(`✅ Extracted: ${name} (${product.category})`);
+            logger.info(
+              `✅ Extracted: ${name} (${product.category})${nutritions ? ' with nutrition data' : ''}`
+            );
           }
         }
       } catch (productError) {

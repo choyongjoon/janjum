@@ -76,58 +76,83 @@ const CRAWLER_CONFIG = {
 // DATA EXTRACTION FUNCTIONS
 // ================================================
 
+// Regex patterns for nutrition extraction
+const NUTRITION_PATTERNS = {
+  servingSize: /(\d+)\s*(ml|mL|ML|g|gram)/i,
+  calories: /(\d+)\s*(kcal|칼로리|열량)/i,
+  protein: /단백질.*?(\d+(?:\.\d+)?)\s*(g|gram)/i,
+  fat: /지방.*?(\d+(?:\.\d+)?)\s*(g|gram)/i,
+  carbohydrates: /탄수화물.*?(\d+(?:\.\d+)?)\s*(g|gram)/i,
+  sugar: /당류.*?(\d+(?:\.\d+)?)\s*(g|gram)/i,
+  sodium: /나트륨.*?(\d+(?:\.\d+)?)\s*(mg|milligram)/i,
+  caffeine: /카페인.*?(\d+(?:\.\d+)?)\s*(mg|milligram)/i,
+} as const;
+
+function parseNutritionValue(match: RegExpMatchArray | null): number | null {
+  if (!match?.[1]) {
+    return null;
+  }
+  const value = Number.parseFloat(match[1]);
+  return Number.isNaN(value) ? null : value;
+}
+
 function extractNutritionFromText(infoText: string): Nutritions | null {
   try {
-    // Parse nutrition values from the info text
-    const servingSizeMatch = infoText.match(/(\d+)\s*(ml|mL|ML|g|gram)/i);
-    const caloriesMatch = infoText.match(/(\d+)\s*(kcal|칼로리|열량)/i);
-    const proteinMatch = infoText.match(/단백질.*?(\d+(?:\.\d+)?)\s*(g|gram)/i);
-    const fatMatch = infoText.match(/지방.*?(\d+(?:\.\d+)?)\s*(g|gram)/i);
-    const carbohydratesMatch = infoText.match(/탄수화물.*?(\d+(?:\.\d+)?)\s*(g|gram)/i);
-    const sugarMatch = infoText.match(/당류.*?(\d+(?:\.\d+)?)\s*(g|gram)/i);
-    const sodiumMatch = infoText.match(/나트륨.*?(\d+(?:\.\d+)?)\s*(mg|milligram)/i);
-    const caffeineMatch = infoText.match(/카페인.*?(\d+(?:\.\d+)?)\s*(mg|milligram)/i);
-
-    const parseValue = (match: RegExpMatchArray | null): number | null => {
-      if (!match || !match[1]) return null;
-      const value = parseFloat(match[1]);
-      return isNaN(value) ? null : value;
+    // Parse nutrition values using pre-defined patterns
+    const matches = {
+      servingSize: infoText.match(NUTRITION_PATTERNS.servingSize),
+      calories: infoText.match(NUTRITION_PATTERNS.calories),
+      protein: infoText.match(NUTRITION_PATTERNS.protein),
+      fat: infoText.match(NUTRITION_PATTERNS.fat),
+      carbohydrates: infoText.match(NUTRITION_PATTERNS.carbohydrates),
+      sugar: infoText.match(NUTRITION_PATTERNS.sugar),
+      sodium: infoText.match(NUTRITION_PATTERNS.sodium),
+      caffeine: infoText.match(NUTRITION_PATTERNS.caffeine),
     };
 
-    const servingSize = parseValue(servingSizeMatch);
-    const calories = parseValue(caloriesMatch);
-    const protein = parseValue(proteinMatch);
-    const fat = parseValue(fatMatch);
-    const carbohydrates = parseValue(carbohydratesMatch);
-    const sugar = parseValue(sugarMatch);
-    const sodium = parseValue(sodiumMatch);
-    const caffeine = parseValue(caffeineMatch);
+    const values = {
+      servingSize: parseNutritionValue(matches.servingSize),
+      calories: parseNutritionValue(matches.calories),
+      protein: parseNutritionValue(matches.protein),
+      fat: parseNutritionValue(matches.fat),
+      carbohydrates: parseNutritionValue(matches.carbohydrates),
+      sugar: parseNutritionValue(matches.sugar),
+      sodium: parseNutritionValue(matches.sodium),
+      caffeine: parseNutritionValue(matches.caffeine),
+    };
 
     // Only return nutrition data if we found at least some values
-    if (servingSize !== null || calories !== null || protein !== null || fat !== null) {
+    if (
+      values.servingSize !== null ||
+      values.calories !== null ||
+      values.protein !== null ||
+      values.fat !== null
+    ) {
       return {
-        servingSize,
-        servingSizeUnit: servingSize !== null ? (servingSizeMatch?.[2]?.toLowerCase().includes('ml') ? 'ml' : 'g') : null,
-        calories,
-        caloriesUnit: calories !== null ? 'kcal' : null,
-        carbohydrates,
-        carbohydratesUnit: carbohydrates !== null ? 'g' : null,
-        sugar,
-        sugarUnit: sugar !== null ? 'g' : null,
-        protein,
-        proteinUnit: protein !== null ? 'g' : null,
-        fat,
-        fatUnit: fat !== null ? 'g' : null,
+        servingSize: values.servingSize,
+        servingSizeUnit: values.servingSize !== null 
+          ? (matches.servingSize?.[2]?.toLowerCase().includes('ml') ? 'ml' : 'g')
+          : null,
+        calories: values.calories,
+        caloriesUnit: values.calories !== null ? 'kcal' : null,
+        carbohydrates: values.carbohydrates,
+        carbohydratesUnit: values.carbohydrates !== null ? 'g' : null,
+        sugar: values.sugar,
+        sugarUnit: values.sugar !== null ? 'g' : null,
+        protein: values.protein,
+        proteinUnit: values.protein !== null ? 'g' : null,
+        fat: values.fat,
+        fatUnit: values.fat !== null ? 'g' : null,
         transFat: null,
         transFatUnit: null,
         saturatedFat: null,
         saturatedFatUnit: null,
-        natrium: sodium,
-        natriumUnit: sodium !== null ? 'mg' : null,
+        natrium: values.sodium,
+        natriumUnit: values.sodium !== null ? 'mg' : null,
         cholesterol: null,
         cholesterolUnit: null,
-        caffeine,
-        caffeineUnit: caffeine !== null ? 'mg' : null,
+        caffeine: values.caffeine,
+        caffeineUnit: values.caffeine !== null ? 'mg' : null,
       };
     }
   } catch (error) {
