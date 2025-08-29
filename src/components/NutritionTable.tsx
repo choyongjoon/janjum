@@ -63,7 +63,6 @@ export const nutritionItems: NutritionItem[] = [
   { key: 'natrium', name: '나트륨' },
   { key: 'carbohydrates', name: '탄수화물' },
   { key: 'sugar', name: '당류', dependency: 'carbohydrates' },
-  { key: 'protein', name: '단백질' },
   { key: 'fat', name: '지방' },
   { key: 'transFat', name: '트랜스지방', dependency: 'fat' },
   { key: 'saturatedFat', name: '포화지방', dependency: 'fat' },
@@ -74,7 +73,7 @@ export const nutritionItems: NutritionItem[] = [
 
 export const NutritionTable = ({ nutritions }: { nutritions: Nutritions }) => {
   return (
-    <div className="max-w-3xs border-4 border-black bg-white">
+    <div className="max-w-3xs border-4 border-black bg-white text-black">
       <table className="table">
         <thead>
           <tr>
@@ -101,27 +100,25 @@ export const NutritionTable = ({ nutritions }: { nutritions: Nutritions }) => {
               <div>기준치에 대한 비율</div>
             </span>
           </tr>
-          {nutritionItems.map((item) => {
-            if (nutritions[item.key] === undefined) {
-              return null;
-            }
-
-            return (
-              <NutrationRow
-                isLeftPadded={
-                  item.dependency && nutritions[item.dependency] !== undefined
-                }
-                key={item.key}
-                label={item.name}
-                percent={calculatePercent(
-                  nutritions[item.key],
-                  // @ts-expect-error
-                  dailyStandardNutritions[item.key]
-                )}
-                value={`${nutritions[item.key]}${nutritions[`${item.key}Unit`]}`}
-              />
-            );
-          })}
+          {nutritionItems
+            .filter((item) => nutritions[item.key] !== undefined)
+            .map((item) => {
+              return (
+                <NutrationRow
+                  isLeftPadded={
+                    item.dependency && nutritions[item.dependency] !== undefined
+                  }
+                  key={item.key}
+                  label={item.name}
+                  percent={calculatePercent(
+                    nutritions[item.key],
+                    // @ts-expect-error
+                    dailyStandardNutritions[item.key]
+                  )}
+                  value={`${nutritions[item.key]}${nutritions[`${item.key}Unit`]}`}
+                />
+              );
+            })}
           <tr className="flex break-keep border-t-4 p-1 leading-none">
             <p className="font-light">
               <span className="font-medium text-sm">
