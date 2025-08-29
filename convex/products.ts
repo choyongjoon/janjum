@@ -8,10 +8,12 @@ export const getByCafe = query({
   handler: async (ctx, { cafeId }) => {
     const products = await ctx.db
       .query('products')
-      .withIndex('by_cafe', (q) => q.eq('cafeId', cafeId))
+      .withIndex('by_cafe_active', (q) =>
+        q.eq('cafeId', cafeId).eq('isActive', true)
+      )
       .collect();
 
-    return await Promise.all(
+    const productsWithImages = await Promise.all(
       products.map(async (product) => ({
         ...product,
         imageUrl: product.imageStorageId
@@ -19,6 +21,9 @@ export const getByCafe = query({
           : undefined,
       }))
     );
+
+    // Sort by addedAt in descending order (recently created first)
+    return productsWithImages.sort((a, b) => b.addedAt - a.addedAt);
   },
 });
 
@@ -35,15 +40,18 @@ export const search = query({
       return [];
     }
 
-    const productsQuery = ctx.db.query('products');
-
-    // Filter by active products only
-    let products = await productsQuery.collect();
-
     // Filter by cafe if specified
-    if (cafeId) {
-      products = products.filter((p) => p.cafeId === cafeId);
-    }
+    let products = cafeId
+      ? await ctx.db
+          .query('products')
+          .withIndex('by_cafe_active', (q) =>
+            q.eq('cafeId', cafeId).eq('isActive', true)
+          )
+          .collect()
+      : await ctx.db
+          .query('products')
+          .filter((q) => q.eq(q.field('isActive'), true))
+          .collect();
 
     // Filter by category if specified
     if (category) {
