@@ -8,6 +8,7 @@ import {
   waitForLoad,
   writeProductsToJson,
 } from './crawlerUtils';
+import { parseNutritionValueFromText } from './nutritionUtils';
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
@@ -160,14 +161,6 @@ function createMinimalNutrition(
   return null;
 }
 
-function parseNutritionValue(text: string | null): number | null {
-  if (!text || text.trim() === '' || text.trim() === '-') {
-    return null;
-  }
-  const parsed = Number.parseFloat(text.trim());
-  return Number.isNaN(parsed) ? null : parsed;
-}
-
 function extractAllNutritionValues(page: Page): Promise<string[]> {
   return Promise.all([
     page
@@ -233,26 +226,30 @@ function createNutritionObject(
   return {
     servingSize,
     servingSizeUnit: servingSize !== null ? 'ml' : null,
-    calories: parseNutritionValue(calories),
-    caloriesUnit: parseNutritionValue(calories) !== null ? 'kcal' : null,
-    carbohydrates: parseNutritionValue(carbohydrates),
-    carbohydratesUnit: parseNutritionValue(carbohydrates) !== null ? 'g' : null,
-    sugar: parseNutritionValue(sugar),
-    sugarUnit: parseNutritionValue(sugar) !== null ? 'g' : null,
-    protein: parseNutritionValue(protein),
-    proteinUnit: parseNutritionValue(protein) !== null ? 'g' : null,
-    fat: parseNutritionValue(fat),
-    fatUnit: parseNutritionValue(fat) !== null ? 'g' : null,
-    transFat: parseNutritionValue(transFat),
-    transFatUnit: parseNutritionValue(transFat) !== null ? 'g' : null,
-    saturatedFat: parseNutritionValue(saturatedFat),
-    saturatedFatUnit: parseNutritionValue(saturatedFat) !== null ? 'g' : null,
-    natrium: parseNutritionValue(sodium),
-    natriumUnit: parseNutritionValue(sodium) !== null ? 'mg' : null,
-    cholesterol: parseNutritionValue(cholesterol),
-    cholesterolUnit: parseNutritionValue(cholesterol) !== null ? 'mg' : null,
-    caffeine: parseNutritionValue(caffeine),
-    caffeineUnit: parseNutritionValue(caffeine) !== null ? 'mg' : null,
+    calories: parseNutritionValueFromText(calories),
+    caloriesUnit:
+      parseNutritionValueFromText(calories) !== null ? 'kcal' : null,
+    carbohydrates: parseNutritionValueFromText(carbohydrates),
+    carbohydratesUnit:
+      parseNutritionValueFromText(carbohydrates) !== null ? 'g' : null,
+    sugar: parseNutritionValueFromText(sugar),
+    sugarUnit: parseNutritionValueFromText(sugar) !== null ? 'g' : null,
+    protein: parseNutritionValueFromText(protein),
+    proteinUnit: parseNutritionValueFromText(protein) !== null ? 'g' : null,
+    fat: parseNutritionValueFromText(fat),
+    fatUnit: parseNutritionValueFromText(fat) !== null ? 'g' : null,
+    transFat: parseNutritionValueFromText(transFat),
+    transFatUnit: parseNutritionValueFromText(transFat) !== null ? 'g' : null,
+    saturatedFat: parseNutritionValueFromText(saturatedFat),
+    saturatedFatUnit:
+      parseNutritionValueFromText(saturatedFat) !== null ? 'g' : null,
+    natrium: parseNutritionValueFromText(sodium),
+    natriumUnit: parseNutritionValueFromText(sodium) !== null ? 'mg' : null,
+    cholesterol: parseNutritionValueFromText(cholesterol),
+    cholesterolUnit:
+      parseNutritionValueFromText(cholesterol) !== null ? 'mg' : null,
+    caffeine: parseNutritionValueFromText(caffeine),
+    caffeineUnit: parseNutritionValueFromText(caffeine) !== null ? 'mg' : null,
   };
 }
 

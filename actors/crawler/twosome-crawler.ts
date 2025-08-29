@@ -9,6 +9,10 @@ import {
   waitForLoad,
   writeProductsToJson,
 } from './crawlerUtils';
+import {
+  extractNutritionFromText,
+  hasNutritionKeywords,
+} from './nutritionUtils';
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
@@ -74,104 +78,6 @@ const CRAWLER_CONFIG = {
 // DATA EXTRACTION FUNCTIONS
 // ================================================
 
-// Regex patterns for nutrition extraction
-const NUTRITION_PATTERNS = {
-  servingSize: /(\d+)\s*(ml|mL|ML|g|gram)/i,
-  calories: /(\d+)\s*(kcal|칼로리|열량)/i,
-  protein: /단백질.*?(\d+(?:\.\d+)?)\s*(g|gram)/i,
-  fat: /지방.*?(\d+(?:\.\d+)?)\s*(g|gram)/i,
-  carbohydrates: /탄수화물.*?(\d+(?:\.\d+)?)\s*(g|gram)/i,
-  sugar: /당류.*?(\d+(?:\.\d+)?)\s*(g|gram)/i,
-  sodium: /나트륨.*?(\d+(?:\.\d+)?)\s*(mg|milligram)/i,
-  caffeine: /카페인.*?(\d+(?:\.\d+)?)\s*(mg|milligram)/i,
-} as const;
-
-function parseNutritionValue(match: RegExpMatchArray | null): number | null {
-  if (!match?.[1]) {
-    return null;
-  }
-  const value = Number.parseFloat(match[1]);
-  return Number.isNaN(value) ? null : value;
-}
-
-function createNutritionObject(
-  values: Record<string, number | null>,
-  matches: Record<string, RegExpMatchArray | null>
-): Nutritions {
-  const getServingSizeUnit = (): string | null => {
-    if (values.servingSize === null) {
-      return null;
-    }
-    const unitText = matches.servingSize?.[2]?.toLowerCase();
-    return unitText?.includes('ml') ? 'ml' : 'g';
-  };
-
-  return {
-    servingSize: values.servingSize,
-    servingSizeUnit: getServingSizeUnit(),
-    calories: values.calories,
-    caloriesUnit: values.calories !== null ? 'kcal' : null,
-    carbohydrates: values.carbohydrates,
-    carbohydratesUnit: values.carbohydrates !== null ? 'g' : null,
-    sugar: values.sugar,
-    sugarUnit: values.sugar !== null ? 'g' : null,
-    protein: values.protein,
-    proteinUnit: values.protein !== null ? 'g' : null,
-    fat: values.fat,
-    fatUnit: values.fat !== null ? 'g' : null,
-    transFat: null,
-    transFatUnit: null,
-    saturatedFat: null,
-    saturatedFatUnit: null,
-    natrium: values.sodium,
-    natriumUnit: values.sodium !== null ? 'mg' : null,
-    cholesterol: null,
-    cholesterolUnit: null,
-    caffeine: values.caffeine,
-    caffeineUnit: values.caffeine !== null ? 'mg' : null,
-  };
-}
-
-function extractNutritionFromText(nutritionText: string): Nutritions | null {
-  try {
-    // Parse nutrition values using pre-defined patterns
-    const matches = {
-      servingSize: nutritionText.match(NUTRITION_PATTERNS.servingSize),
-      calories: nutritionText.match(NUTRITION_PATTERNS.calories),
-      protein: nutritionText.match(NUTRITION_PATTERNS.protein),
-      fat: nutritionText.match(NUTRITION_PATTERNS.fat),
-      carbohydrates: nutritionText.match(NUTRITION_PATTERNS.carbohydrates),
-      sugar: nutritionText.match(NUTRITION_PATTERNS.sugar),
-      sodium: nutritionText.match(NUTRITION_PATTERNS.sodium),
-      caffeine: nutritionText.match(NUTRITION_PATTERNS.caffeine),
-    };
-
-    const values = {
-      servingSize: parseNutritionValue(matches.servingSize),
-      calories: parseNutritionValue(matches.calories),
-      protein: parseNutritionValue(matches.protein),
-      fat: parseNutritionValue(matches.fat),
-      carbohydrates: parseNutritionValue(matches.carbohydrates),
-      sugar: parseNutritionValue(matches.sugar),
-      sodium: parseNutritionValue(matches.sodium),
-      caffeine: parseNutritionValue(matches.caffeine),
-    };
-
-    // Only return nutrition data if we found at least some values
-    if (
-      values.servingSize !== null ||
-      values.calories !== null ||
-      values.protein !== null ||
-      values.fat !== null
-    ) {
-      return createNutritionObject(values, matches);
-    }
-  } catch (error) {
-    logger.debug('Failed to parse nutrition data from text:', error);
-  }
-  return null;
-}
-
 // Helper function to debug DL elements
 async function debugDlElements(page: Page, _menuCode: string): Promise<void> {
   const allDlElements = page.locator('dl');
@@ -187,18 +93,6 @@ async function debugDlElements(page: Page, _menuCode: string): Promise<void> {
       `📋 dl[${i}] class: "${className}" - text preview: "${textContent?.slice(0, 100)}..."`
     );
   }
-}
-
-// Helper function to check if text contains nutrition keywords
-function hasNutritionKeywords(text: string): boolean {
-  return (
-    text.includes('칼로리') ||
-    text.includes('kcal') ||
-    text.includes('영양') ||
-    text.includes('단백질') ||
-    text.includes('지방') ||
-    text.includes('탄수화물')
-  );
 }
 
 // Helper function to get alternative nutrition selectors
