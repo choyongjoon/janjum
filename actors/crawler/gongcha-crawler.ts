@@ -114,9 +114,11 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
 
     // Parse nutrition values
     const parseValue = (text: string | null): number | null => {
-      if (!text || text.trim() === '' || text.trim() === '-') return null;
+      if (!text || text.trim() === '' || text.trim() === '-') {
+        return null;
+      }
       const parsed = Number.parseFloat(text.trim());
-      return isNaN(parsed) ? null : parsed;
+      return Number.isNaN(parsed) ? null : parsed;
     };
 
     const servingSize = parseValue(servingSizeText);
@@ -183,65 +185,90 @@ async function extractBasicProductInfo(container: Locator) {
   return { name: productName, imageSrc };
 }
 
+// Helper function to navigate to product detail page
+async function navigateToProductDetail(
+  page: Page,
+  productLink: Locator,
+  productName: string
+): Promise<void> {
+  const href = await productLink.getAttribute('href').catch(() => '');
+  logger.info(
+    `Extracting description and nutrition for: ${productName} (href: ${href})`
+  );
+
+  await productLink.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(500);
+
+  await productLink.click({ timeout: 8000 });
+  await page.waitForTimeout(2000); // Wait longer for page to fully load
+
+  // Only take screenshot in test mode for debugging
+  if (isTestMode) {
+    await takeDebugScreenshot(
+      page,
+      `gongcha-detail-${productName.replace(/\s+/g, '_')}`
+    );
+  }
+}
+
+// Helper function to check if text is a valid product description
+function isValidProductDescription(text: string): boolean {
+  const trimmed = text.trim();
+  return (
+    trimmed.length > 20 &&
+    !trimmed.includes('Follow us') &&
+    !trimmed.includes('Menu') &&
+    !trimmed.includes('공차') &&
+    (trimmed.includes('티') ||
+      trimmed.includes('스무디') ||
+      trimmed.includes('밀크'))
+  );
+}
+
+// Helper function to extract description from main element
+async function extractMainDescription(page: Page): Promise<string> {
+  const descElement = page.locator('.text-a .t2').first();
+  if ((await descElement.count()) > 0) {
+    const description = (await descElement.textContent()) || '';
+    return description.trim();
+  }
+  return '';
+}
+
+// Helper function to extract description from fallback elements
+async function extractFallbackDescription(page: Page): Promise<string> {
+  const descElements = page.locator('p');
+  const descCount = await descElements.count();
+
+  for (let i = 0; i < descCount; i++) {
+    const text = (await descElements.nth(i).textContent()) || '';
+    if (isValidProductDescription(text)) {
+      return text.trim();
+    }
+  }
+  return '';
+}
+
+// Helper function to extract complete product description
+async function extractProductDescription(page: Page): Promise<string> {
+  let description = await extractMainDescription(page);
+
+  if (!description) {
+    description = await extractFallbackDescription(page);
+  }
+
+  return description;
+}
+
 async function extractDescriptionAndNutritionFromDetailPage(
   page: Page,
   productLink: Locator,
   productName: string
 ): Promise<{ description: string; nutritions: Nutritions | null }> {
   try {
-    const href = await productLink.getAttribute('href').catch(() => '');
-    logger.info(
-      `Extracting description and nutrition for: ${productName} (href: ${href})`
-    );
+    await navigateToProductDetail(page, productLink, productName);
 
-    await productLink.scrollIntoViewIfNeeded();
-    await page.waitForTimeout(500);
-
-    await productLink.click({ timeout: 8000 });
-    await page.waitForTimeout(2000); // Wait longer for page to fully load
-
-    // Only take screenshot in test mode for debugging
-    if (isTestMode) {
-      await takeDebugScreenshot(
-        page,
-        `gongcha-detail-${productName.replace(/\s+/g, '_')}`
-      );
-    }
-
-    // Extract description - look for the main product description paragraph
-    let description = '';
-    const descElement = page.locator('.text-a .t2').first();
-    if ((await descElement.count()) > 0) {
-      description = (await descElement.textContent()) || '';
-      description = description.trim();
-    }
-
-    if (!description) {
-      // Fallback: Look for description paragraphs
-      const descElements = page.locator('p');
-      const descCount = await descElements.count();
-
-      for (let i = 0; i < descCount; i++) {
-        const text = (await descElements.nth(i).textContent()) || '';
-        const trimmed = text.trim();
-
-        // Look for meaningful product descriptions (longer than 20 chars, not navigation text)
-        if (
-          trimmed.length > 20 &&
-          !trimmed.includes('Follow us') &&
-          !trimmed.includes('Menu') &&
-          !trimmed.includes('공차') &&
-          (trimmed.includes('티') ||
-            trimmed.includes('스무디') ||
-            trimmed.includes('밀크'))
-        ) {
-          description = trimmed;
-          break;
-        }
-      }
-    }
-
-    // Extract nutrition data
+    const description = await extractProductDescription(page);
     const nutritions = await extractNutritionData(page);
 
     if (description) {

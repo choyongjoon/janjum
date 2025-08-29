@@ -21,6 +21,14 @@ const SITE_CONFIG = {
 } as const;
 
 // ================================================
+// REGEX PATTERNS
+// ================================================
+
+const STARBUCKS_REGEX_PATTERNS = {
+  servingSize: /(\d+)ml/,
+} as const;
+
+// ================================================
 // CSS SELECTORS
 // ================================================
 
@@ -81,6 +89,179 @@ const CRAWLER_CONFIG = {
 // DATA EXTRACTION FUNCTIONS
 // ================================================
 
+async function checkNutritionInfoExists(page: Page): Promise<boolean> {
+  return (await page.locator('#product_info01').count()) > 0;
+}
+
+async function waitForNutritionContent(page: Page): Promise<void> {
+  await page
+    .waitForFunction(
+      () => {
+        const servingElement = document.querySelector('#product_info01');
+        return (
+          servingElement?.textContent &&
+          servingElement.textContent.trim().length > 0
+        );
+      },
+      { timeout: 10_000 }
+    )
+    .catch(() => {
+      logger.warn('Serving size not populated within timeout');
+    });
+}
+
+async function extractServingSize(page: Page): Promise<number | undefined> {
+  const servingText = await page.locator('#product_info01').textContent();
+  logger.info(`Serving size text: ${servingText}`);
+
+  const servingMatch = servingText?.match(STARBUCKS_REGEX_PATTERNS.servingSize);
+  return servingMatch ? Number.parseInt(servingMatch[1], 10) : undefined;
+}
+
+async function checkNutritionValuesPopulated(
+  page: Page
+): Promise<{ caloriesText: string; proteinText: string }> {
+  const caloriesText = await page
+    .locator('.product_info_content li.kcal dd')
+    .textContent()
+    .catch(() => '');
+  const proteinText = await page
+    .locator('.product_info_content li.protein dd')
+    .textContent()
+    .catch(() => '');
+
+  logger.info(
+    `Calories text: '${caloriesText}', Protein text: '${proteinText}'`
+  );
+
+  return { caloriesText, proteinText };
+}
+
+function hasValidNutritionValues(
+  caloriesText: string,
+  proteinText: string
+): boolean {
+  const isCaloriesEmpty =
+    !caloriesText || caloriesText.trim() === '' || caloriesText.trim() === '-';
+  const isProteinEmpty =
+    !proteinText || proteinText.trim() === '' || proteinText.trim() === '-';
+  return !(isCaloriesEmpty && isProteinEmpty);
+}
+
+function createMinimalNutrition(
+  servingSize: number | undefined
+): Nutritions | null {
+  if (servingSize) {
+    return {
+      servingSize,
+      servingSizeUnit: 'ml',
+    };
+  }
+  return null;
+}
+
+function parseNutritionValue(text: string | null): number | null {
+  if (!text || text.trim() === '' || text.trim() === '-') {
+    return null;
+  }
+  const parsed = Number.parseFloat(text.trim());
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function extractAllNutritionValues(page: Page): Promise<string[]> {
+  return Promise.all([
+    page
+      .locator('.product_info_content li.kcal dd')
+      .textContent()
+      .catch(() => ''),
+    page
+      .locator('.product_info_content li.protein dd')
+      .textContent()
+      .catch(() => ''),
+    page
+      .locator('.product_info_content li.fat dd')
+      .textContent()
+      .catch(() => ''),
+    page
+      .locator('.product_info_content li.sat_FAT dd')
+      .textContent()
+      .catch(() => ''),
+    page
+      .locator('.product_info_content li.trans_FAT dd')
+      .textContent()
+      .catch(() => ''),
+    page
+      .locator('.product_info_content li.cholesterol dd')
+      .textContent()
+      .catch(() => ''),
+    page
+      .locator('.product_info_content li.sodium dd')
+      .textContent()
+      .catch(() => ''),
+    page
+      .locator('.product_info_content li.sugars dd')
+      .textContent()
+      .catch(() => ''),
+    page
+      .locator('.product_info_content li.chabo dd')
+      .textContent()
+      .catch(() => ''), // carbohydrates
+    page
+      .locator('.product_info_content li.caffeine dd')
+      .textContent()
+      .catch(() => ''),
+  ]);
+}
+
+function createNutritionObject(
+  servingSize: number | undefined,
+  nutritionValues: string[]
+): Nutritions {
+  const [
+    calories,
+    protein,
+    fat,
+    saturatedFat,
+    transFat,
+    cholesterol,
+    sodium,
+    sugar,
+    carbohydrates,
+    caffeine,
+  ] = nutritionValues;
+
+  return {
+    servingSize,
+    servingSizeUnit: servingSize !== null ? 'ml' : null,
+    calories: parseNutritionValue(calories),
+    caloriesUnit: parseNutritionValue(calories) !== null ? 'kcal' : null,
+    carbohydrates: parseNutritionValue(carbohydrates),
+    carbohydratesUnit: parseNutritionValue(carbohydrates) !== null ? 'g' : null,
+    sugar: parseNutritionValue(sugar),
+    sugarUnit: parseNutritionValue(sugar) !== null ? 'g' : null,
+    protein: parseNutritionValue(protein),
+    proteinUnit: parseNutritionValue(protein) !== null ? 'g' : null,
+    fat: parseNutritionValue(fat),
+    fatUnit: parseNutritionValue(fat) !== null ? 'g' : null,
+    transFat: parseNutritionValue(transFat),
+    transFatUnit: parseNutritionValue(transFat) !== null ? 'g' : null,
+    saturatedFat: parseNutritionValue(saturatedFat),
+    saturatedFatUnit: parseNutritionValue(saturatedFat) !== null ? 'g' : null,
+    natrium: parseNutritionValue(sodium),
+    natriumUnit: parseNutritionValue(sodium) !== null ? 'mg' : null,
+    cholesterol: parseNutritionValue(cholesterol),
+    cholesterolUnit: parseNutritionValue(cholesterol) !== null ? 'mg' : null,
+    caffeine: parseNutritionValue(caffeine),
+    caffeineUnit: parseNutritionValue(caffeine) !== null ? 'mg' : null,
+  };
+}
+
+function hasAnyNutritionData(nutritions: Nutritions): boolean {
+  return Object.entries(nutritions).some(
+    ([key, value]) => !key.endsWith('Unit') && value !== null
+  );
+}
+
 async function extractNutritionData(page: Page): Promise<Nutritions | null> {
   try {
     // Wait for the page to fully load and for AJAX requests to complete
@@ -90,8 +271,7 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
     await takeDebugScreenshot(page, 'nutrition-debug');
 
     // First check if nutrition data is available by checking the serving size element
-    const hasNutritionInfo =
-      (await page.locator('#product_info01').count()) > 0;
+    const hasNutritionInfo = await checkNutritionInfoExists(page);
 
     if (!hasNutritionInfo) {
       logger.warn('No nutrition info section found on page');
@@ -99,161 +279,30 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
     }
 
     // Wait for nutrition content to be populated
-    await page
-      .waitForFunction(
-        () => {
-          const servingElement = document.querySelector('#product_info01');
-          return (
-            servingElement &&
-            servingElement.textContent &&
-            servingElement.textContent.trim().length > 0
-          );
-        },
-        { timeout: 10_000 }
-      )
-      .catch(() => {
-        logger.warn('Serving size not populated within timeout');
-      });
+    await waitForNutritionContent(page);
 
     // Extract serving size information
-    const servingText = await page.locator('#product_info01').textContent();
-    logger.info(`Serving size text: ${servingText}`);
-
-    const servingMatch = servingText?.match(/(\d+)ml/);
-    const servingSize = servingMatch
-      ? Number.parseInt(servingMatch[1])
-      : undefined;
+    const servingSize = await extractServingSize(page);
 
     // Check if nutrition values are populated (they might be loaded via AJAX)
-    const caloriesText = await page
-      .locator('.product_info_content li.kcal dd')
-      .textContent()
-      .catch(() => '');
-    const proteinText = await page
-      .locator('.product_info_content li.protein dd')
-      .textContent()
-      .catch(() => '');
-
-    logger.info(
-      `Calories text: '${caloriesText}', Protein text: '${proteinText}'`
-    );
+    const { caloriesText, proteinText } =
+      await checkNutritionValuesPopulated(page);
 
     // If nutrition values are empty or not loaded, return minimal data with serving size
-    if (
-      (!caloriesText ||
-        caloriesText.trim() === '' ||
-        caloriesText.trim() === '-') &&
-      (!proteinText || proteinText.trim() === '' || proteinText.trim() === '-')
-    ) {
-      // Return basic serving size info if available
-      if (servingSize) {
-        return {
-          servingSize,
-          servingSizeUnit: 'ml',
-        };
-      }
-
-      return null;
+    if (!hasValidNutritionValues(caloriesText, proteinText)) {
+      return createMinimalNutrition(servingSize);
     }
 
-    // Parse nutrition values
-    const parseValue = (text: string | null): number | null => {
-      if (!text || text.trim() === '' || text.trim() === '-') return null;
-      const parsed = Number.parseFloat(text.trim());
-      return isNaN(parsed) ? null : parsed;
-    };
-
     // Extract all nutrition values
-    const nutritionValues = await Promise.all([
-      page
-        .locator('.product_info_content li.kcal dd')
-        .textContent()
-        .catch(() => ''),
-      page
-        .locator('.product_info_content li.protein dd')
-        .textContent()
-        .catch(() => ''),
-      page
-        .locator('.product_info_content li.fat dd')
-        .textContent()
-        .catch(() => ''),
-      page
-        .locator('.product_info_content li.sat_FAT dd')
-        .textContent()
-        .catch(() => ''),
-      page
-        .locator('.product_info_content li.trans_FAT dd')
-        .textContent()
-        .catch(() => ''),
-      page
-        .locator('.product_info_content li.cholesterol dd')
-        .textContent()
-        .catch(() => ''),
-      page
-        .locator('.product_info_content li.sodium dd')
-        .textContent()
-        .catch(() => ''),
-      page
-        .locator('.product_info_content li.sugars dd')
-        .textContent()
-        .catch(() => ''),
-      page
-        .locator('.product_info_content li.chabo dd')
-        .textContent()
-        .catch(() => ''), // carbohydrates
-      page
-        .locator('.product_info_content li.caffeine dd')
-        .textContent()
-        .catch(() => ''),
-    ]);
+    const nutritionValues = await extractAllNutritionValues(page);
 
-    const [
-      calories,
-      protein,
-      fat,
-      saturatedFat,
-      transFat,
-      cholesterol,
-      sodium,
-      sugar,
-      carbohydrates,
-      caffeine,
-    ] = nutritionValues;
-
-    const nutritions: Nutritions = {
-      servingSize,
-      servingSizeUnit: servingSize !== null ? 'ml' : null,
-      calories: parseValue(calories),
-      caloriesUnit: parseValue(calories) !== null ? 'kcal' : null,
-      carbohydrates: parseValue(carbohydrates),
-      carbohydratesUnit: parseValue(carbohydrates) !== null ? 'g' : null,
-      sugar: parseValue(sugar),
-      sugarUnit: parseValue(sugar) !== null ? 'g' : null,
-      protein: parseValue(protein),
-      proteinUnit: parseValue(protein) !== null ? 'g' : null,
-      fat: parseValue(fat),
-      fatUnit: parseValue(fat) !== null ? 'g' : null,
-      transFat: parseValue(transFat),
-      transFatUnit: parseValue(transFat) !== null ? 'g' : null,
-      saturatedFat: parseValue(saturatedFat),
-      saturatedFatUnit: parseValue(saturatedFat) !== null ? 'g' : null,
-      natrium: parseValue(sodium),
-      natriumUnit: parseValue(sodium) !== null ? 'mg' : null,
-      cholesterol: parseValue(cholesterol),
-      cholesterolUnit: parseValue(cholesterol) !== null ? 'mg' : null,
-      caffeine: parseValue(caffeine),
-      caffeineUnit: parseValue(caffeine) !== null ? 'mg' : null,
-    };
+    const nutritions = createNutritionObject(servingSize, nutritionValues);
 
     // Log the extracted values
     logger.info(`Extracted nutrition data: ${JSON.stringify(nutritions)}`);
 
     // Only return nutrition data if at least one nutrition field has a value
-    const hasNutritionData = Object.entries(nutritions).some(
-      ([key, value]) => !key.endsWith('Unit') && value !== null
-    );
-
-    return hasNutritionData ? nutritions : null;
+    return hasAnyNutritionData(nutritions) ? nutritions : null;
   } catch (error) {
     logger.error('Error extracting nutrition data:', error);
     return null;

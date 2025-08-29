@@ -96,64 +96,96 @@ function parseNutritionValue(match: RegExpMatchArray | null): number | null {
   return Number.isNaN(value) ? null : value;
 }
 
+// Helper function to determine serving size unit
+function getServingSizeUnit(
+  matches: Record<string, RegExpMatchArray | null>,
+  hasValue: boolean
+): string | null {
+  if (!hasValue) {
+    return null;
+  }
+  const unitText = matches.servingSize?.[2]?.toLowerCase();
+  return unitText?.includes('ml') ? 'ml' : 'g';
+}
+
+// Helper function to parse all nutrition matches
+function parseNutritionMatches(infoText: string) {
+  return {
+    servingSize: infoText.match(NUTRITION_PATTERNS.servingSize),
+    calories: infoText.match(NUTRITION_PATTERNS.calories),
+    protein: infoText.match(NUTRITION_PATTERNS.protein),
+    fat: infoText.match(NUTRITION_PATTERNS.fat),
+    carbohydrates: infoText.match(NUTRITION_PATTERNS.carbohydrates),
+    sugar: infoText.match(NUTRITION_PATTERNS.sugar),
+    sodium: infoText.match(NUTRITION_PATTERNS.sodium),
+    caffeine: infoText.match(NUTRITION_PATTERNS.caffeine),
+  };
+}
+
+// Helper function to parse all nutrition values
+function parseNutritionValues(
+  matches: Record<string, RegExpMatchArray | null>
+) {
+  return {
+    servingSize: parseNutritionValue(matches.servingSize),
+    calories: parseNutritionValue(matches.calories),
+    protein: parseNutritionValue(matches.protein),
+    fat: parseNutritionValue(matches.fat),
+    carbohydrates: parseNutritionValue(matches.carbohydrates),
+    sugar: parseNutritionValue(matches.sugar),
+    sodium: parseNutritionValue(matches.sodium),
+    caffeine: parseNutritionValue(matches.caffeine),
+  };
+}
+
+// Helper function to check if we have any nutrition data
+function hasAnyNutritionData(values: Record<string, number | null>): boolean {
+  return (
+    values.servingSize !== null ||
+    values.calories !== null ||
+    values.protein !== null ||
+    values.fat !== null
+  );
+}
+
+// Helper function to create nutrition object
+function createNutritionObject(
+  values: Record<string, number | null>,
+  matches: Record<string, RegExpMatchArray | null>
+): Nutritions {
+  return {
+    servingSize: values.servingSize,
+    servingSizeUnit: getServingSizeUnit(matches, values.servingSize !== null),
+    calories: values.calories,
+    caloriesUnit: values.calories !== null ? 'kcal' : null,
+    carbohydrates: values.carbohydrates,
+    carbohydratesUnit: values.carbohydrates !== null ? 'g' : null,
+    sugar: values.sugar,
+    sugarUnit: values.sugar !== null ? 'g' : null,
+    protein: values.protein,
+    proteinUnit: values.protein !== null ? 'g' : null,
+    fat: values.fat,
+    fatUnit: values.fat !== null ? 'g' : null,
+    transFat: null,
+    transFatUnit: null,
+    saturatedFat: null,
+    saturatedFatUnit: null,
+    natrium: values.sodium,
+    natriumUnit: values.sodium !== null ? 'mg' : null,
+    cholesterol: null,
+    cholesterolUnit: null,
+    caffeine: values.caffeine,
+    caffeineUnit: values.caffeine !== null ? 'mg' : null,
+  };
+}
+
 function extractNutritionFromText(infoText: string): Nutritions | null {
   try {
-    // Parse nutrition values using pre-defined patterns
-    const matches = {
-      servingSize: infoText.match(NUTRITION_PATTERNS.servingSize),
-      calories: infoText.match(NUTRITION_PATTERNS.calories),
-      protein: infoText.match(NUTRITION_PATTERNS.protein),
-      fat: infoText.match(NUTRITION_PATTERNS.fat),
-      carbohydrates: infoText.match(NUTRITION_PATTERNS.carbohydrates),
-      sugar: infoText.match(NUTRITION_PATTERNS.sugar),
-      sodium: infoText.match(NUTRITION_PATTERNS.sodium),
-      caffeine: infoText.match(NUTRITION_PATTERNS.caffeine),
-    };
+    const matches = parseNutritionMatches(infoText);
+    const values = parseNutritionValues(matches);
 
-    const values = {
-      servingSize: parseNutritionValue(matches.servingSize),
-      calories: parseNutritionValue(matches.calories),
-      protein: parseNutritionValue(matches.protein),
-      fat: parseNutritionValue(matches.fat),
-      carbohydrates: parseNutritionValue(matches.carbohydrates),
-      sugar: parseNutritionValue(matches.sugar),
-      sodium: parseNutritionValue(matches.sodium),
-      caffeine: parseNutritionValue(matches.caffeine),
-    };
-
-    // Only return nutrition data if we found at least some values
-    if (
-      values.servingSize !== null ||
-      values.calories !== null ||
-      values.protein !== null ||
-      values.fat !== null
-    ) {
-      return {
-        servingSize: values.servingSize,
-        servingSizeUnit: values.servingSize !== null 
-          ? (matches.servingSize?.[2]?.toLowerCase().includes('ml') ? 'ml' : 'g')
-          : null,
-        calories: values.calories,
-        caloriesUnit: values.calories !== null ? 'kcal' : null,
-        carbohydrates: values.carbohydrates,
-        carbohydratesUnit: values.carbohydrates !== null ? 'g' : null,
-        sugar: values.sugar,
-        sugarUnit: values.sugar !== null ? 'g' : null,
-        protein: values.protein,
-        proteinUnit: values.protein !== null ? 'g' : null,
-        fat: values.fat,
-        fatUnit: values.fat !== null ? 'g' : null,
-        transFat: null,
-        transFatUnit: null,
-        saturatedFat: null,
-        saturatedFatUnit: null,
-        natrium: values.sodium,
-        natriumUnit: values.sodium !== null ? 'mg' : null,
-        cholesterol: null,
-        cholesterolUnit: null,
-        caffeine: values.caffeine,
-        caffeineUnit: values.caffeine !== null ? 'mg' : null,
-      };
+    if (hasAnyNutritionData(values)) {
+      return createNutritionObject(values, matches);
     }
   } catch (error) {
     logger.debug('Failed to extract nutrition data from info text:', error);
