@@ -1,6 +1,7 @@
 import { PlaywrightCrawler, type Request } from 'crawlee';
 import type { Locator, Page } from 'playwright';
 import { logger } from '../../shared/logger';
+import type { Nutritions } from '../../shared/nutritions';
 import {
   type Product,
   takeDebugScreenshot,
@@ -75,9 +76,69 @@ const CRAWLER_CONFIG = {
 // DATA EXTRACTION FUNCTIONS
 // ================================================
 
+function extractNutritionFromText(infoText: string): Nutritions | null {
+  try {
+    // Parse nutrition values from the info text
+    const servingSizeMatch = infoText.match(/(\d+)\s*(ml|mL|ML|g|gram)/i);
+    const caloriesMatch = infoText.match(/(\d+)\s*(kcal|칼로리|열량)/i);
+    const proteinMatch = infoText.match(/단백질.*?(\d+(?:\.\d+)?)\s*(g|gram)/i);
+    const fatMatch = infoText.match(/지방.*?(\d+(?:\.\d+)?)\s*(g|gram)/i);
+    const carbohydratesMatch = infoText.match(/탄수화물.*?(\d+(?:\.\d+)?)\s*(g|gram)/i);
+    const sugarMatch = infoText.match(/당류.*?(\d+(?:\.\d+)?)\s*(g|gram)/i);
+    const sodiumMatch = infoText.match(/나트륨.*?(\d+(?:\.\d+)?)\s*(mg|milligram)/i);
+    const caffeineMatch = infoText.match(/카페인.*?(\d+(?:\.\d+)?)\s*(mg|milligram)/i);
+
+    const parseValue = (match: RegExpMatchArray | null): number | null => {
+      if (!match || !match[1]) return null;
+      const value = parseFloat(match[1]);
+      return isNaN(value) ? null : value;
+    };
+
+    const servingSize = parseValue(servingSizeMatch);
+    const calories = parseValue(caloriesMatch);
+    const protein = parseValue(proteinMatch);
+    const fat = parseValue(fatMatch);
+    const carbohydrates = parseValue(carbohydratesMatch);
+    const sugar = parseValue(sugarMatch);
+    const sodium = parseValue(sodiumMatch);
+    const caffeine = parseValue(caffeineMatch);
+
+    // Only return nutrition data if we found at least some values
+    if (servingSize !== null || calories !== null || protein !== null || fat !== null) {
+      return {
+        servingSize,
+        servingSizeUnit: servingSize !== null ? (servingSizeMatch?.[2]?.toLowerCase().includes('ml') ? 'ml' : 'g') : null,
+        calories,
+        caloriesUnit: calories !== null ? 'kcal' : null,
+        carbohydrates,
+        carbohydratesUnit: carbohydrates !== null ? 'g' : null,
+        sugar,
+        sugarUnit: sugar !== null ? 'g' : null,
+        protein,
+        proteinUnit: protein !== null ? 'g' : null,
+        fat,
+        fatUnit: fat !== null ? 'g' : null,
+        transFat: null,
+        transFatUnit: null,
+        saturatedFat: null,
+        saturatedFatUnit: null,
+        natrium: sodium,
+        natriumUnit: sodium !== null ? 'mg' : null,
+        cholesterol: null,
+        cholesterolUnit: null,
+        caffeine,
+        caffeineUnit: caffeine !== null ? 'mg' : null,
+      };
+    }
+  } catch (error) {
+    logger.debug('Failed to extract nutrition data from info text:', error);
+  }
+  return null;
+}
+
 async function extractProductData(container: Locator) {
   try {
-    const [productId, name, imageUrl] = await Promise.all([
+    const [productId, name, imageUrl, nutritionInfo] = await Promise.all([
       container
         .locator(SELECTORS.productData.id)
         .getAttribute('id')
@@ -96,9 +157,20 @@ async function extractProductData(container: Locator) {
           }
           return url;
         }),
+      container
+        .locator('.info')
+        .textContent()
+        .then((text) => text?.trim() || '')
+        .catch(() => ''),
     ]);
 
     if (name && name.length > 0) {
+      // Extract nutrition data from the .info selector
+      let nutritions: Nutritions | null = null;
+      if (nutritionInfo) {
+        nutritions = extractNutritionFromText(nutritionInfo);
+      }
+
       return {
         name,
         nameEn: null,
@@ -106,6 +178,7 @@ async function extractProductData(container: Locator) {
         price: null,
         imageUrl,
         id: productId,
+        nutritions,
       };
     }
   } catch {
@@ -122,6 +195,7 @@ async function extractPageProducts(page: Page) {
     price: number | null;
     imageUrl: string;
     id: string;
+    nutritions?: Nutritions | null;
   }> = [];
 
   // Get all product containers
@@ -281,6 +355,7 @@ async function handleCategoryPage(
       externalCategory: categoryName,
       externalId: `compose_${categoryId}_${productData.name}`,
       externalUrl: url,
+      nutritions: productData.nutritions || null,
     }));
 
     // Limit products in test mode
