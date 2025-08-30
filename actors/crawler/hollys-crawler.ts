@@ -1,12 +1,14 @@
 import { PlaywrightCrawler, type Request } from 'crawlee';
 import type { Page } from 'playwright';
 import { logger } from '../../shared/logger';
+import type { Nutritions } from '../../shared/nutritions';
 import {
   type Product,
   takeDebugScreenshot,
   waitForLoad,
   writeProductsToJson,
 } from './crawlerUtils';
+import { extractNutritionFromText } from './nutritionUtils';
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
@@ -89,6 +91,93 @@ const HOLLYS_CATEGORIES = [
 // ================================================
 // DATA EXTRACTION FUNCTIONS
 // ================================================
+
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: optimize later
+async function extractNutritionData(page: Page): Promise<Nutritions | null> {
+  try {
+    // First, try to find serving size information from other parts of the page
+    let servingSizeInfo = '';
+
+    // Check for serving size in description or other text elements
+    const allTextElements = await page.locator('div, p, span').all();
+    for (const element of allTextElements) {
+      const text = await element.textContent().catch(() => '');
+      if (
+        text &&
+        (text.includes('ml') || text.includes('mL') || text.includes('ML'))
+      ) {
+        logger.debug(
+          `Found potential serving size text: ${text.substring(0, 100)}...`
+        );
+        servingSizeInfo += `${text} `;
+      }
+    }
+
+    // Try .tableType01 first (structured table)
+    const tableElement = page.locator('.tableType01');
+    const tableElementCount = await tableElement.count();
+
+    if (tableElementCount > 0) {
+      logger.info('Found .tableType01, extracting table data');
+
+      // Extract all table cells to get structured nutrition data
+      const tableRows = await tableElement.locator('tr').all();
+      let nutritionText = '';
+
+      for (const row of tableRows) {
+        const cellsText = await row.textContent().catch(() => '');
+        if (cellsText) {
+          nutritionText += `${cellsText} `;
+        }
+      }
+
+      if (nutritionText) {
+        logger.debug(`Table nutrition text: ${nutritionText}`);
+        // Combine table nutrition with serving size info if found
+        const combinedText = `${servingSizeInfo} ${nutritionText}`;
+        logger.debug(
+          `Combined nutrition text: ${combinedText.substring(0, 200)}...`
+        );
+
+        const nutrition = extractNutritionFromText(combinedText);
+        if (nutrition) {
+          logger.debug(
+            `Successfully extracted nutrition data from table with serving size: ${nutrition.servingSize}${nutrition.servingSizeUnit}`
+          );
+          return nutrition;
+        }
+      }
+    }
+
+    // Fallback to .menu_info
+    const menuInfoElement = page.locator('.menu_info');
+    const menuInfoElementCount = await menuInfoElement.count();
+
+    if (menuInfoElementCount > 0) {
+      logger.debug('Found .menu_info, extracting text data');
+      const nutritionText = await menuInfoElement.textContent().catch(() => '');
+      if (nutritionText) {
+        logger.debug(
+          `Menu info nutrition text: ${nutritionText.substring(0, 200)}...`
+        );
+        const nutrition = extractNutritionFromText(nutritionText);
+        if (nutrition) {
+          logger.debug('Successfully extracted nutrition data from menu_info');
+          return nutrition;
+        }
+      }
+    }
+
+    logger.debug('No nutrition data found in either selector');
+    return null;
+  } catch (error) {
+    logger.debug(
+      'Failed to extract nutrition data from Hollys menu item:',
+      error
+    );
+    return null;
+  }
+}
 
 function parseProductName(rawName: string): {
   name: string;
@@ -249,58 +338,62 @@ async function extractProductDetails(
   imageUrl: string;
   description: string | null;
   price: string | null;
+  nutritions: Nutritions | null;
 } | null> {
   try {
     // Wait for essential content first with shorter timeout
     await page.waitForSelector(SELECTORS.detailName, { timeout: 2000 });
 
     // Extract data using specific selectors with very short timeouts
-    const [rawName, imageUrl, description, price] = await Promise.all([
-      page
-        .locator(SELECTORS.detailName)
-        .first()
-        .textContent({ timeout: 1000 })
-        .then((text) => text || '')
-        .catch(() => ''),
+    const [rawName, imageUrl, description, price, nutritions] =
+      await Promise.all([
+        page
+          .locator(SELECTORS.detailName)
+          .first()
+          .textContent({ timeout: 1000 })
+          .then((text) => text || '')
+          .catch(() => ''),
 
-      page
-        .locator(SELECTORS.detailImage)
-        .first()
-        .getAttribute('src', { timeout: 1000 })
-        .then((src) => {
-          if (!src) {
-            return '';
-          }
-          if (src.startsWith('http')) {
-            return src;
-          }
-          if (src.startsWith('/')) {
-            return `${SITE_CONFIG.baseUrl}${src}`;
-          }
-          return `${SITE_CONFIG.baseUrl}/${src}`;
-        })
-        .catch(() => ''),
+        page
+          .locator(SELECTORS.detailImage)
+          .first()
+          .getAttribute('src', { timeout: 1000 })
+          .then((src) => {
+            if (!src) {
+              return '';
+            }
+            if (src.startsWith('http')) {
+              return src;
+            }
+            if (src.startsWith('/')) {
+              return `${SITE_CONFIG.baseUrl}${src}`;
+            }
+            return `${SITE_CONFIG.baseUrl}/${src}`;
+          })
+          .catch(() => ''),
 
-      page
-        .locator(SELECTORS.detailDescription)
-        .first()
-        .textContent({ timeout: 1000 })
-        .then((text) => text?.trim() || null)
-        .catch(() => null),
+        page
+          .locator(SELECTORS.detailDescription)
+          .first()
+          .textContent({ timeout: 1000 })
+          .then((text) => text?.trim() || null)
+          .catch(() => null),
 
-      page
-        .locator(SELECTORS.detailPrice)
-        .first()
-        .textContent({ timeout: 1000 })
-        .then((text) => text?.trim() || null)
-        .catch(() => null),
-    ]);
+        page
+          .locator(SELECTORS.detailPrice)
+          .first()
+          .textContent({ timeout: 1000 })
+          .then((text) => text?.trim() || null)
+          .catch(() => null),
+
+        extractNutritionData(page),
+      ]);
 
     // Parse the name to separate Korean and English parts
     const { name, nameEn } = parseProductName(rawName);
 
     if (name) {
-      return { name, nameEn, imageUrl, description, price };
+      return { name, nameEn, imageUrl, description, price, nutritions };
     }
 
     logger.debug(`⚠️ No product name found on ${productUrl}`);
@@ -338,7 +431,7 @@ async function handleProductPage(
 
       const totalTime = Date.now() - startTime;
       logger.info(
-        `✅ Extracted: ${productData.name}${productData.nameEn ? ` | ${productData.nameEn}` : ''}${productData.price ? ` (${productData.price})` : ''} [${totalTime}ms, extraction: ${extractEnd - extractStart}ms]`
+        `✅ Extracted: ${productData.name}${productData.nameEn ? ` | ${productData.nameEn}` : ''}${productData.price ? ` (${productData.price})` : ''}${productData.nutritions ? ' with nutrition data' : ''} [${totalTime}ms, extraction: ${extractEnd - extractStart}ms]`
       );
     } else {
       logger.warn(`⚠️ Failed to extract data from: ${productUrl}`);
@@ -355,6 +448,7 @@ function createBasicProduct(
     imageUrl: string;
     description: string | null;
     price: string | null;
+    nutritions: Nutritions | null;
   },
   categoryName: string,
   pageUrl: string
@@ -380,6 +474,7 @@ function createBasicProduct(
     externalCategory: categoryName,
     externalId,
     externalUrl: pageUrl,
+    nutritions: productInfo.nutritions,
   };
 }
 

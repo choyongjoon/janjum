@@ -1,12 +1,14 @@
 import { PlaywrightCrawler, type Request } from 'crawlee';
 import type { Locator, Page } from 'playwright';
 import { logger } from '../../shared/logger';
+import type { Nutritions } from '../../shared/nutritions';
 import {
   type Product,
   takeDebugScreenshot,
   waitForLoad,
   writeProductsToJson,
 } from './crawlerUtils';
+import { extractNutritionFromText } from './nutritionUtils';
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
@@ -211,55 +213,89 @@ async function extractCategoryValues(
   }
 }
 
+async function extractNutritionData(
+  container: Locator
+): Promise<Nutritions | null> {
+  try {
+    // Look for nutrition data in the .pro_comp selector
+    const nutritionElement = container.locator('.pro_comp');
+
+    // Check if nutrition element exists
+    const nutritionElementCount = await nutritionElement.count();
+    if (nutritionElementCount === 0) {
+      return null;
+    }
+
+    // Extract the text content from the nutrition element
+    const nutritionText = await nutritionElement.textContent().catch(() => '');
+
+    if (!nutritionText) {
+      return null;
+    }
+
+    return extractNutritionFromText(nutritionText);
+  } catch (error) {
+    logger.debug(
+      'Failed to extract nutrition data from Ediya menu item:',
+      error
+    );
+    return null;
+  }
+}
+
 async function extractProductData(container: Locator): Promise<{
   name: string;
   nameEn: string | null;
   description: string | null;
   imageUrl: string;
+  nutritions: Nutritions | null;
 } | null> {
   try {
-    const [name, nameEn, description, imageUrl] = await Promise.all([
-      container
-        .locator(SELECTORS.productData.name)
-        .textContent()
-        .then((text) => {
-          if (!text) {
-            return '';
-          }
-          // Clean the name by removing whitespace and gift suffix
-          const cleaned = text.trim().replace(GIFT_SUFFIX_REGEX, '');
-          return cleaned;
-        }),
-      container
-        .locator(SELECTORS.productData.nameEn)
-        .textContent()
-        .then((text) => text?.trim() || null)
-        .catch(() => null),
-      container
-        .locator(SELECTORS.productData.description)
-        .textContent()
-        .then((text) => text?.trim() || null)
-        .catch(() => null),
-      container
-        .locator(SELECTORS.productData.image)
-        .getAttribute('src')
-        .then((src) => {
-          if (!src) {
-            return '';
-          }
+    const [name, nameEn, description, imageUrl, nutritions] = await Promise.all(
+      [
+        container
+          .locator(SELECTORS.productData.name)
+          .textContent()
+          .then((text) => {
+            if (!text) {
+              return '';
+            }
+            // Clean the name by removing whitespace and gift suffix
+            const cleaned = text.trim().replace(GIFT_SUFFIX_REGEX, '');
+            return cleaned;
+          }),
+        container
+          .locator(SELECTORS.productData.nameEn)
+          .textContent()
+          .then((text) => text?.trim() || null)
+          .catch(() => null),
+        container
+          .locator(SELECTORS.productData.description)
+          .textContent()
+          .then((text) => text?.trim() || null)
+          .catch(() => null),
+        container
+          .locator(SELECTORS.productData.image)
+          .getAttribute('src')
+          .then((src) => {
+            if (!src) {
+              return '';
+            }
 
-          // Handle relative paths properly
-          if (src.startsWith('/')) {
-            return `${SITE_CONFIG.baseUrl}${src}`;
-          }
-          if (src.startsWith('http')) {
-            return src;
-          }
-          // Relative path without leading slash
-          return `${SITE_CONFIG.baseUrl}/${src}`;
-        })
-        .catch(() => ''),
-    ]);
+            // Handle relative paths properly
+            if (src.startsWith('/')) {
+              return `${SITE_CONFIG.baseUrl}${src}`;
+            }
+            if (src.startsWith('http')) {
+              return src;
+            }
+            // Relative path without leading slash
+            return `${SITE_CONFIG.baseUrl}/${src}`;
+          })
+          .catch(() => ''),
+        extractNutritionData(container),
+      ]
+    );
 
     if (name && name.length > 0) {
       return {
@@ -267,6 +303,7 @@ async function extractProductData(container: Locator): Promise<{
         nameEn,
         description,
         imageUrl,
+        nutritions,
       };
     }
   } catch (error) {
@@ -281,6 +318,7 @@ function createProduct(
     nameEn: string | null;
     description: string | null;
     imageUrl: string;
+    nutritions: Nutritions | null;
   },
   categoryName: string,
   pageUrl: string
@@ -297,7 +335,60 @@ function createProduct(
     externalCategory: categoryName,
     externalId,
     externalUrl: pageUrl,
+    nutritions: productData.nutritions,
   };
+}
+
+async function getProductContainers(
+  page: Page,
+  categoryName: string
+): Promise<Locator[]> {
+  await waitForLoad(page);
+
+  // Load all products by clicking "더보기" buttons
+  await loadAllProducts(page);
+
+  // Find product containers after loading all products
+  const containers = await page.locator(SELECTORS.productContainers).all();
+
+  if (containers.length === 0) {
+    logger.warn(`⚠️ No product containers found for category: ${categoryName}`);
+    return [];
+  }
+
+  logger.info(
+    `🔍 Found ${containers.length} product containers in ${categoryName} (after loading all products)`
+  );
+
+  return containers;
+}
+
+function limitContainersForTestMode(containers: Locator[]): Locator[] {
+  const containersToProcess = isTestMode
+    ? containers.slice(0, maxProductsInTestMode)
+    : containers;
+
+  if (isTestMode) {
+    logger.info(
+      `🧪 Test mode: limiting to ${containersToProcess.length} products`
+    );
+  }
+
+  return containersToProcess;
+}
+
+async function processProductContainer(
+  container: Locator,
+  categoryName: string,
+  pageUrl: string
+): Promise<Product | null> {
+  const productData = await extractProductData(container);
+
+  if (productData) {
+    return createProduct(productData, categoryName, pageUrl);
+  }
+
+  return null;
 }
 
 async function extractProductsFromPage(
@@ -309,53 +400,32 @@ async function extractProductsFromPage(
   try {
     logger.info(`📄 Extracting products from category: ${categoryName}`);
 
-    await waitForLoad(page);
-
-    // Load all products by clicking "더보기" buttons
-    await loadAllProducts(page);
-
-    // Find product containers after loading all products
-    const containers = await page.locator(SELECTORS.productContainers).all();
+    const containers = await getProductContainers(page, categoryName);
 
     if (containers.length === 0) {
-      logger.warn(
-        `⚠️ No product containers found for category: ${categoryName}`
-      );
       return [];
     }
 
-    logger.info(
-      `🔍 Found ${containers.length} product containers in ${categoryName} (after loading all products)`
-    );
-
-    // Limit products in test mode
-    const containersToProcess = isTestMode
-      ? containers.slice(0, maxProductsInTestMode)
-      : containers;
-
-    if (isTestMode) {
-      logger.info(
-        `🧪 Test mode: limiting to ${containersToProcess.length} products`
-      );
-    }
+    const containersToProcess = limitContainersForTestMode(containers);
 
     // Process each product container
     for (let i = 0; i < containersToProcess.length; i++) {
       try {
         const container = containersToProcess[i];
+        const product = await processProductContainer(
+          container,
+          categoryName,
+          page.url()
+        );
 
-        const productData = await extractProductData(container);
-
-        if (productData) {
-          const product = createProduct(productData, categoryName, page.url());
-
-          // Check for duplicates
-          if (!products.some((p) => p.externalId === product.externalId)) {
-            products.push(product);
-            logger.info(
-              `✅ Extracted: ${product.name} (${product.externalCategory})`
-            );
-          }
+        if (
+          product &&
+          !products.some((p) => p.externalId === product.externalId)
+        ) {
+          products.push(product);
+          logger.info(
+            `✅ Extracted: ${product.name} (${product.externalCategory})${product.nutritions ? ' with nutrition data' : ''}`
+          );
         }
       } catch (productError) {
         logger.debug(`⚠️ Failed to extract product ${i + 1}: ${productError}`);

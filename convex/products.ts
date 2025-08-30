@@ -1,4 +1,5 @@
 import { v } from 'convex/values';
+import type { Nutritions } from '../shared/nutritions';
 import { api } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { type MutationCtx, mutation, query } from './_generated/server';
@@ -133,6 +134,7 @@ type UpsertProductArgs = {
   externalId: string;
   externalUrl: string;
   price?: number;
+  nutritions?: Nutritions;
   downloadImages?: boolean;
   isActive?: boolean;
 };
@@ -145,9 +147,53 @@ type ExistingProduct = {
   description?: string;
   externalImageUrl?: string;
   imageStorageId?: Id<'_storage'>;
+  nutritions?: Nutritions;
   isActive?: boolean;
   removedAt?: number;
 };
+
+function hasNutritionChanges(
+  existing?: Nutritions,
+  args?: Nutritions
+): boolean {
+  if (!(existing || args)) {
+    return false;
+  }
+  if (!existing && args) {
+    return true;
+  }
+  if (existing && !args) {
+    return true;
+  }
+  if (!(existing && args)) {
+    return false;
+  }
+
+  return (
+    existing.servingSize !== args.servingSize ||
+    existing.servingSizeUnit !== args.servingSizeUnit ||
+    existing.calories !== args.calories ||
+    existing.caloriesUnit !== args.caloriesUnit ||
+    existing.carbohydrates !== args.carbohydrates ||
+    existing.carbohydratesUnit !== args.carbohydratesUnit ||
+    existing.sugar !== args.sugar ||
+    existing.sugarUnit !== args.sugarUnit ||
+    existing.protein !== args.protein ||
+    existing.proteinUnit !== args.proteinUnit ||
+    existing.fat !== args.fat ||
+    existing.fatUnit !== args.fatUnit ||
+    existing.transFat !== args.transFat ||
+    existing.transFatUnit !== args.transFatUnit ||
+    existing.saturatedFat !== args.saturatedFat ||
+    existing.saturatedFatUnit !== args.saturatedFatUnit ||
+    existing.natrium !== args.natrium ||
+    existing.natriumUnit !== args.natriumUnit ||
+    existing.cholesterol !== args.cholesterol ||
+    existing.cholesterolUnit !== args.cholesterolUnit ||
+    existing.caffeine !== args.caffeine ||
+    existing.caffeineUnit !== args.caffeineUnit
+  );
+}
 
 function hasProductChanges(
   existing: ExistingProduct,
@@ -163,6 +209,7 @@ function hasProductChanges(
     existing.description !== args.description ||
     existing.externalImageUrl !== args.externalImageUrl ||
     existing.imageStorageId !== args.imageStorageId ||
+    hasNutritionChanges(existing.nutritions, args.nutritions) ||
     wasActive !== willBeActive ||
     // If becoming active and had removedAt, that's a change
     (willBeActive && existing.removedAt !== undefined)
@@ -253,6 +300,32 @@ export const upsertProduct = mutation({
     externalId: v.string(),
     externalUrl: v.string(),
     price: v.optional(v.number()),
+    nutritions: v.optional(
+      v.object({
+        servingSize: v.optional(v.number()),
+        servingSizeUnit: v.optional(v.string()),
+        calories: v.optional(v.number()),
+        caloriesUnit: v.optional(v.string()),
+        carbohydrates: v.optional(v.number()),
+        carbohydratesUnit: v.optional(v.string()),
+        sugar: v.optional(v.number()),
+        sugarUnit: v.optional(v.string()),
+        protein: v.optional(v.number()),
+        proteinUnit: v.optional(v.string()),
+        fat: v.optional(v.number()),
+        fatUnit: v.optional(v.string()),
+        transFat: v.optional(v.number()),
+        transFatUnit: v.optional(v.string()),
+        saturatedFat: v.optional(v.number()),
+        saturatedFatUnit: v.optional(v.string()),
+        natrium: v.optional(v.number()),
+        natriumUnit: v.optional(v.string()),
+        cholesterol: v.optional(v.number()),
+        cholesterolUnit: v.optional(v.string()),
+        caffeine: v.optional(v.number()),
+        caffeineUnit: v.optional(v.string()),
+      })
+    ),
     downloadImages: v.optional(v.boolean()),
     isActive: v.optional(v.boolean()), // Default to true if not specified
   },

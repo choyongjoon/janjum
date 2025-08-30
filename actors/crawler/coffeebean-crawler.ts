@@ -1,12 +1,14 @@
 import { PlaywrightCrawler } from 'crawlee';
 import type { Locator, Page } from 'playwright';
 import { logger } from '../../shared/logger';
+import type { Nutritions } from '../../shared/nutritions';
 import {
   type Product,
   takeDebugScreenshot,
   waitForLoad,
   writeProductsToJson,
 } from './crawlerUtils';
+import { extractNutritionFromText } from './nutritionUtils';
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
@@ -66,6 +68,36 @@ const CRAWLER_CONFIG = {
 // ================================================
 // DATA EXTRACTION FUNCTIONS
 // ================================================
+
+async function extractNutritionData(
+  container: Locator
+): Promise<Nutritions | null> {
+  try {
+    // Look for nutrition data in the .info selector
+    const nutritionElement = container.locator('.info');
+
+    // Check if nutrition element exists
+    const nutritionElementCount = await nutritionElement.count();
+    if (nutritionElementCount === 0) {
+      return null;
+    }
+
+    // Extract the text content from the nutrition element
+    const nutritionText = await nutritionElement.textContent().catch(() => '');
+
+    if (!nutritionText) {
+      return null;
+    }
+
+    return extractNutritionFromText(nutritionText);
+  } catch (error) {
+    logger.debug(
+      'Failed to extract nutrition data from Coffeebean menu item:',
+      error
+    );
+    return null;
+  }
+}
 
 async function extractCategoriesFromMenu(
   page: Page
@@ -176,6 +208,7 @@ async function extractProductsFromListing(
     nameEn: string | null;
     imageUrl: string;
     description: string | null;
+    nutritions: Nutritions | null;
   }>
 > {
   const allProducts: Array<{
@@ -183,6 +216,7 @@ async function extractProductsFromListing(
     nameEn: string | null;
     imageUrl: string;
     description: string | null;
+    nutritions: Nutritions | null;
   }> = [];
 
   try {
@@ -238,6 +272,7 @@ async function extractProductsFromCurrentPage(
     nameEn: string | null;
     imageUrl: string;
     description: string | null;
+    nutritions: Nutritions | null;
   }>
 > {
   const products: Array<{
@@ -245,6 +280,7 @@ async function extractProductsFromCurrentPage(
     nameEn: string | null;
     imageUrl: string;
     description: string | null;
+    nutritions: Nutritions | null;
   }> = [];
 
   try {
@@ -288,44 +324,46 @@ async function extractProductsFromCurrentPage(
       const batchResults = await Promise.all(
         batch.map(async (container, index) => {
           try {
-            const [name, nameEn, imageUrl, description] = await Promise.all([
-              container
-                .locator(SELECTORS.productName)
-                .textContent()
-                .then((text) => text?.trim() || ''),
-              container
-                .locator(SELECTORS.nameEn)
-                .textContent()
-                .then((text) => text?.trim() || null)
-                .catch(() => null),
-              container
-                .locator(SELECTORS.productImage)
-                .getAttribute('src')
-                .then((src) => {
-                  if (!src) {
-                    return '';
-                  }
-                  if (src.startsWith('http')) {
-                    return src;
-                  }
-                  if (src.startsWith('/')) {
-                    return `${SITE_CONFIG.baseUrl}${src}`;
-                  }
-                  return `${SITE_CONFIG.baseUrl}/${src}`;
-                })
-                .catch(() => ''),
-              container
-                .locator(SELECTORS.productDescription)
-                .textContent()
-                .then((text) => text?.trim() || null)
-                .catch(() => null),
-            ]);
+            const [name, nameEn, imageUrl, description, nutritions] =
+              await Promise.all([
+                container
+                  .locator(SELECTORS.productName)
+                  .textContent()
+                  .then((text) => text?.trim() || ''),
+                container
+                  .locator(SELECTORS.nameEn)
+                  .textContent()
+                  .then((text) => text?.trim() || null)
+                  .catch(() => null),
+                container
+                  .locator(SELECTORS.productImage)
+                  .getAttribute('src')
+                  .then((src) => {
+                    if (!src) {
+                      return '';
+                    }
+                    if (src.startsWith('http')) {
+                      return src;
+                    }
+                    if (src.startsWith('/')) {
+                      return `${SITE_CONFIG.baseUrl}${src}`;
+                    }
+                    return `${SITE_CONFIG.baseUrl}/${src}`;
+                  })
+                  .catch(() => ''),
+                container
+                  .locator(SELECTORS.productDescription)
+                  .textContent()
+                  .then((text) => text?.trim() || null)
+                  .catch(() => null),
+                extractNutritionData(container),
+              ]);
 
             if (name) {
               logger.info(
-                `✅ Extracted: ${name}${nameEn ? ` (${nameEn})` : ''} [Page ${pageNumber}]`
+                `✅ Extracted: ${name}${nameEn ? ` (${nameEn})` : ''} [Page ${pageNumber}]${nutritions ? ' with nutrition data' : ''}`
               );
-              return { name, nameEn, imageUrl, description };
+              return { name, nameEn, imageUrl, description, nutritions };
             }
             return null;
           } catch (productError) {
@@ -363,6 +401,7 @@ function createBasicProduct(
     nameEn: string | null;
     imageUrl: string;
     description: string | null;
+    nutritions: Nutritions | null;
   },
   categoryName: string,
   pageUrl: string
@@ -379,6 +418,7 @@ function createBasicProduct(
     externalCategory: categoryName,
     externalId,
     externalUrl: pageUrl,
+    nutritions: productInfo.nutritions,
   };
 }
 
@@ -448,6 +488,7 @@ async function processProducts(
     nameEn: string | null;
     imageUrl: string;
     description: string | null;
+    nutritions: Nutritions | null;
   }>,
   categoryName: string,
   categoryUrl: string,

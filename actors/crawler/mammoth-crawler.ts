@@ -1,12 +1,14 @@
 import { PlaywrightCrawler } from 'crawlee';
 import type { Page } from 'playwright';
 import { logger } from '../../shared/logger';
+import type { Nutritions } from '../../shared/nutritions';
 import {
   type Product,
   takeDebugScreenshot,
   waitForLoad,
   writeProductsToJson,
 } from './crawlerUtils';
+import { extractNutritionFromText } from './nutritionUtils';
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
@@ -45,6 +47,7 @@ const SELECTORS = {
     category: '.product-category, .detail-category',
     image: '.product-image img, .detail-image img',
     price: '.price, .product-price',
+    nutritionTable: '.i_table',
   },
 } as const;
 
@@ -78,14 +81,191 @@ const CRAWLER_CONFIG = {
 
 const menuSeqRegex = /goViewB\(['""]?(\d+)['""]?\)/;
 
+// Regex patterns for Mammoth nutrition extraction
+const MAMMOTH_NUTRITION_PATTERNS = {
+  servingSize: /ICE\((\d+)oz\)/i,
+  calories: /칼로리\s*\([^)]*\)\s*([0-9.]+)/i,
+  protein: /단백질\s*\([^)]*\)\s*([0-9.]+)/i,
+  sugar: /당류\s*\([^)]*\)\s*([0-9.]+)/i,
+  sodium: /나트륨\s*\([^)]*\)\s*([0-9.]+)/i,
+  caffeine: /카페인\s*\([^)]*\)\s*([0-9.]+)/i,
+} as const;
+
 function extractMenuSeqFromHref(href: string): string | null {
   const match = href.match(menuSeqRegex);
   return match ? match[1] : null;
 }
 
+function extractMammothNutritionFromText(text: string): Nutritions | null {
+  try {
+    const nutrition: Nutritions = {};
+
+    // Mammoth-specific patterns for Korean nutrition labels with parentheses format
+    // Format: "Korean Label (Unit) Value"
+
+    // Extract serving size from ICE(32oz) format
+    const servingSizeMatch = text.match(MAMMOTH_NUTRITION_PATTERNS.servingSize);
+    if (servingSizeMatch) {
+      const ozValue = Number.parseFloat(servingSizeMatch[1]);
+      // Convert oz to ml (1 oz = 29.5735 ml)
+      nutrition.servingSize = Math.round(ozValue * 29.5735);
+      nutrition.servingSizeUnit = 'ml';
+    }
+
+    // Extract calories: 칼로리 (Kcal) 30.2
+    const caloriesMatch = text.match(MAMMOTH_NUTRITION_PATTERNS.calories);
+    if (caloriesMatch) {
+      nutrition.calories = Number.parseFloat(caloriesMatch[1]);
+      nutrition.caloriesUnit = 'kcal';
+    }
+
+    // Extract protein: 단백질 (g) 1.9
+    const proteinMatch = text.match(MAMMOTH_NUTRITION_PATTERNS.protein);
+    if (proteinMatch) {
+      nutrition.protein = Number.parseFloat(proteinMatch[1]);
+      nutrition.proteinUnit = 'g';
+    }
+
+    // Extract sugar: 당류 (g) 73.5
+    const sugarMatch = text.match(MAMMOTH_NUTRITION_PATTERNS.sugar);
+    if (sugarMatch) {
+      nutrition.sugar = Number.parseFloat(sugarMatch[1]);
+      nutrition.sugarUnit = 'g';
+    }
+
+    // Extract sodium: 나트륨 (mg) 2.0
+    const sodiumMatch = text.match(MAMMOTH_NUTRITION_PATTERNS.sodium);
+    if (sodiumMatch) {
+      nutrition.natrium = Number.parseFloat(sodiumMatch[1]);
+      nutrition.natriumUnit = 'mg';
+    }
+
+    // Extract caffeine: 카페인 (mg) 486.5
+    const caffeineMatch = text.match(MAMMOTH_NUTRITION_PATTERNS.caffeine);
+    if (caffeineMatch) {
+      nutrition.caffeine = Number.parseFloat(caffeineMatch[1]);
+      nutrition.caffeineUnit = 'mg';
+    }
+
+    // Return null if no nutrition data was found
+    const hasData = Object.keys(nutrition).length > 0;
+    return hasData ? nutrition : null;
+  } catch (error) {
+    logger.debug('Error parsing Mammoth nutrition text:', error);
+    return null;
+  }
+}
+
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: optimize later
+async function extractNutritionData(page: Page): Promise<Nutritions | null> {
+  try {
+    const nutritionTableElement = page.locator(
+      SELECTORS.productDetails.nutritionTable
+    );
+    const nutritionTableCount = await nutritionTableElement.count();
+
+    if (nutritionTableCount > 0) {
+      logger.debug('Found .i_table selector, extracting nutrition data');
+
+      // Try extracting from individual table cells for Mammoth's specific format
+      const tableCells = await nutritionTableElement.locator('td, th').all();
+
+      let combinedText = '';
+      for (const tableCell of tableCells) {
+        const cellText = await tableCell.textContent().catch(() => '');
+        if (cellText?.trim()) {
+          combinedText += `${cellText} `;
+        }
+      }
+
+      if (combinedText) {
+        logger.debug(
+          `Combined cell text: ${combinedText.substring(0, 200)}...`
+        );
+        const nutrition = extractMammothNutritionFromText(combinedText);
+        if (nutrition) {
+          logger.debug('Successfully extracted nutrition data from .i_table');
+          return nutrition;
+        }
+      }
+
+      // Fallback to standard extraction
+      const allTableText = await nutritionTableElement
+        .textContent()
+        .catch(() => '');
+      if (allTableText) {
+        const nutrition = extractNutritionFromText(allTableText);
+        if (nutrition) {
+          logger.debug(
+            'Successfully extracted nutrition data from full table text'
+          );
+          return nutrition;
+        }
+      }
+    } else {
+      logger.debug('No .i_table selector found on page');
+    }
+    return null;
+  } catch (error) {
+    logger.debug(
+      'Failed to extract nutrition data from Mammoth product:',
+      error
+    );
+    return null;
+  }
+}
+
 // ================================================
 // PAGE HANDLERS
 // ================================================
+
+async function handleProductPage(
+  page: Page,
+  request: {
+    userData: {
+      basicInfo: {
+        name: string;
+        nameEn?: string;
+        menuSeq: string;
+        imageUrl?: string;
+      };
+    };
+  },
+  crawlerInstance: PlaywrightCrawler
+) {
+  const { basicInfo } = request.userData;
+
+  logger.info(`🔗 Processing product: ${basicInfo.name}`);
+
+  try {
+    await waitForLoad(page);
+
+    // Extract nutrition data from the product detail page
+    const nutritions = await extractNutritionData(page);
+
+    const product: Product = {
+      name: basicInfo.name,
+      nameEn: basicInfo.nameEn || '',
+      description: '',
+      externalCategory: 'Coffee',
+      externalId: basicInfo.menuSeq,
+      externalImageUrl: basicInfo.imageUrl || '',
+      externalUrl: `${SITE_CONFIG.productUrlTemplate}${basicInfo.menuSeq}`,
+      price: null,
+      category: 'Coffee',
+      nutritions,
+    };
+
+    await crawlerInstance.pushData(product);
+
+    const nutritionInfo = nutritions ? ' with nutrition data' : '';
+    logger.info(
+      `✅ Extracted: ${product.name}${product.nameEn ? ` (${product.nameEn})` : ''}${nutritionInfo}`
+    );
+  } catch (error) {
+    logger.warn(`Failed to process product ${basicInfo.name}: ${error}`);
+  }
+}
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: optimize later
 async function handleMenuListPage(
@@ -97,12 +277,17 @@ async function handleMenuListPage(
   await waitForLoad(page);
   await takeDebugScreenshot(page, 'mammoth-menu-list');
 
-  // Extract products directly from the list page
-  const products: Product[] = [];
-
+  // Extract product URLs from the list page
   try {
     const productLinks = await page.locator(SELECTORS.productItems).all();
     logger.info(`Found ${productLinks.length} product links on the page`);
+
+    const productUrls: Array<{
+      name: string;
+      nameEn: string;
+      menuSeq: string;
+      imageUrl: string;
+    }> = [];
 
     for (const link of productLinks) {
       try {
@@ -131,52 +316,48 @@ async function handleMenuListPage(
           .catch(() => '');
 
         if (koreanName) {
-          const product: Product = {
+          productUrls.push({
             name: koreanName,
             nameEn: englishName || '',
-            description: '',
-            externalCategory: 'Coffee',
-            externalId: menuSeq,
-            externalImageUrl: imageSrc
+            menuSeq,
+            imageUrl: imageSrc
               ? new URL(imageSrc, SITE_CONFIG.baseUrl).href
               : '',
-            externalUrl: `${SITE_CONFIG.productUrlTemplate}${menuSeq}`,
-            price: null,
-            category: 'Coffee',
-          };
-
-          products.push(product);
-          logger.info(
-            `✅ Extracted: ${product.name}${product.nameEn ? ` (${product.nameEn})` : ''}`
-          );
+          });
         }
       } catch (error) {
         logger.warn(`Error processing product link: ${error}`);
       }
     }
+
+    // Limit products in test mode
+    const productsToProcess = isTestMode
+      ? productUrls.slice(0, maxProductsInTestMode)
+      : productUrls;
+
+    if (isTestMode) {
+      logger.info(
+        `🧪 Test mode: limiting to ${productsToProcess.length} products`
+      );
+    }
+
+    // Enqueue product detail pages for processing
+    for (const basicInfo of productsToProcess) {
+      await crawlerInstance.addRequests([
+        {
+          url: `${SITE_CONFIG.productUrlTemplate}${basicInfo.menuSeq}`,
+          userData: { basicInfo },
+          label: 'PRODUCT',
+        },
+      ]);
+    }
+
+    logger.info(
+      `Enqueued ${productsToProcess.length} products from Mammoth Coffee menu`
+    );
   } catch (error) {
     logger.error(`Error extracting products from list page: ${error}`);
   }
-
-  // Limit products in test mode
-  const productsToProcess = isTestMode
-    ? products.slice(0, maxProductsInTestMode)
-    : products;
-
-  if (isTestMode) {
-    logger.info(
-      `🧪 Test mode: limiting to ${productsToProcess.length} products`
-    );
-  }
-
-  // Push products directly to crawler
-  for (const product of productsToProcess) {
-    await crawlerInstance.pushData(product);
-  }
-
-  logger.info(
-    `Processed ${productsToProcess.length} products from Mammoth Coffee menu`
-  );
 }
 
 // ================================================
@@ -188,9 +369,12 @@ export const createMammothCrawler = () =>
     launchContext: {
       launchOptions: CRAWLER_CONFIG.launchOptions,
     },
-    async requestHandler({ page, crawler: crawlerInstance }) {
-      // Only handle menu list pages, extract products directly from them
-      await handleMenuListPage(page, crawlerInstance);
+    async requestHandler({ page, request, crawler: crawlerInstance }) {
+      if (request.label === 'PRODUCT') {
+        await handleProductPage(page, request, crawlerInstance);
+      } else {
+        await handleMenuListPage(page, crawlerInstance);
+      }
     },
     maxConcurrency: CRAWLER_CONFIG.maxConcurrency,
     maxRequestsPerCrawl: CRAWLER_CONFIG.maxRequestsPerCrawl,

@@ -1,12 +1,14 @@
 import { PlaywrightCrawler } from 'crawlee';
 import type { Locator, Page } from 'playwright';
 import { logger } from '../../shared/logger';
+import type { Nutritions } from '../../shared/nutritions';
 import {
   type Product,
   takeDebugScreenshot,
   waitForLoad,
   writeProductsToJson,
 } from './crawlerUtils';
+import { extractNutritionFromText } from './nutritionUtils';
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
@@ -37,6 +39,12 @@ const SELECTORS = {
     nameContainer: '.txtArea',
     nameEn: '.txtArea .sTxt',
     image: 'img',
+    productLink: 'a',
+  },
+
+  // Product detail page selectors
+  productDetail: {
+    nutritional: '.nutritional',
   },
 } as const;
 
@@ -71,6 +79,49 @@ const CRAWLER_CONFIG = {
 // Regular expressions defined at module level for performance
 const EXTERNAL_ID_REGEX = /[^\w-]/g;
 
+async function extractNutritionFromItem(
+  item: Locator
+): Promise<Nutritions | null> {
+  try {
+    // Try to find .nutritional selector within the item
+    const nutritionalElement = item.locator(
+      SELECTORS.productDetail.nutritional
+    );
+    const nutritionalCount = await nutritionalElement.count();
+
+    if (nutritionalCount > 0) {
+      logger.debug(
+        'Found .nutritional selector within item, extracting nutrition data'
+      );
+      const nutritionText = await nutritionalElement
+        .textContent()
+        .catch(() => '');
+
+      if (nutritionText) {
+        logger.debug(`Nutrition text from item: ${nutritionText}`);
+        const nutrition = extractNutritionFromText(nutritionText);
+        if (nutrition) {
+          logger.info(
+            'Successfully extracted nutrition data from item .nutritional'
+          );
+          return nutrition;
+        }
+      }
+    }
+
+    // Paul Bassett's listing page doesn't contain nutrition information
+    // Nutrition data would need to be extracted from individual product detail pages
+    // which are not accessible due to href="#" links
+    return null;
+  } catch (error) {
+    logger.debug(
+      'Failed to extract nutrition data from Paul Bassett item:',
+      error
+    );
+    return null;
+  }
+}
+
 // Map category IDs to category names and types
 const CATEGORY_MAP = {
   A: { name: 'COFFEE', type: 'Coffee' },
@@ -89,6 +140,7 @@ function getCategoryFromUrl(url: string): { name: string; type: string } {
   );
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: optimize later
 async function extractProductFromItem(
   item: Locator,
   pageUrl: string
@@ -121,6 +173,9 @@ async function extractProductFromItem(
       .first()
       .getAttribute('src')
       .catch(() => '');
+
+    // Try to extract nutrition data from the item itself
+    const nutritions = await extractNutritionFromItem(item);
 
     // Check for status labels (New/Best)
     const fullText = (await item.textContent().catch(() => '')) || '';
@@ -157,6 +212,7 @@ async function extractProductFromItem(
       externalUrl: pageUrl,
       price: null,
       category: categoryInfo.type,
+      nutritions,
     };
 
     let statusInfo = '';
@@ -165,12 +221,69 @@ async function extractProductFromItem(
     } else if (hasBestLabel) {
       statusInfo = ' [Best]';
     }
+    const nutritionInfo = nutritions ? ' with nutrition data' : '';
     logger.info(
-      `✅ Extracted [${categoryInfo.name}]: ${product.name}${statusInfo}`
+      `✅ Extracted [${categoryInfo.name}]: ${product.name}${statusInfo}${nutritionInfo}`
     );
     return product;
   } catch (error) {
     logger.warn(`Failed to extract data from product item: ${error}`);
+    return null;
+  }
+}
+
+async function _extractProductDetailsFromPage(
+  page: Page,
+  basicInfo: {
+    name: string;
+    categoryInfo: { name: string; type: string };
+    productUrl: string;
+  }
+): Promise<Product | null> {
+  try {
+    await waitForLoad(page);
+
+    // Extract detailed information from product page
+    const name = basicInfo.name;
+    const nameEn = ''; // Extract from page if available
+    const description = ''; // Extract from page if available
+
+    // Extract image (update selector as needed)
+    const imageSrc = await page
+      .locator('img')
+      .first()
+      .getAttribute('src')
+      .catch(() => '');
+
+    // Extract nutrition data (currently not available on Paul Bassett pages)
+    const nutritions: Nutritions | null = null;
+
+    const product: Product = {
+      name,
+      nameEn,
+      description,
+      externalCategory: basicInfo.categoryInfo.name,
+      externalId: name
+        .replace(/\s+/g, '-')
+        .toLowerCase()
+        .replace(EXTERNAL_ID_REGEX, ''),
+      externalImageUrl: imageSrc
+        ? new URL(imageSrc, SITE_CONFIG.baseUrl).href
+        : '',
+      externalUrl: basicInfo.productUrl,
+      price: null,
+      category: basicInfo.categoryInfo.type,
+      nutritions,
+    };
+
+    logger.info(
+      `✅ Extracted [${basicInfo.categoryInfo.name}]: ${name} with nutrition data`
+    );
+    return product;
+  } catch (error) {
+    logger.warn(
+      `Failed to extract product details from ${basicInfo.productUrl}: ${error}`
+    );
     return null;
   }
 }

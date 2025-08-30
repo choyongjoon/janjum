@@ -1,5 +1,6 @@
 import type { GenericDataModel, GenericMutationCtx } from 'convex/server';
 import { v } from 'convex/values';
+import type { Nutritions } from '../shared/nutritions';
 import { api } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { mutation } from './_generated/server';
@@ -14,6 +15,7 @@ interface CrawlerProduct {
   externalUrl: string;
   price: number | null;
   category: string | null;
+  nutritions?: Nutritions | null;
   imageStorageId?: Id<'_storage'>;
 }
 interface UploadResults {
@@ -28,6 +30,28 @@ interface UploadResults {
   processingTime: number;
   removedProducts?: string[];
   reactivatedProducts?: string[];
+}
+
+// Helper function to clean nutrition data (convert null to undefined)
+function cleanNutritions(
+  nutritions?: Nutritions | null
+): Nutritions | undefined {
+  if (!nutritions) {
+    return;
+  }
+
+  const cleaned: Nutritions = {};
+
+  // Convert all null values to undefined
+  for (const [key, value] of Object.entries(nutritions)) {
+    if (value !== null) {
+      (cleaned as Record<string, unknown>)[key] = value;
+    }
+  }
+
+  // Return undefined if no actual nutrition data exists
+  const hasData = Object.keys(cleaned).length > 0;
+  return hasData ? cleaned : undefined;
 }
 
 // Helper function to upload products to database
@@ -49,6 +73,7 @@ async function uploadProductsToDatabase(
         externalCategory: product.externalCategory ?? undefined,
         externalImageUrl: product.externalImageUrl ?? undefined,
         price: product.price ?? undefined,
+        nutritions: cleanNutritions(product.nutritions),
         downloadImages,
       });
       if (result.action === 'created') {
