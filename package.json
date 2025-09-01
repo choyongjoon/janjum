@@ -11,6 +11,8 @@
     "upload": "tsx actors/uploader/upload.ts",
     "categorize": "tsx actors/categorizer/categorize.ts",
     "optimize-images:prod": "dotenv -e .env.prod-upload -- tsx scripts/optimizeImages.ts",
+    "cleanup-storage": "tsx scripts/cleanupStorage.ts",
+    "cleanup-storage:prod": "dotenv -e .env.prod-upload -- tsx scripts/cleanupStorage.ts",
     "data-sync:prod": "scripts/dataSyncProd.sh",
     "test": "vitest",
     "test:e2e": "playwright test",
