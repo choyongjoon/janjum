@@ -21,6 +21,7 @@ import type * as products from "../products.js";
 import type * as reviews from "../reviews.js";
 import type * as shortId from "../shortId.js";
 import type * as stats from "../stats.js";
+import type * as storage from "../storage.js";
 import type * as users from "../users.js";
 
 /**
@@ -40,6 +41,7 @@ declare const fullApi: ApiFromModules<{
   reviews: typeof reviews;
   shortId: typeof shortId;
   stats: typeof stats;
+  storage: typeof storage;
   users: typeof users;
 }>;
 export declare const api: FilterApi<

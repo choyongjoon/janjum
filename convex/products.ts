@@ -226,6 +226,7 @@ function scheduleImageDownloadIfNeeded(
     ctx.scheduler.runAfter(0, api.imageDownloader.downloadAndStoreImageAction, {
       imageUrl: args.externalImageUrl,
       productId,
+      uploadSecret: process.env.CONVEX_UPLOAD_SECRET,
     });
   }
 }
@@ -345,6 +346,13 @@ export const upsertProduct = mutation({
   },
 });
 
+export const getById = query({
+  args: { productId: v.id('products') },
+  handler: async (ctx, { productId }) => {
+    return await ctx.db.get(productId);
+  },
+});
+
 export const getByShortId = query({
   args: { shortId: v.string() },
   handler: async (ctx, { shortId }) => {
@@ -383,14 +391,31 @@ export const updateImage = mutation({
       throw new Error('Unauthorized: Invalid upload secret');
     }
 
+    // Get the current product to check for existing image
+    const product = await ctx.db.get(productId);
+    if (!product) {
+      throw new Error(`Product ${productId} not found`);
+    }
+
+    const oldImageStorageId = product.imageStorageId;
     const now = Date.now();
 
+    // Update product with new image
     await ctx.db.patch(productId, {
       imageStorageId: storageId,
       updatedAt: now,
     });
 
-    return { success: true };
+    // Clean up old image if it exists and is different from new one
+    if (oldImageStorageId && oldImageStorageId !== storageId) {
+      try {
+        await ctx.storage.delete(oldImageStorageId);
+      } catch (_error) {
+        // Old image cleanup is not critical - don't fail the update
+      }
+    }
+
+    return { success: true, oldImageCleaned: !!oldImageStorageId };
   },
 });
 
@@ -403,6 +428,39 @@ export const getAllWithImages = query({
       .collect();
 
     return products;
+  },
+});
+
+export const deleteProduct = mutation({
+  args: {
+    productId: v.id('products'),
+    uploadSecret: v.optional(v.string()),
+  },
+  handler: async (ctx, { productId, uploadSecret }) => {
+    // Verify upload secret for protected operations
+    const expectedSecret = process.env.CONVEX_UPLOAD_SECRET;
+    if (expectedSecret && uploadSecret !== expectedSecret) {
+      throw new Error('Unauthorized: Invalid upload secret');
+    }
+
+    const product = await ctx.db.get(productId);
+    if (!product) {
+      return { success: false, error: 'Product not found' };
+    }
+
+    // Clean up associated image
+    if (product.imageStorageId) {
+      try {
+        await ctx.storage.delete(product.imageStorageId);
+      } catch (_error) {
+        // Image cleanup failure - not critical for product deletion
+      }
+    }
+
+    // Delete the product
+    await ctx.db.delete(productId);
+
+    return { success: true, imageCleaned: !!product.imageStorageId };
   },
 });
 
