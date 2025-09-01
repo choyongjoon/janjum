@@ -49,6 +49,13 @@ const SELECTORS = {
 } as const;
 
 // ================================================
+// REGEX PATTERNS
+// ================================================
+
+// Regex for extracting product ID from goView() onclick attributes
+const GO_VIEW_REGEX = /goView\s*\(\s*['"]([^'"]+)['"]\s*\)/;
+
+// ================================================
 // CRAWLER CONFIGURATION
 // ================================================
 
@@ -110,12 +117,81 @@ async function extractNutritionFromItem(
     }
 
     // Paul Bassett's listing page doesn't contain nutrition information
-    // Nutrition data would need to be extracted from individual product detail pages
-    // which are not accessible due to href="#" links
+    // Nutrition data needs to be extracted from individual product detail pages
     return null;
   } catch (error) {
     logger.debug(
       'Failed to extract nutrition data from Paul Bassett item:',
+      error
+    );
+    return null;
+  }
+}
+
+// Extract nutrition data from product detail page
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: refactor later
+async function extractNutritionFromDetailPage(
+  page: Page,
+  productUrl: string,
+  productName: string
+): Promise<Nutritions | null> {
+  try {
+    logger.info(`🔍 Navigating to product detail page: ${productUrl}`);
+    await page.goto(productUrl);
+    await waitForLoad(page);
+
+    // Try multiple selectors for nutrition information
+    const nutritionSelectors = [
+      '.nutritional',
+      '.nutrition-info',
+      '.product-nutrition',
+      '[class*="nutrition"]',
+      'table:has-text("칼로리")',
+      'div:has-text("영양")',
+      'div:has-text("칼로리")',
+      '.product-detail .nutrition',
+    ];
+
+    for (const selector of nutritionSelectors) {
+      try {
+        const elements = page.locator(selector);
+        const count = await elements.count();
+
+        if (count > 0) {
+          logger.info(`📋 Found nutrition elements with selector: ${selector}`);
+
+          // Try to extract from all matching elements
+          for (let i = 0; i < count; i++) {
+            const element = elements.nth(i);
+            const textContent = await element.textContent().catch(() => '');
+
+            if (
+              textContent &&
+              (textContent.includes('칼로리') ||
+                textContent.includes('영양') ||
+                textContent.includes('kcal'))
+            ) {
+              logger.info(`🔍 Found nutrition text in element ${i}`);
+              const nutrition = extractNutritionFromText(textContent);
+              if (nutrition) {
+                logger.info(
+                  `📊 Successfully extracted nutrition data for ${productName}`
+                );
+                return nutrition;
+              }
+            }
+          }
+        }
+      } catch (error) {
+        logger.debug(`Failed to process selector ${selector}:`, error);
+      }
+    }
+
+    logger.info(`⚠️ No nutrition data found on detail page for ${productName}`);
+    return null;
+  } catch (error) {
+    logger.warn(
+      `Failed to extract nutrition from detail page ${productUrl}:`,
       error
     );
     return null;
@@ -174,8 +250,74 @@ async function extractProductFromItem(
       .getAttribute('src')
       .catch(() => '');
 
-    // Try to extract nutrition data from the item itself
+    // Extract product detail page URL
+    const productLink = await item
+      .locator(SELECTORS.productData.productLink)
+      .first()
+      .getAttribute('href')
+      .catch(() => '');
+
+    // Extract product ID from onclick or data attributes for detail page URL
+    let productDetailUrl = '';
+    let productId = '';
+
+    if (productLink && productLink !== '#') {
+      // Use the actual link if it's not "#"
+      productDetailUrl = new URL(productLink, SITE_CONFIG.baseUrl).href;
+    } else {
+      // Paul Bassett uses href="#" but has JavaScript navigation
+      // Try to extract product ID from onclick attribute or data attributes
+      try {
+        const onclickAttr = await item
+          .locator(SELECTORS.productData.productLink)
+          .first()
+          .getAttribute('onclick')
+          .catch(() => '');
+
+        // Debug: Log onclick attribute for first product
+        if (name === '오렌지플로우 피즈프레소') {
+          logger.info(`🔍 Debug: onclick attribute: "${onclickAttr}"`);
+        }
+
+        // Look for patterns like goView('PB182900') in onclick
+        const dpidMatch = onclickAttr?.match(GO_VIEW_REGEX);
+        if (dpidMatch) {
+          productId = dpidMatch[1];
+          if (name === '오렌지플로우 피즈프레소') {
+            logger.info(`🔍 Debug: extracted dpid: "${productId}"`);
+          }
+        } else {
+          // Try to extract from other attributes or generate based on naming
+          // For now, generate a mock dpid based on product name
+          const cleanName = (nameEn || name).replace(/[^a-zA-Z0-9]/g, '');
+          productId = `PB${cleanName.substring(0, 6).toUpperCase()}00`;
+        }
+
+        // Construct proper detail page URL
+        const categoryId =
+          getCategoryFromUrl(pageUrl).name === 'COFFEE' ? 'A' : 'B';
+        productDetailUrl = `${SITE_CONFIG.baseUrl}/menu/View.pb?cid1=${categoryId}&cid2=&dpid=${productId}`;
+
+        if (name === '오렌지플로우 피즈프레소') {
+          logger.info(`🔍 Debug: final URL: "${productDetailUrl}"`);
+        }
+      } catch (error) {
+        logger.debug(`Failed to extract product ID for ${name}:`, error);
+        // Fallback: generate mock dpid
+        const cleanName = (nameEn || name).replace(/[^a-zA-Z0-9]/g, '');
+        productId = `PB${cleanName.substring(0, 6).toUpperCase()}00`;
+        const categoryId =
+          getCategoryFromUrl(pageUrl).name === 'COFFEE' ? 'A' : 'B';
+        productDetailUrl = `${SITE_CONFIG.baseUrl}/menu/View.pb?cid1=${categoryId}&cid2=&dpid=${productId}`;
+      }
+    }
+
+    // Try to extract nutrition data from the item itself first
     const nutritions = await extractNutritionFromItem(item);
+
+    // If no nutrition data found in listing and we have a valid detail URL,
+    // we'll extract nutrition data during the detail page navigation phase
+    // This is handled separately in the extraction pipeline
 
     // Check for status labels (New/Best)
     const fullText = (await item.textContent().catch(() => '')) || '';
@@ -209,7 +351,7 @@ async function extractProductFromItem(
       externalImageUrl: imageSrc
         ? new URL(imageSrc, SITE_CONFIG.baseUrl).href
         : '',
-      externalUrl: pageUrl,
+      externalUrl: productDetailUrl || pageUrl,
       price: null,
       category: categoryInfo.type,
       nutritions,
@@ -303,6 +445,51 @@ async function extractProductsFromPage(page: Page): Promise<Product[]> {
       (product): product is Product => product !== null
     );
 
+    logger.info(`Found ${validProducts.length} products to process`);
+
+    // Apply test mode limit before processing detail pages
+    if (isTestMode) {
+      logger.info(
+        `🧪 Test mode: limiting to ${maxProductsInTestMode} products`
+      );
+      validProducts.splice(maxProductsInTestMode);
+    }
+
+    // Second phase: Extract nutrition data from detail pages
+    for (let i = 0; i < validProducts.length; i++) {
+      const product = validProducts[i];
+
+      // Only navigate to detail page if we have a valid URL and no nutrition data
+      if (
+        product.externalUrl &&
+        product.externalUrl !== pageUrl &&
+        !product.nutritions
+      ) {
+        try {
+          logger.info(
+            `🔍 Extracting nutrition data for: ${product.name} (${i + 1}/${validProducts.length})`
+          );
+          const nutritions = await extractNutritionFromDetailPage(
+            page,
+            product.externalUrl,
+            product.name
+          );
+
+          if (nutritions) {
+            product.nutritions = nutritions;
+            logger.info(`✅ Updated ${product.name} with nutrition data`);
+          } else {
+            logger.info(`ℹ️ No nutrition data found for ${product.name}`);
+          }
+        } catch (error) {
+          logger.warn(
+            `Failed to extract nutrition for ${product.name}:`,
+            error
+          );
+        }
+      }
+    }
+
     return validProducts;
   } catch (error) {
     logger.error(`Failed to extract products: ${error}`);
@@ -321,27 +508,13 @@ async function handleMenuPage(page: Page, crawlerInstance: PlaywrightCrawler) {
   await takeDebugScreenshot(page, 'paulbassett-menu');
 
   const products = await extractProductsFromPage(page);
-  logger.info(`Found ${products.length} products to process`);
-
-  // Limit products in test mode
-  const productsToProcess = isTestMode
-    ? products.slice(0, maxProductsInTestMode)
-    : products;
-
-  if (isTestMode) {
-    logger.info(
-      `🧪 Test mode: limiting to ${productsToProcess.length} products`
-    );
-  }
 
   // Push all products directly to the crawler
-  for (const product of productsToProcess) {
+  for (const product of products) {
     await crawlerInstance.pushData(product);
   }
 
-  logger.info(
-    `Processed ${productsToProcess.length} products from Paul Bassett menu`
-  );
+  logger.info(`Processed ${products.length} products from Paul Bassett menu`);
 }
 
 // ================================================

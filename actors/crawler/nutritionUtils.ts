@@ -7,13 +7,13 @@ import type { Nutritions } from '../../shared/nutritions';
 
 export const NUTRITION_PATTERNS = {
   servingSize: /(\d+)\s*(ml|mL|ML|g|gram)/i,
-  calories: /(\d+)\s*(kcal|칼로리|열량)/i,
-  protein: /단백질.*?(\d+(?:\.\d+)?)\s*(g|gram)/i,
-  fat: /지방.*?(\d+(?:\.\d+)?)\s*(g|gram)/i,
-  carbohydrates: /탄수화물.*?(\d+(?:\.\d+)?)\s*(g|gram)/i,
-  sugar: /당류.*?(\d+(?:\.\d+)?)\s*(g|gram)/i,
-  sodium: /나트륨.*?(\d+(?:\.\d+)?)\s*(mg|milligram)/i,
-  caffeine: /카페인.*?(\d+(?:\.\d+)?)\s*(mg|milligram)/i,
+  calories: /(\d+(?:\.\d+)?)\s*(kcal|칼로리|열량)/i,
+  protein: /단백질.*?(\d+(?:\.\d+)?)(?:\/\d+(?:\.\d+)?)?\s*(g|gram)?/i,
+  fat: /지방.*?(\d+(?:\.\d+)?)(?:\/\d+(?:\.\d+)?)?\s*(g|gram)?/i,
+  carbohydrates: /탄수화물.*?(\d+(?:\.\d+)?)(?:\/\d+(?:\.\d+)?)?\s*(g|gram)?/i,
+  sugar: /당류.*?(\d+(?:\.\d+)?)(?:\/\d+(?:\.\d+)?)?\s*(g|gram|%)?/i,
+  sodium: /나트륨.*?(\d+(?:\.\d+)?)(?:\/\d+(?:\.\d+)?)?\s*(mg|milligram)?/i,
+  caffeine: /카페인.*?(\d+(?:\.\d+)?)(?:\/\d+(?:\.\d+)?)?\s*(mg|milligram)?/i,
 } as const;
 
 // ================================================

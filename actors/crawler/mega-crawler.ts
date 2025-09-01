@@ -2,12 +2,7 @@ import { PlaywrightCrawler, type Request } from 'crawlee';
 import type { Locator, Page } from 'playwright';
 import { logger } from '../../shared/logger';
 import type { Nutritions } from '../../shared/nutritions';
-import {
-  type Product,
-  takeDebugScreenshot,
-  waitForLoad,
-  writeProductsToJson,
-} from './crawlerUtils';
+import { type Product, waitForLoad, writeProductsToJson } from './crawlerUtils';
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
@@ -33,6 +28,10 @@ const REGEX_PATTERNS = {
   sugar: /(당류|sugar)[:\s]*(\d+\.?\d*)\s*g/i,
   sodium: /(나트륨|sodium)[:\s]*(\d+\.?\d*)\s*mg/i,
   caffeine: /(카페인|caffeine)[:\s]*(\d+\.?\d*)\s*mg/i,
+  modalServingSize: /(\d+(?:\.\d+)?)ml/,
+  modalCalories: /(\d+(?:\.\d+)?)kcal/,
+  modalGrams: /(\d+(?:\.\d+)?)g/,
+  modalMg: /(\d+(?:\.\d+)?)mg/,
 } as const;
 
 // ================================================
@@ -41,15 +40,7 @@ const REGEX_PATTERNS = {
 
 const SELECTORS = {
   // Product container selectors (multiple strategies)
-  productContainers: [
-    '.cont_gallery_list .inner_modal_open',
-    '.cont_gallery_list ul li',
-    '.product-item',
-    '.menu-item',
-    '.item-box',
-    'li[data-id]',
-    '.gallery-item',
-  ],
+  productContainers: ['ul#menu_list > li'],
 
   // Product data selectors
   productData: {
@@ -117,25 +108,8 @@ function _parseMegaNutritionValue(text: string): number | null {
   return null;
 }
 
-// Helper function to extract body text and log sample
-async function getPageBodyText(page: Page): Promise<string | null> {
-  const bodyText = await page.locator('body').innerText();
-  if (!bodyText) {
-    logger.info('No content found on page for nutrition extraction');
-    return null;
-  }
-
-  // Log a sample of the page text for debugging
-  const sampleText = bodyText.substring(0, 2000);
-  logger.info(
-    `Sample page text: ${sampleText.replace(/\n/g, ' ').replace(/\s+/g, ' ')}`
-  );
-
-  return bodyText;
-}
-
 // Helper function to find all nutrition matches
-function findMegaNutritionMatches(bodyText: string) {
+function _findMegaNutritionMatches(bodyText: string) {
   return {
     servingSizeMatch: bodyText.match(REGEX_PATTERNS.servingSize),
     caloriesMatch: bodyText.match(REGEX_PATTERNS.calories),
@@ -149,14 +123,14 @@ function findMegaNutritionMatches(bodyText: string) {
 }
 
 // Helper function to check if any nutrition data exists
-function hasAnyMegaNutritionData(
+function _hasAnyMegaNutritionData(
   matches: Record<string, RegExpMatchArray | null>
 ): boolean {
   return Object.values(matches).some((match) => match !== null);
 }
 
 // Helper function to log nutrition matches
-function logMegaNutritionMatches(
+function _logMegaNutritionMatches(
   matches: Record<string, RegExpMatchArray | null>
 ): void {
   const matchStatus = Object.entries(matches)
@@ -218,7 +192,7 @@ function extractMegaMineralNutrition(
 }
 
 // Helper function to create Mega nutrition object
-function createMegaNutritionObject(
+function _createMegaNutritionObject(
   matches: Record<string, RegExpMatchArray | null>
 ): Nutritions {
   const basicNutrition = extractMegaBasicNutrition(matches);
@@ -238,28 +212,120 @@ function createMegaNutritionObject(
   };
 }
 
+// Helper function to parse serving information
+function parseServingInfo(servingInfo: string[], nutrition: Nutritions): void {
+  for (const info of servingInfo) {
+    const servingSizeMatch = info.match(REGEX_PATTERNS.modalServingSize);
+    if (servingSizeMatch) {
+      nutrition.servingSize = Number.parseFloat(servingSizeMatch[1]);
+      nutrition.servingSizeUnit = 'ml';
+    }
+
+    const caloriesMatch = info.match(REGEX_PATTERNS.modalCalories);
+    if (caloriesMatch) {
+      nutrition.calories = Number.parseFloat(caloriesMatch[1]);
+      nutrition.caloriesUnit = 'kcal';
+    }
+  }
+}
+
+// Helper function to parse individual nutrition item
+function parseNutritionItem(item: string, nutrition: Nutritions): void {
+  if (item.includes('포화지방')) {
+    const match = item.match(REGEX_PATTERNS.modalGrams);
+    if (match) {
+      nutrition.saturatedFat = Number.parseFloat(match[1]);
+      nutrition.saturatedFatUnit = 'g';
+    }
+    return;
+  }
+
+  if (item.includes('당류')) {
+    const match = item.match(REGEX_PATTERNS.modalGrams);
+    if (match) {
+      nutrition.sugar = Number.parseFloat(match[1]);
+      nutrition.sugarUnit = 'g';
+    }
+    return;
+  }
+
+  if (item.includes('나트륨')) {
+    const match = item.match(REGEX_PATTERNS.modalMg);
+    if (match) {
+      nutrition.natrium = Number.parseFloat(match[1]);
+      nutrition.natriumUnit = 'mg';
+    }
+    return;
+  }
+
+  if (item.includes('단백질')) {
+    const match = item.match(REGEX_PATTERNS.modalGrams);
+    if (match) {
+      nutrition.protein = Number.parseFloat(match[1]);
+      nutrition.proteinUnit = 'g';
+    }
+    return;
+  }
+
+  if (item.includes('카페인')) {
+    const match = item.match(REGEX_PATTERNS.modalMg);
+    if (match) {
+      nutrition.caffeine = Number.parseFloat(match[1]);
+      nutrition.caffeineUnit = 'mg';
+    }
+  }
+}
+
+// Helper function to parse nutrition items
+function parseNutritionItems(
+  nutritionItems: string[],
+  nutrition: Nutritions
+): void {
+  for (const item of nutritionItems) {
+    parseNutritionItem(item, nutrition);
+  }
+}
+
+// Simplified nutrition data extraction function
 async function extractNutritionData(page: Page): Promise<Nutritions | null> {
   try {
-    logger.info('Starting nutrition data extraction');
-    // Wait for any dynamic content to load
-    await page.waitForTimeout(2000);
+    logger.info('Starting nutrition data extraction from .inner_modal');
 
-    const bodyText = await getPageBodyText(page);
-    if (!bodyText) {
+    const innerModal = page.locator('.inner_modal');
+    const modalCount = await innerModal.count();
+
+    if (modalCount === 0) {
+      logger.info('No nutrition information found in .inner_modal');
       return null;
     }
 
-    const matches = findMegaNutritionMatches(bodyText);
-    logMegaNutritionMatches(matches);
+    logger.debug('Found .inner_modal selector, extracting nutrition data');
 
-    if (!hasAnyMegaNutritionData(matches)) {
-      logger.info('No nutrition information found in page text');
+    const servingInfo = await innerModal
+      .locator('.cont_text .cont_text_inner')
+      .allTextContents();
+    const nutritionItems = await innerModal
+      .locator('.cont_list ul li')
+      .allTextContents();
+
+    if (servingInfo.length === 0 && nutritionItems.length === 0) {
+      logger.info('No nutrition information found in .inner_modal');
       return null;
     }
 
-    const nutritions = createMegaNutritionObject(matches);
+    const nutrition: Nutritions = {};
+    parseServingInfo(servingInfo, nutrition);
+    parseNutritionItems(nutritionItems, nutrition);
 
-    return nutritions;
+    if (Object.keys(nutrition).length > 0) {
+      logger.info(
+        'Successfully extracted nutrition data from .inner_modal structured format'
+      );
+      return nutrition;
+    }
+
+    logger.info('No nutrition information found in .inner_modal');
+    return null;
   } catch (error) {
     logger.error('Error extracting nutrition data:', error);
     return null;
@@ -340,100 +406,6 @@ async function findMegaProductContainers(
   return { containers: null, usedSelector: 'none' };
 }
 
-// Helper function to click product image and wait for modal
-async function clickMegaProductImage(
-  container: Locator,
-  productName: string,
-  page: Page
-): Promise<boolean> {
-  const productImage = container.locator(SELECTORS.productData.image).first();
-  if ((await productImage.count()) === 0) {
-    logger.warn(
-      `No product image found for ${productName}, skipping nutrition extraction`
-    );
-    return false;
-  }
-
-  await productImage.click();
-  await page.waitForTimeout(3000); // Wait for modal to fully load
-
-  // Wait for modal content to appear
-  try {
-    await page.waitForSelector('.modal-content', { timeout: 5000 });
-    await page.waitForTimeout(1000); // Extra wait for content to populate
-    return true;
-  } catch (error) {
-    logger.warn(`Modal did not appear for ${productName}: ${error}`);
-    return false;
-  }
-}
-
-// Helper function to close modal or navigate back
-async function closeMegaModal(page: Page): Promise<void> {
-  const closeButton = page.locator(
-    '.close, .modal-close, .btn-close, [aria-label="Close"]'
-  );
-
-  if ((await closeButton.count()) > 0) {
-    try {
-      const isVisible = await closeButton.first().isVisible({ timeout: 3000 });
-      if (isVisible) {
-        await closeButton.first().click({ timeout: 5000 });
-        await page.waitForTimeout(500);
-        return;
-      }
-      logger.info('Close button exists but not visible, trying to go back');
-    } catch (error) {
-      logger.warn(`Could not close modal: ${error}, trying to go back`);
-    }
-  }
-
-  // If modal close failed or no close button, go back
-  try {
-    await page.goBack();
-    await waitForLoad(page);
-  } catch (_error) {
-    logger.warn('Could not go back, continuing...');
-  }
-}
-
-// Helper function to extract nutrition for a single product
-async function extractMegaProductNutrition(
-  container: Locator,
-  product: Product,
-  page: Page,
-  index: number
-): Promise<void> {
-  try {
-    logger.info(`Attempting to extract nutrition for product: ${product.name}`);
-
-    const modalOpened = await clickMegaProductImage(
-      container,
-      product.name,
-      page
-    );
-    if (!modalOpened) {
-      return;
-    }
-
-    // Take debug screenshot to understand the modal structure
-    await takeDebugScreenshot(page, `mega-product-modal-${index}`);
-
-    // Try to extract nutrition data
-    const nutritions = await extractNutritionData(page);
-    if (nutritions) {
-      product.nutritions = nutritions;
-      logger.info(`✅ Extracted nutrition data for: ${product.name}`);
-    } else {
-      logger.info(`ℹ️  No nutrition data found for: ${product.name}`);
-    }
-
-    await closeMegaModal(page);
-  } catch (error) {
-    logger.warn(`Could not extract nutrition for ${product.name}: ${error}`);
-  }
-}
-
 async function extractPageProducts(page: Page, categoryName = 'Default') {
   const products: Product[] = [];
 
@@ -444,16 +416,41 @@ async function extractPageProducts(page: Page, categoryName = 'Default') {
   }
 
   const containerCount = await productContainers.count();
-  logger.info(`Processing all ${containerCount} products`);
 
-  // Process all containers sequentially to handle clicks and modals properly
-  for (let i = 0; i < containerCount; i++) {
+  // Limit products in test mode
+  const maxProducts = isTestMode ? maxProductsInTestMode : containerCount;
+  const actualCount = Math.min(containerCount, maxProducts);
+
+  logger.info(
+    `Processing ${actualCount} products (found ${containerCount} total)`
+  );
+
+  // Process containers sequentially
+  for (let i = 0; i < actualCount; i++) {
     const container = productContainers.nth(i);
     const product = await extractProductData(container, categoryName);
 
     if (product) {
       product.externalUrl = page.url();
-      await extractMegaProductNutrition(container, product, page, i);
+
+      // Try to click product to open modal and extract nutrition
+      try {
+        const productImage = container
+          .locator(SELECTORS.productData.image)
+          .first();
+        if ((await productImage.count()) > 0) {
+          const nutritions = await extractNutritionData(page);
+          if (nutritions) {
+            product.nutritions = nutritions;
+            logger.info(`✅ Found nutrition data for: ${product.name}`);
+          }
+        }
+      } catch (error) {
+        logger.debug(
+          `Could not extract nutrition for ${product.name}: ${error}`
+        );
+      }
+
       products.push(product);
     }
   }
@@ -528,7 +525,6 @@ async function handleMainMenuPage(
   logger.info('Processing Mega MGC Coffee main menu page with pagination');
 
   await waitForLoad(page);
-  await takeDebugScreenshot(page, 'mega-main-menu');
 
   // Try to discover categories
   const categories = await extractMenuCategories(page);
