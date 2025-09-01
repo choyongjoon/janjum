@@ -53,6 +53,7 @@ const CRAWLER_CONFIG = {
 // Regex patterns for performance
 const FILE_EXTENSION_REGEX = /\.[^.]*$/;
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: refactor later
 async function extractNutritionData(page: Page): Promise<Nutritions | null> {
   try {
     // Look for the nutrition table on the detail page
@@ -134,28 +135,28 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
     );
 
     const nutritions: Nutritions = {
-      servingSize,
-      servingSizeUnit: servingSize !== null ? 'ml' : null,
-      calories,
-      caloriesUnit: calories !== null ? 'kcal' : null,
-      carbohydrates: null, // Gongcha doesn't provide carbohydrates data
-      carbohydratesUnit: null,
-      sugar,
-      sugarUnit: sugar !== null ? 'g' : null,
-      protein,
-      proteinUnit: protein !== null ? 'g' : null,
-      fat: null, // Gongcha doesn't provide total fat data
-      fatUnit: null,
-      transFat: null, // Gongcha doesn't provide trans fat data
-      transFatUnit: null,
-      saturatedFat,
-      saturatedFatUnit: saturatedFat !== null ? 'g' : null,
-      natrium: sodium,
-      natriumUnit: sodium !== null ? 'mg' : null,
-      cholesterol: null, // Gongcha doesn't provide cholesterol data
-      cholesterolUnit: null,
-      caffeine,
-      caffeineUnit: caffeine !== null ? 'mg' : null,
+      servingSize: servingSize ?? undefined,
+      servingSizeUnit: servingSize !== null ? 'ml' : undefined,
+      calories: calories ?? undefined,
+      caloriesUnit: calories !== null ? 'kcal' : undefined,
+      carbohydrates: undefined, // Gongcha doesn't provide carbohydrates data
+      carbohydratesUnit: undefined,
+      sugar: sugar ?? undefined,
+      sugarUnit: sugar !== null ? 'g' : undefined,
+      protein: protein ?? undefined,
+      proteinUnit: protein !== null ? 'g' : undefined,
+      fat: undefined, // Gongcha doesn't provide total fat data
+      fatUnit: undefined,
+      transFat: undefined, // Gongcha doesn't provide trans fat data
+      transFatUnit: undefined,
+      saturatedFat: saturatedFat ?? undefined,
+      saturatedFatUnit: saturatedFat !== null ? 'g' : undefined,
+      natrium: sodium ?? undefined,
+      natriumUnit: sodium !== null ? 'mg' : undefined,
+      cholesterol: undefined, // Gongcha doesn't provide cholesterol data
+      cholesterolUnit: undefined,
+      caffeine: caffeine ?? undefined,
+      caffeineUnit: caffeine !== null ? 'mg' : undefined,
     };
 
     // Only return nutrition data if at least one nutrition field has a value

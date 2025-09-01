@@ -146,12 +146,12 @@ function extractMegaBasicNutrition(
   return {
     servingSize: matches.servingSizeMatch
       ? Number.parseInt(matches.servingSizeMatch[1], 10)
-      : null,
-    servingSizeUnit: matches.servingSizeMatch ? 'ml' : null,
+      : undefined,
+    servingSizeUnit: matches.servingSizeMatch ? 'ml' : undefined,
     calories: matches.caloriesMatch
       ? Number.parseInt(matches.caloriesMatch[1], 10)
-      : null,
-    caloriesUnit: matches.caloriesMatch ? 'kcal' : null,
+      : undefined,
+    caloriesUnit: matches.caloriesMatch ? 'kcal' : undefined,
   };
 }
 
@@ -162,16 +162,18 @@ function extractMegaMacroNutrition(
   return {
     protein: matches.proteinMatch
       ? Number.parseFloat(matches.proteinMatch[2])
-      : null,
-    proteinUnit: matches.proteinMatch ? 'g' : null,
-    fat: matches.fatMatch ? Number.parseFloat(matches.fatMatch[2]) : null,
-    fatUnit: matches.fatMatch ? 'g' : null,
+      : undefined,
+    proteinUnit: matches.proteinMatch ? 'g' : undefined,
+    fat: matches.fatMatch ? Number.parseFloat(matches.fatMatch[2]) : undefined,
+    fatUnit: matches.fatMatch ? 'g' : undefined,
     carbohydrates: matches.carbohydratesMatch
       ? Number.parseFloat(matches.carbohydratesMatch[2])
-      : null,
-    carbohydratesUnit: matches.carbohydratesMatch ? 'g' : null,
-    sugar: matches.sugarMatch ? Number.parseFloat(matches.sugarMatch[2]) : null,
-    sugarUnit: matches.sugarMatch ? 'g' : null,
+      : undefined,
+    carbohydratesUnit: matches.carbohydratesMatch ? 'g' : undefined,
+    sugar: matches.sugarMatch
+      ? Number.parseFloat(matches.sugarMatch[2])
+      : undefined,
+    sugarUnit: matches.sugarMatch ? 'g' : undefined,
   };
 }
 
@@ -182,12 +184,12 @@ function extractMegaMineralNutrition(
   return {
     natrium: matches.natriumMatch
       ? Number.parseFloat(matches.natriumMatch[2])
-      : null,
-    natriumUnit: matches.natriumMatch ? 'mg' : null,
+      : undefined,
+    natriumUnit: matches.natriumMatch ? 'mg' : undefined,
     caffeine: matches.caffeineMatch
       ? Number.parseFloat(matches.caffeineMatch[2])
-      : null,
-    caffeineUnit: matches.caffeineMatch ? 'mg' : null,
+      : undefined,
+    caffeineUnit: matches.caffeineMatch ? 'mg' : undefined,
   };
 }
 
@@ -203,12 +205,12 @@ function _createMegaNutritionObject(
     ...basicNutrition,
     ...macroNutrition,
     ...mineralNutrition,
-    transFat: null,
-    transFatUnit: null,
-    saturatedFat: null,
-    saturatedFatUnit: null,
-    cholesterol: null,
-    cholesterolUnit: null,
+    transFat: undefined,
+    transFatUnit: undefined,
+    saturatedFat: undefined,
+    saturatedFatUnit: undefined,
+    cholesterol: undefined,
+    cholesterolUnit: undefined,
   };
 }
 
@@ -379,7 +381,7 @@ async function extractProductData(
         externalCategory: categoryName,
         externalId: `mega_${name}`,
         externalUrl: '', // Will be filled by caller
-        nutritions: null, // Will be filled when available
+        nutritions: undefined, // Will be filled when available
       };
     }
   } catch (error) {

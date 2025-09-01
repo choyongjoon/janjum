@@ -173,7 +173,7 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
   } catch (error) {
     logger.debug(
       'Failed to extract nutrition data from Hollys menu item:',
-      error
+      error as Record<string, unknown>
     );
     return null;
   }

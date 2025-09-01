@@ -237,7 +237,7 @@ async function extractNutritionData(
   } catch (error) {
     logger.debug(
       'Failed to extract nutrition data from Ediya menu item:',
-      error
+      error as Record<string, unknown>
     );
     return null;
   }

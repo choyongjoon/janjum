@@ -151,7 +151,10 @@ function extractMammothNutritionFromText(text: string): Nutritions | null {
     const hasData = Object.keys(nutrition).length > 0;
     return hasData ? nutrition : null;
   } catch (error) {
-    logger.debug('Error parsing Mammoth nutrition text:', error);
+    logger.debug(
+      'Error parsing Mammoth nutrition text:',
+      error as Record<string, unknown>
+    );
     return null;
   }
 }
@@ -209,7 +212,7 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
   } catch (error) {
     logger.debug(
       'Failed to extract nutrition data from Mammoth product:',
-      error
+      error as Record<string, unknown>
     );
     return null;
   }
@@ -371,7 +374,20 @@ export const createMammothCrawler = () =>
     },
     async requestHandler({ page, request, crawler: crawlerInstance }) {
       if (request.label === 'PRODUCT') {
-        await handleProductPage(page, request, crawlerInstance);
+        await handleProductPage(
+          page,
+          request as unknown as {
+            userData: {
+              basicInfo: {
+                name: string;
+                nameEn?: string;
+                menuSeq: string;
+                imageUrl?: string;
+              };
+            };
+          },
+          crawlerInstance
+        );
       } else {
         await handleMenuListPage(page, crawlerInstance);
       }

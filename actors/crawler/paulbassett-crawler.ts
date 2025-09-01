@@ -122,7 +122,7 @@ async function extractNutritionFromItem(
   } catch (error) {
     logger.debug(
       'Failed to extract nutrition data from Paul Bassett item:',
-      error
+      error as Record<string, unknown>
     );
     return null;
   }
@@ -183,7 +183,10 @@ async function extractNutritionFromDetailPage(
           }
         }
       } catch (error) {
-        logger.debug(`Failed to process selector ${selector}:`, error);
+        logger.debug(
+          `Failed to process selector ${selector}:`,
+          error as Record<string, unknown>
+        );
       }
     }
 
@@ -302,7 +305,10 @@ async function extractProductFromItem(
           logger.info(`🔍 Debug: final URL: "${productDetailUrl}"`);
         }
       } catch (error) {
-        logger.debug(`Failed to extract product ID for ${name}:`, error);
+        logger.debug(
+          `Failed to extract product ID for ${name}:`,
+          error as Record<string, unknown>
+        );
         // Fallback: generate mock dpid
         const cleanName = (nameEn || name).replace(/[^a-zA-Z0-9]/g, '');
         productId = `PB${cleanName.substring(0, 6).toUpperCase()}00`;
@@ -551,7 +557,10 @@ export const runPaulBassettCrawler = async () => {
     const dataset = await crawler.getData();
     await writeProductsToJson(dataset.items as Product[], 'paulbassett');
   } catch (error) {
-    logger.error('Paul Bassett crawler failed:', error);
+    logger.error(
+      'Paul Bassett crawler failed:',
+      error as Record<string, unknown>
+    );
     throw error;
   }
 };
@@ -559,7 +568,7 @@ export const runPaulBassettCrawler = async () => {
 // Only run if this file is executed directly (not imported)
 if (import.meta.url === `file://${process.argv[1]}`) {
   runPaulBassettCrawler().catch((error) => {
-    logger.error('Crawler execution failed:', error);
+    logger.error('Crawler execution failed:', error as Record<string, unknown>);
     process.exit(1);
   });
 }

@@ -178,7 +178,10 @@ async function tryAlternativeNutritionSelectors(
         return result;
       }
     } catch (selectorError) {
-      logger.debug(`Selector ${selector} failed:`, selectorError);
+      logger.debug(
+        `Selector ${selector} failed:`,
+        selectorError as Record<string, unknown>
+      );
     }
   }
 
@@ -518,7 +521,7 @@ async function extractNutritionDataFromDetailPage(
   } catch (error) {
     logger.debug(
       `Failed to extract nutrition data for menuCode ${menuCode}:`,
-      error
+      error as Record<string, unknown>
     );
     return null;
   }
@@ -685,7 +688,7 @@ async function extractProductsFromListing(
 }
 
 function createBasicProduct(
-  productInfo: { name: string; menuCode: string; imageUrl: string },
+  productInfo: { name: string; menuCode: string; imageUrl?: string },
   categoryName: string,
   nutritions: Nutritions | null = null
 ): Product {
@@ -696,7 +699,7 @@ function createBasicProduct(
     nameEn: null,
     description: null,
     price: null,
-    externalImageUrl: productInfo.imageUrl,
+    externalImageUrl: productInfo.imageUrl || '',
     category: null, // Category will be set later
     externalCategory: categoryName,
     externalId,

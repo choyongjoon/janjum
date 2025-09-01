@@ -141,33 +141,35 @@ export function hasNutritionKeywords(text: string): boolean {
 // NUTRITION OBJECT CREATION
 // ================================================
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: refactor later
 export function createNutritionObject(
   values: NutritionValues,
   matches: NutritionMatches
 ): Nutritions {
   return {
-    servingSize: values.servingSize,
-    servingSizeUnit: getServingSizeUnit(matches, values.servingSize !== null),
-    calories: values.calories,
-    caloriesUnit: values.calories !== null ? 'kcal' : null,
-    carbohydrates: values.carbohydrates,
-    carbohydratesUnit: values.carbohydrates !== null ? 'g' : null,
-    sugar: values.sugar,
-    sugarUnit: values.sugar !== null ? 'g' : null,
-    protein: values.protein,
-    proteinUnit: values.protein !== null ? 'g' : null,
-    fat: values.fat,
-    fatUnit: values.fat !== null ? 'g' : null,
-    transFat: null,
-    transFatUnit: null,
-    saturatedFat: null,
-    saturatedFatUnit: null,
-    natrium: values.sodium,
-    natriumUnit: values.sodium !== null ? 'mg' : null,
-    cholesterol: null,
-    cholesterolUnit: null,
-    caffeine: values.caffeine,
-    caffeineUnit: values.caffeine !== null ? 'mg' : null,
+    servingSize: values.servingSize ?? undefined,
+    servingSizeUnit:
+      getServingSizeUnit(matches, values.servingSize !== null) ?? undefined,
+    calories: values.calories ?? undefined,
+    caloriesUnit: values.calories !== null ? 'kcal' : undefined,
+    carbohydrates: values.carbohydrates ?? undefined,
+    carbohydratesUnit: values.carbohydrates !== null ? 'g' : undefined,
+    sugar: values.sugar ?? undefined,
+    sugarUnit: values.sugar !== null ? 'g' : undefined,
+    protein: values.protein ?? undefined,
+    proteinUnit: values.protein !== null ? 'g' : undefined,
+    fat: values.fat ?? undefined,
+    fatUnit: values.fat !== null ? 'g' : undefined,
+    transFat: undefined,
+    transFatUnit: undefined,
+    saturatedFat: undefined,
+    saturatedFatUnit: undefined,
+    natrium: values.sodium ?? undefined,
+    natriumUnit: values.sodium !== null ? 'mg' : undefined,
+    cholesterol: undefined,
+    cholesterolUnit: undefined,
+    caffeine: values.caffeine ?? undefined,
+    caffeineUnit: values.caffeine !== null ? 'mg' : undefined,
   };
 }
 
@@ -186,7 +188,10 @@ export function extractNutritionFromText(
       return createNutritionObject(values, matches);
     }
   } catch (error) {
-    logger.debug('Failed to extract nutrition data from text:', error);
+    logger.debug(
+      'Failed to extract nutrition data from text:',
+      error as Record<string, unknown>
+    );
   }
   return null;
 }

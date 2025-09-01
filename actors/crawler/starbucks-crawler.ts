@@ -122,14 +122,16 @@ async function extractServingSize(page: Page): Promise<number | undefined> {
 async function checkNutritionValuesPopulated(
   page: Page
 ): Promise<{ caloriesText: string; proteinText: string }> {
-  const caloriesText = await page
-    .locator('.product_info_content li.kcal dd')
-    .textContent()
-    .catch(() => '');
-  const proteinText = await page
-    .locator('.product_info_content li.protein dd')
-    .textContent()
-    .catch(() => '');
+  const caloriesText =
+    (await page
+      .locator('.product_info_content li.kcal dd')
+      .textContent()
+      .catch(() => '')) || '';
+  const proteinText =
+    (await page
+      .locator('.product_info_content li.protein dd')
+      .textContent()
+      .catch(() => '')) || '';
 
   logger.info(
     `Calories text: '${caloriesText}', Protein text: '${proteinText}'`
@@ -166,46 +168,57 @@ function extractAllNutritionValues(page: Page): Promise<string[]> {
     page
       .locator('.product_info_content li.kcal dd')
       .textContent()
-      .catch(() => ''),
+      .catch(() => '')
+      .then((text) => text || ''),
     page
       .locator('.product_info_content li.protein dd')
       .textContent()
-      .catch(() => ''),
+      .catch(() => '')
+      .then((text) => text || ''),
     page
       .locator('.product_info_content li.fat dd')
       .textContent()
-      .catch(() => ''),
+      .catch(() => '')
+      .then((text) => text || ''),
     page
       .locator('.product_info_content li.sat_FAT dd')
       .textContent()
-      .catch(() => ''),
+      .catch(() => '')
+      .then((text) => text || ''),
     page
       .locator('.product_info_content li.trans_FAT dd')
       .textContent()
-      .catch(() => ''),
+      .catch(() => '')
+      .then((text) => text || ''),
     page
       .locator('.product_info_content li.cholesterol dd')
       .textContent()
-      .catch(() => ''),
+      .catch(() => '')
+      .then((text) => text || ''),
     page
       .locator('.product_info_content li.sodium dd')
       .textContent()
-      .catch(() => ''),
+      .catch(() => '')
+      .then((text) => text || ''),
     page
       .locator('.product_info_content li.sugars dd')
       .textContent()
-      .catch(() => ''),
+      .catch(() => '')
+      .then((text) => text || ''),
     page
       .locator('.product_info_content li.chabo dd')
       .textContent()
-      .catch(() => ''), // carbohydrates
+      .catch(() => '')
+      .then((text) => text || ''), // carbohydrates
     page
       .locator('.product_info_content li.caffeine dd')
       .textContent()
-      .catch(() => ''),
+      .catch(() => '')
+      .then((text) => text || ''),
   ]);
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: refactor later
 function createNutritionObject(
   servingSize: number | undefined,
   nutritionValues: string[]
@@ -225,31 +238,35 @@ function createNutritionObject(
 
   return {
     servingSize,
-    servingSizeUnit: servingSize !== null ? 'ml' : null,
-    calories: parseNutritionValueFromText(calories),
+    servingSizeUnit: servingSize !== null ? 'ml' : undefined,
+    calories: parseNutritionValueFromText(calories) ?? undefined,
     caloriesUnit:
-      parseNutritionValueFromText(calories) !== null ? 'kcal' : null,
-    carbohydrates: parseNutritionValueFromText(carbohydrates),
+      parseNutritionValueFromText(calories) !== null ? 'kcal' : undefined,
+    carbohydrates: parseNutritionValueFromText(carbohydrates) ?? undefined,
     carbohydratesUnit:
-      parseNutritionValueFromText(carbohydrates) !== null ? 'g' : null,
-    sugar: parseNutritionValueFromText(sugar),
-    sugarUnit: parseNutritionValueFromText(sugar) !== null ? 'g' : null,
-    protein: parseNutritionValueFromText(protein),
-    proteinUnit: parseNutritionValueFromText(protein) !== null ? 'g' : null,
-    fat: parseNutritionValueFromText(fat),
-    fatUnit: parseNutritionValueFromText(fat) !== null ? 'g' : null,
-    transFat: parseNutritionValueFromText(transFat),
-    transFatUnit: parseNutritionValueFromText(transFat) !== null ? 'g' : null,
-    saturatedFat: parseNutritionValueFromText(saturatedFat),
+      parseNutritionValueFromText(carbohydrates) !== null ? 'g' : undefined,
+    sugar: parseNutritionValueFromText(sugar) ?? undefined,
+    sugarUnit: parseNutritionValueFromText(sugar) !== null ? 'g' : undefined,
+    protein: parseNutritionValueFromText(protein) ?? undefined,
+    proteinUnit:
+      parseNutritionValueFromText(protein) !== null ? 'g' : undefined,
+    fat: parseNutritionValueFromText(fat) ?? undefined,
+    fatUnit: parseNutritionValueFromText(fat) !== null ? 'g' : undefined,
+    transFat: parseNutritionValueFromText(transFat) ?? undefined,
+    transFatUnit:
+      parseNutritionValueFromText(transFat) !== null ? 'g' : undefined,
+    saturatedFat: parseNutritionValueFromText(saturatedFat) ?? undefined,
     saturatedFatUnit:
-      parseNutritionValueFromText(saturatedFat) !== null ? 'g' : null,
-    natrium: parseNutritionValueFromText(sodium),
-    natriumUnit: parseNutritionValueFromText(sodium) !== null ? 'mg' : null,
-    cholesterol: parseNutritionValueFromText(cholesterol),
+      parseNutritionValueFromText(saturatedFat) !== null ? 'g' : undefined,
+    natrium: parseNutritionValueFromText(sodium) ?? undefined,
+    natriumUnit:
+      parseNutritionValueFromText(sodium) !== null ? 'mg' : undefined,
+    cholesterol: parseNutritionValueFromText(cholesterol) ?? undefined,
     cholesterolUnit:
-      parseNutritionValueFromText(cholesterol) !== null ? 'mg' : null,
-    caffeine: parseNutritionValueFromText(caffeine),
-    caffeineUnit: parseNutritionValueFromText(caffeine) !== null ? 'mg' : null,
+      parseNutritionValueFromText(cholesterol) !== null ? 'mg' : undefined,
+    caffeine: parseNutritionValueFromText(caffeine) ?? undefined,
+    caffeineUnit:
+      parseNutritionValueFromText(caffeine) !== null ? 'mg' : undefined,
   };
 }
 
