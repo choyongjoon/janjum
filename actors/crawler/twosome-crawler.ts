@@ -246,75 +246,16 @@ async function extractNutritionDataFromDetailPage(
     await page.goto(detailUrl);
     await waitForLoad(page);
 
-    // Wait for nutrition popup to load and try to click to reveal it
-    await page.waitForTimeout(3000);
-
-    // Try multiple approaches to reveal nutrition data
-    try {
-      // Method 1: Click on nutrition info text
-      const nutritionButton = page.getByText('제품 영양정보');
-      if ((await nutritionButton.count()) > 0) {
-        await nutritionButton.first().click();
-        await page.waitForTimeout(1500);
-      }
-    } catch {
-      // Method 1 failed, try other approaches
-    }
-
-    try {
-      // Method 2: Look for and click nutrition popup trigger
-      const popupTrigger = page.locator('[class*="popup"]').first();
-      if ((await popupTrigger.count()) > 0) {
-        await popupTrigger.click();
-        await page.waitForTimeout(2000);
-      }
-    } catch {
-      // Method 2 failed
-    }
-
-    // Try additional methods to reveal nutrition data
-    try {
-      // Method 3: Click any element containing "영양"
-      const nutritionElements = page.locator(':has-text("영양")');
-      for (let i = 0; i < Math.min(await nutritionElements.count(), 3); i++) {
-        await nutritionElements.nth(i).click();
-        await page.waitForTimeout(1000);
-      }
-    } catch {
-      // Method 3 failed
-    }
-
-    // Method 4: Click "확인" button to confirm nutrition popup
+    // Click "확인" button to confirm nutrition popup
     try {
       const confirmButton = page.getByText('확인');
       if ((await confirmButton.count()) > 0) {
         logger.info('🔘 Clicking 확인 button to reveal nutrition data');
         await confirmButton.first().click();
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(1000);
       }
     } catch {
-      // Method 4 failed
-    }
-
-    // Method 5: Try other confirmation button patterns
-    try {
-      const confirmButtons = [
-        page.locator('button:has-text("확인")'),
-        page.locator('input[type="button"][value="확인"]'),
-        page.locator('.btn:has-text("확인")'),
-        page.locator('[onclick*="confirm"]'),
-      ];
-
-      for (const button of confirmButtons) {
-        if ((await button.count()) > 0) {
-          logger.info('🔘 Clicking confirmation button');
-          await button.first().click();
-          await page.waitForTimeout(1500);
-          break;
-        }
-      }
-    } catch {
-      // Method 5 failed
+      // Method failed
     }
 
     // Debug: Check what elements are actually available
@@ -790,6 +731,7 @@ async function pushProductsInBatches(
   }
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: <explanation>
 async function handleMainMenuPage(
   page: Page,
   crawlerInstance: PlaywrightCrawler
@@ -847,7 +789,16 @@ async function handleMainMenuPage(
         if (text?.trim() === categoryName) {
           await element.click();
           await waitForLoad(page);
+
+          // Wait for product list to update after category selection
+          await page.waitForTimeout(2000); // Allow time for category products to load
+
+          // Verify product list has loaded
+          const productContainers = page.locator(SELECTORS.productListItems);
+          await productContainers.first().waitFor({ timeout: 10_000 });
+
           categoryClicked = true;
+          logger.info(`✅ Successfully clicked category: ${categoryName}`);
           break;
         }
       }
@@ -858,6 +809,17 @@ async function handleMainMenuPage(
       }
 
       const products = await extractProductsFromListing(page, categoryName);
+
+      // Debug: Log first few product codes to verify different products per category
+      if (products.length > 0) {
+        const productCodes = products
+          .slice(0, 3)
+          .map((p) => p.menuCode)
+          .join(', ');
+        logger.info(
+          `🔍 First product codes in ${categoryName}: ${productCodes}`
+        );
+      }
 
       // Extract nutrition data for each product
       const createdProducts = await processProductsInCategory(
