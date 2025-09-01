@@ -2,6 +2,7 @@ import { convexQuery } from '@convex-dev/react-query';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import type { Id } from 'convex/_generated/dataModel';
+import { NutritionDialogButton } from '~/components/NutritionDialogButton';
 import { RatingSummary } from '~/components/RatingSummary';
 import { api } from '../../convex/_generated/api';
 import { BackLink } from '../components/BackLink';
@@ -125,7 +126,6 @@ function ProductPage() {
                   </div>
                 </div>
               )}
-
               {/* Rating Display */}
               <RatingSummary className="mt-4" reviewStats={reviewStats} />
             </div>
@@ -147,6 +147,10 @@ function ProductPage() {
               <p className="whitespace-pre-wrap text-base-content/80">
                 {product.description}
               </p>
+            )}
+
+            {product.nutritions && (
+              <NutritionDialogButton nutritions={product.nutritions} />
             )}
 
             {/* Product Metadata */}

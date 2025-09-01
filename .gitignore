@@ -49,3 +49,6 @@ dist/
 
 # Netlify
 .netlify/
+
+*storybook.log
+storybook-static

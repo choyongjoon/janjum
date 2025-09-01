@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { logger } from 'shared/logger';
+import type { Nutritions } from 'shared/nutritions';
 
 export interface Product {
   name: string;
@@ -13,6 +14,7 @@ export interface Product {
   externalCategory: string;
   externalId: string;
   externalUrl: string;
+  nutritions?: Nutritions | null;
 }
 
 export const waitFor = async (ms: number) => {

@@ -1,6 +1,7 @@
 import { PlaywrightCrawler } from 'crawlee';
 import type { Locator, Page } from 'playwright';
 import { logger } from '../../shared/logger';
+import type { Nutritions } from '../../shared/nutritions';
 import {
   type Product,
   takeDebugScreenshot,
@@ -52,6 +53,124 @@ const CRAWLER_CONFIG = {
 // Regex patterns for performance
 const FILE_EXTENSION_REGEX = /\.[^.]*$/;
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: refactor later
+async function extractNutritionData(page: Page): Promise<Nutritions | null> {
+  try {
+    // Look for the nutrition table on the detail page
+    const nutritionTable = page.locator('.table-list table tbody tr').first();
+
+    if ((await nutritionTable.count()) === 0) {
+      logger.warn('No nutrition table found on page');
+      return null;
+    }
+
+    // Extract nutrition values from table cells
+    const nutritionValues = await Promise.all([
+      nutritionTable
+        .locator('td')
+        .nth(2)
+        .textContent()
+        .catch(() => ''), // Serving size (ml)
+      nutritionTable
+        .locator('td')
+        .nth(3)
+        .textContent()
+        .catch(() => ''), // Calories (kcal)
+      nutritionTable
+        .locator('td')
+        .nth(4)
+        .textContent()
+        .catch(() => ''), // Sugar (g)
+      nutritionTable
+        .locator('td')
+        .nth(5)
+        .textContent()
+        .catch(() => ''), // Protein (g)
+      nutritionTable
+        .locator('td')
+        .nth(6)
+        .textContent()
+        .catch(() => ''), // Saturated fat (g)
+      nutritionTable
+        .locator('td')
+        .nth(7)
+        .textContent()
+        .catch(() => ''), // Sodium (mg)
+      nutritionTable
+        .locator('td')
+        .nth(8)
+        .textContent()
+        .catch(() => ''), // Caffeine (mg)
+    ]);
+
+    const [
+      servingSizeText,
+      caloriesText,
+      sugarText,
+      proteinText,
+      saturatedFatText,
+      sodiumText,
+      caffeineText,
+    ] = nutritionValues;
+
+    // Parse nutrition values
+    const parseValue = (text: string | null): number | null => {
+      if (!text || text.trim() === '' || text.trim() === '-') {
+        return null;
+      }
+      const parsed = Number.parseFloat(text.trim());
+      return Number.isNaN(parsed) ? null : parsed;
+    };
+
+    const servingSize = parseValue(servingSizeText);
+    const calories = parseValue(caloriesText);
+    const sugar = parseValue(sugarText);
+    const protein = parseValue(proteinText);
+    const saturatedFat = parseValue(saturatedFatText);
+    const sodium = parseValue(sodiumText);
+    const caffeine = parseValue(caffeineText);
+
+    logger.info(
+      `Gongcha nutrition values: serving=${servingSizeText}, calories=${caloriesText}, sugar=${sugarText}, protein=${proteinText}, saturatedFat=${saturatedFatText}, sodium=${sodiumText}, caffeine=${caffeineText}`
+    );
+
+    const nutritions: Nutritions = {
+      servingSize: servingSize ?? undefined,
+      servingSizeUnit: servingSize !== null ? 'ml' : undefined,
+      calories: calories ?? undefined,
+      caloriesUnit: calories !== null ? 'kcal' : undefined,
+      carbohydrates: undefined, // Gongcha doesn't provide carbohydrates data
+      carbohydratesUnit: undefined,
+      sugar: sugar ?? undefined,
+      sugarUnit: sugar !== null ? 'g' : undefined,
+      protein: protein ?? undefined,
+      proteinUnit: protein !== null ? 'g' : undefined,
+      fat: undefined, // Gongcha doesn't provide total fat data
+      fatUnit: undefined,
+      transFat: undefined, // Gongcha doesn't provide trans fat data
+      transFatUnit: undefined,
+      saturatedFat: saturatedFat ?? undefined,
+      saturatedFatUnit: saturatedFat !== null ? 'g' : undefined,
+      natrium: sodium ?? undefined,
+      natriumUnit: sodium !== null ? 'mg' : undefined,
+      cholesterol: undefined, // Gongcha doesn't provide cholesterol data
+      cholesterolUnit: undefined,
+      caffeine: caffeine ?? undefined,
+      caffeineUnit: caffeine !== null ? 'mg' : undefined,
+    };
+
+    // Only return nutrition data if at least one nutrition field has a value
+    const hasNutritionData = Object.entries(nutritions).some(
+      ([key, value]) => !key.endsWith('Unit') && value !== null
+    );
+
+    return hasNutritionData ? nutritions : null;
+  } catch (error) {
+    logger.error('Error extracting nutrition data from Gongcha page:', error);
+    return null;
+  }
+}
+
 async function extractBasicProductInfo(container: Locator) {
   const imageElement = container.locator('img').first();
   const imageSrc = await imageElement.getAttribute('src').catch(() => '');
@@ -67,61 +186,102 @@ async function extractBasicProductInfo(container: Locator) {
   return { name: productName, imageSrc };
 }
 
-async function extractDescriptionFromDetailPage(
+// Helper function to navigate to product detail page
+async function navigateToProductDetail(
   page: Page,
   productLink: Locator,
   productName: string
-): Promise<string> {
+): Promise<void> {
+  const href = await productLink.getAttribute('href').catch(() => '');
+  logger.info(
+    `Extracting description and nutrition for: ${productName} (href: ${href})`
+  );
+
+  await productLink.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(500);
+
+  await productLink.click({ timeout: 8000 });
+  await page.waitForTimeout(2000); // Wait longer for page to fully load
+
+  // Only take screenshot in test mode for debugging
+  if (isTestMode) {
+    await takeDebugScreenshot(
+      page,
+      `gongcha-detail-${productName.replace(/\s+/g, '_')}`
+    );
+  }
+}
+
+// Helper function to check if text is a valid product description
+function isValidProductDescription(text: string): boolean {
+  const trimmed = text.trim();
+  return (
+    trimmed.length > 20 &&
+    !trimmed.includes('Follow us') &&
+    !trimmed.includes('Menu') &&
+    !trimmed.includes('공차') &&
+    (trimmed.includes('티') ||
+      trimmed.includes('스무디') ||
+      trimmed.includes('밀크'))
+  );
+}
+
+// Helper function to extract description from main element
+async function extractMainDescription(page: Page): Promise<string> {
+  const descElement = page.locator('.text-a .t2').first();
+  if ((await descElement.count()) > 0) {
+    const description = (await descElement.textContent()) || '';
+    return description.trim();
+  }
+  return '';
+}
+
+// Helper function to extract description from fallback elements
+async function extractFallbackDescription(page: Page): Promise<string> {
+  const descElements = page.locator('p');
+  const descCount = await descElements.count();
+
+  for (let i = 0; i < descCount; i++) {
+    const text = (await descElements.nth(i).textContent()) || '';
+    if (isValidProductDescription(text)) {
+      return text.trim();
+    }
+  }
+  return '';
+}
+
+// Helper function to extract complete product description
+async function extractProductDescription(page: Page): Promise<string> {
+  let description = await extractMainDescription(page);
+
+  if (!description) {
+    description = await extractFallbackDescription(page);
+  }
+
+  return description;
+}
+
+async function extractDescriptionAndNutritionFromDetailPage(
+  page: Page,
+  productLink: Locator,
+  productName: string
+): Promise<{ description: string; nutritions: Nutritions | null }> {
   try {
-    const href = await productLink.getAttribute('href').catch(() => '');
-    logger.info(`Extracting description for: ${productName} (href: ${href})`);
+    await navigateToProductDetail(page, productLink, productName);
 
-    await productLink.scrollIntoViewIfNeeded();
-    await page.waitForTimeout(500);
-
-    await productLink.click({ timeout: 8000 });
-    await page.waitForTimeout(1000); // Wait for page to load
-
-    // Only take screenshot in test mode for debugging
-    if (isTestMode) {
-      await takeDebugScreenshot(
-        page,
-        `gongcha-detail-${productName.replace(/\s+/g, '_')}`
-      );
-    }
-
-    // Look for description paragraphs on the detail page
-    const descElements = page.locator('p');
-    const descCount = await descElements.count();
-
-    let description = '';
-    for (let i = 0; i < descCount; i++) {
-      const text = (await descElements.nth(i).textContent()) || '';
-      const trimmed = text.trim();
-
-      // Look for meaningful product descriptions (longer than 20 chars, not navigation text)
-      if (
-        trimmed.length > 20 &&
-        !trimmed.includes('Follow us') &&
-        !trimmed.includes('Menu') &&
-        !trimmed.includes('공차') &&
-        trimmed.includes('티')
-      ) {
-        description = trimmed;
-        break;
-      }
-    }
+    const description = await extractProductDescription(page);
+    const nutritions = await extractNutritionData(page);
 
     if (description) {
       logger.info(`Found description: "${description.substring(0, 50)}..."`);
-      return description;
+    } else {
+      logger.warn(`No description found for ${productName}`);
     }
 
-    logger.warn(`No description found for ${productName}`);
-    return '';
+    return { description: description || '', nutritions };
   } catch (error) {
     logger.error(`Navigation failed for ${productName}: ${error}`);
-    return '';
+    return { description: '', nutritions: null };
   }
 }
 
@@ -156,11 +316,12 @@ async function extractProductFromContainer(
     // Store current page URL to navigate back
     const currentUrl = page.url();
 
-    const description = await extractDescriptionFromDetailPage(
-      page,
-      productLink,
-      productName
-    );
+    const { description, nutritions } =
+      await extractDescriptionAndNutritionFromDetailPage(
+        page,
+        productLink,
+        productName
+      );
 
     // Navigate back to the category page
     await page.goto(currentUrl);
@@ -180,6 +341,7 @@ async function extractProductFromContainer(
       externalUrl: currentUrl,
       price: null,
       category: categoryName,
+      nutritions,
     };
 
     return product;

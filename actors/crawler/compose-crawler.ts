@@ -1,6 +1,7 @@
 import { PlaywrightCrawler, type Request } from 'crawlee';
 import type { Locator, Page } from 'playwright';
 import { logger } from '../../shared/logger';
+import type { Nutritions } from '../../shared/nutritions';
 import {
   type Product,
   takeDebugScreenshot,
@@ -47,6 +48,18 @@ const PATTERNS = {
   pageNumber: /page=(\d+)/,
 } as const;
 
+// Compose-specific nutrition patterns
+const COMPOSE_NUTRITION_PATTERNS = {
+  servingSize: /용량\s*:\s*(\d+(?:\.\d+)?)\s*(ml|oz)/i,
+  calories: /열량\s*\(\s*kcal\s*\)\s*:\s*(\d+(?:\.\d+)?)/i,
+  sodium: /나트륨\s*\(\s*mg\s*\)\s*:\s*(\d+(?:\.\d+)?)/i,
+  carbohydrates: /탄수화물\s*\(\s*g\s*\)\s*:\s*(\d+(?:\.\d+)?)/i,
+  sugar: /당류\s*\(\s*g\s*\)\s*:\s*(\d+(?:\.\d+)?)/i,
+  fat: /지방\s*\(\s*g\s*\)\s*:\s*(\d+(?:\.\d+)?)/i,
+  saturatedFat: /포화지방\s*\(\s*g\s*\)\s*:\s*(\d+(?:\.\d+)?)/i,
+  protein: /단백질\s*\(\s*g\s*\)\s*:\s*(\d+(?:\.\d+)?)/i,
+} as const;
+
 // ================================================
 // CRAWLER CONFIGURATION
 // ================================================
@@ -75,9 +88,97 @@ const CRAWLER_CONFIG = {
 // DATA EXTRACTION FUNCTIONS
 // ================================================
 
+// Helper function to extract Compose nutrition data
+function extractComposeNutrition(nutritionText: string): Nutritions | null {
+  try {
+    const nutrition: Nutritions = {};
+
+    // Extract serving size
+    const servingSizeMatch = nutritionText.match(
+      COMPOSE_NUTRITION_PATTERNS.servingSize
+    );
+    if (servingSizeMatch) {
+      let servingSize = Number.parseFloat(servingSizeMatch[1]);
+      let unit = servingSizeMatch[2].toLowerCase();
+
+      // Convert oz to ml if needed
+      if (unit === 'oz') {
+        servingSize *= 29.5735; // 1 oz = 29.5735 ml
+        unit = 'ml';
+      }
+
+      nutrition.servingSize = servingSize;
+      nutrition.servingSizeUnit = unit;
+    }
+
+    // Extract calories
+    const caloriesMatch = nutritionText.match(
+      COMPOSE_NUTRITION_PATTERNS.calories
+    );
+    if (caloriesMatch) {
+      nutrition.calories = Number.parseFloat(caloriesMatch[1]);
+      nutrition.caloriesUnit = 'kcal';
+    }
+
+    // Extract sodium
+    const sodiumMatch = nutritionText.match(COMPOSE_NUTRITION_PATTERNS.sodium);
+    if (sodiumMatch) {
+      nutrition.natrium = Number.parseFloat(sodiumMatch[1]);
+      nutrition.natriumUnit = 'mg';
+    }
+
+    // Extract carbohydrates
+    const carbohydratesMatch = nutritionText.match(
+      COMPOSE_NUTRITION_PATTERNS.carbohydrates
+    );
+    if (carbohydratesMatch) {
+      nutrition.carbohydrates = Number.parseFloat(carbohydratesMatch[1]);
+      nutrition.carbohydratesUnit = 'g';
+    }
+
+    // Extract sugar
+    const sugarMatch = nutritionText.match(COMPOSE_NUTRITION_PATTERNS.sugar);
+    if (sugarMatch) {
+      nutrition.sugar = Number.parseFloat(sugarMatch[1]);
+      nutrition.sugarUnit = 'g';
+    }
+
+    // Extract fat
+    const fatMatch = nutritionText.match(COMPOSE_NUTRITION_PATTERNS.fat);
+    if (fatMatch) {
+      nutrition.fat = Number.parseFloat(fatMatch[1]);
+      nutrition.fatUnit = 'g';
+    }
+
+    // Extract saturated fat
+    const saturatedFatMatch = nutritionText.match(
+      COMPOSE_NUTRITION_PATTERNS.saturatedFat
+    );
+    if (saturatedFatMatch) {
+      nutrition.saturatedFat = Number.parseFloat(saturatedFatMatch[1]);
+      nutrition.saturatedFatUnit = 'g';
+    }
+
+    // Extract protein
+    const proteinMatch = nutritionText.match(
+      COMPOSE_NUTRITION_PATTERNS.protein
+    );
+    if (proteinMatch) {
+      nutrition.protein = Number.parseFloat(proteinMatch[1]);
+      nutrition.proteinUnit = 'g';
+    }
+
+    // Return nutrition data if we found any values
+    return Object.keys(nutrition).length > 0 ? nutrition : null;
+  } catch (error) {
+    logger.debug(`Error extracting Compose nutrition: ${error}`);
+    return null;
+  }
+}
+
 async function extractProductData(container: Locator) {
   try {
-    const [productId, name, imageUrl] = await Promise.all([
+    const [productId, name, imageUrl, nutritionInfo] = await Promise.all([
       container
         .locator(SELECTORS.productData.id)
         .getAttribute('id')
@@ -96,9 +197,23 @@ async function extractProductData(container: Locator) {
           }
           return url;
         }),
+      container
+        .locator('ul.info.g-0')
+        .textContent()
+        .then((text) => text?.trim() || '')
+        .catch(() => ''),
     ]);
 
     if (name && name.length > 0) {
+      // Extract nutrition data using the custom Compose parser
+      let nutritions: Nutritions | null = null;
+      if (nutritionInfo) {
+        nutritions = extractComposeNutrition(nutritionInfo);
+        if (nutritions) {
+          logger.info(`✅ Found nutrition data for: ${name}`);
+        }
+      }
+
       return {
         name,
         nameEn: null,
@@ -106,6 +221,7 @@ async function extractProductData(container: Locator) {
         price: null,
         imageUrl,
         id: productId,
+        nutritions,
       };
     }
   } catch {
@@ -122,6 +238,7 @@ async function extractPageProducts(page: Page) {
     price: number | null;
     imageUrl: string;
     id: string;
+    nutritions?: Nutritions | null;
   }> = [];
 
   // Get all product containers
@@ -281,6 +398,7 @@ async function handleCategoryPage(
       externalCategory: categoryName,
       externalId: `compose_${categoryId}_${productData.name}`,
       externalUrl: url,
+      nutritions: productData.nutritions || null,
     }));
 
     // Limit products in test mode

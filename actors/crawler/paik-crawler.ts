@@ -1,12 +1,14 @@
 import { PlaywrightCrawler, type Request } from 'crawlee';
 import type { Locator, Page } from 'playwright';
 import { logger } from '../../shared/logger';
+import type { Nutritions } from '../../shared/nutritions';
 import {
   type Product,
   takeDebugScreenshot,
   waitForLoad,
   writeProductsToJson,
 } from './crawlerUtils';
+import { extractNutritionFromText } from './nutritionUtils';
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
@@ -64,6 +66,37 @@ const CRAWLER_CONFIG = {
 // ================================================
 // DATA EXTRACTION FUNCTIONS
 // ================================================
+
+// Extract nutrition data from .ingredient_table_box selector
+async function extractNutritionData(
+  menuItem: Locator
+): Promise<Nutritions | null> {
+  try {
+    // Look for nutrition data in the ingredient table box
+    const nutritionBox = menuItem.locator('.ingredient_table_box');
+
+    // Check if nutrition box exists
+    const nutritionBoxCount = await nutritionBox.count();
+    if (nutritionBoxCount === 0) {
+      return null;
+    }
+
+    // Extract the text content from the nutrition box
+    const nutritionText = await nutritionBox.textContent().catch(() => '');
+
+    if (!nutritionText) {
+      return null;
+    }
+
+    return extractNutritionFromText(nutritionText);
+  } catch (error) {
+    logger.debug(
+      'Failed to extract nutrition data from Paik menu item:',
+      error as Record<string, unknown>
+    );
+    return null;
+  }
+}
 
 // Extract category URLs from the main menu page
 async function extractCategoryUrls(
@@ -194,7 +227,8 @@ function createProduct(
   imageUrl: string,
   description: string,
   category: string,
-  pageUrl: string
+  pageUrl: string,
+  nutritions: Nutritions | null = null
 ): Product {
   const externalId = `paik_${category}_${name}`;
 
@@ -208,6 +242,7 @@ function createProduct(
     externalCategory: category,
     externalId,
     externalUrl: pageUrl,
+    nutritions,
   };
 }
 
@@ -261,10 +296,11 @@ async function extractProductsFromPage(
       try {
         const menuItem = menuItems[i];
 
-        const [name, imageUrl, description] = await Promise.all([
+        const [name, imageUrl, description, nutritions] = await Promise.all([
           extractProductName(menuItem),
           extractProductImage(menuItem),
           extractProductDescription(menuItem, page),
+          extractNutritionData(menuItem),
         ]);
 
         if (isValidProductName(name)) {
@@ -273,13 +309,16 @@ async function extractProductsFromPage(
             imageUrl,
             description,
             categoryName,
-            page.url()
+            page.url(),
+            nutritions
           );
 
           // Check for duplicates
           if (!products.some((p) => p.externalId === product.externalId)) {
             products.push(product);
-            logger.info(`✅ Extracted: ${name} (${product.category})`);
+            logger.info(
+              `✅ Extracted: ${name} (${product.category})${nutritions ? ' with nutrition data' : ''}`
+            );
           }
         }
       } catch (productError) {

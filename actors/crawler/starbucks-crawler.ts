@@ -1,12 +1,14 @@
 import { PlaywrightCrawler, type Request } from 'crawlee';
 import type { Page } from 'playwright';
 import { logger } from '../../shared/logger';
+import type { Nutritions } from '../../shared/nutritions';
 import {
   type Product,
   takeDebugScreenshot,
   waitForLoad,
   writeProductsToJson,
 } from './crawlerUtils';
+import { parseNutritionValueFromText } from './nutritionUtils';
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
@@ -17,6 +19,14 @@ const SITE_CONFIG = {
   startUrl: 'https://www.starbucks.co.kr/menu/drink_list.do',
   productUrlTemplate:
     'https://www.starbucks.co.kr/menu/drink_view.do?product_cd=',
+} as const;
+
+// ================================================
+// REGEX PATTERNS
+// ================================================
+
+const STARBUCKS_REGEX_PATTERNS = {
+  servingSize: /(\d+)ml/,
 } as const;
 
 // ================================================
@@ -80,6 +90,239 @@ const CRAWLER_CONFIG = {
 // DATA EXTRACTION FUNCTIONS
 // ================================================
 
+async function checkNutritionInfoExists(page: Page): Promise<boolean> {
+  return (await page.locator('#product_info01').count()) > 0;
+}
+
+async function waitForNutritionContent(page: Page): Promise<void> {
+  await page
+    .waitForFunction(
+      () => {
+        const servingElement = document.querySelector('#product_info01');
+        return (
+          servingElement?.textContent &&
+          servingElement.textContent.trim().length > 0
+        );
+      },
+      { timeout: 10_000 }
+    )
+    .catch(() => {
+      logger.warn('Serving size not populated within timeout');
+    });
+}
+
+async function extractServingSize(page: Page): Promise<number | undefined> {
+  const servingText = await page.locator('#product_info01').textContent();
+  logger.info(`Serving size text: ${servingText}`);
+
+  const servingMatch = servingText?.match(STARBUCKS_REGEX_PATTERNS.servingSize);
+  return servingMatch ? Number.parseInt(servingMatch[1], 10) : undefined;
+}
+
+async function checkNutritionValuesPopulated(
+  page: Page
+): Promise<{ caloriesText: string; proteinText: string }> {
+  const caloriesText =
+    (await page
+      .locator('.product_info_content li.kcal dd')
+      .textContent()
+      .catch(() => '')) || '';
+  const proteinText =
+    (await page
+      .locator('.product_info_content li.protein dd')
+      .textContent()
+      .catch(() => '')) || '';
+
+  logger.info(
+    `Calories text: '${caloriesText}', Protein text: '${proteinText}'`
+  );
+
+  return { caloriesText, proteinText };
+}
+
+function hasValidNutritionValues(
+  caloriesText: string,
+  proteinText: string
+): boolean {
+  const isCaloriesEmpty =
+    !caloriesText || caloriesText.trim() === '' || caloriesText.trim() === '-';
+  const isProteinEmpty =
+    !proteinText || proteinText.trim() === '' || proteinText.trim() === '-';
+  return !(isCaloriesEmpty && isProteinEmpty);
+}
+
+function createMinimalNutrition(
+  servingSize: number | undefined
+): Nutritions | null {
+  if (servingSize) {
+    return {
+      servingSize,
+      servingSizeUnit: 'ml',
+    };
+  }
+  return null;
+}
+
+function extractAllNutritionValues(page: Page): Promise<string[]> {
+  return Promise.all([
+    page
+      .locator('.product_info_content li.kcal dd')
+      .textContent()
+      .catch(() => '')
+      .then((text) => text || ''),
+    page
+      .locator('.product_info_content li.protein dd')
+      .textContent()
+      .catch(() => '')
+      .then((text) => text || ''),
+    page
+      .locator('.product_info_content li.fat dd')
+      .textContent()
+      .catch(() => '')
+      .then((text) => text || ''),
+    page
+      .locator('.product_info_content li.sat_FAT dd')
+      .textContent()
+      .catch(() => '')
+      .then((text) => text || ''),
+    page
+      .locator('.product_info_content li.trans_FAT dd')
+      .textContent()
+      .catch(() => '')
+      .then((text) => text || ''),
+    page
+      .locator('.product_info_content li.cholesterol dd')
+      .textContent()
+      .catch(() => '')
+      .then((text) => text || ''),
+    page
+      .locator('.product_info_content li.sodium dd')
+      .textContent()
+      .catch(() => '')
+      .then((text) => text || ''),
+    page
+      .locator('.product_info_content li.sugars dd')
+      .textContent()
+      .catch(() => '')
+      .then((text) => text || ''),
+    page
+      .locator('.product_info_content li.chabo dd')
+      .textContent()
+      .catch(() => '')
+      .then((text) => text || ''), // carbohydrates
+    page
+      .locator('.product_info_content li.caffeine dd')
+      .textContent()
+      .catch(() => '')
+      .then((text) => text || ''),
+  ]);
+}
+
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: refactor later
+function createNutritionObject(
+  servingSize: number | undefined,
+  nutritionValues: string[]
+): Nutritions {
+  const [
+    calories,
+    protein,
+    fat,
+    saturatedFat,
+    transFat,
+    cholesterol,
+    sodium,
+    sugar,
+    carbohydrates,
+    caffeine,
+  ] = nutritionValues;
+
+  return {
+    servingSize,
+    servingSizeUnit: servingSize !== null ? 'ml' : undefined,
+    calories: parseNutritionValueFromText(calories) ?? undefined,
+    caloriesUnit:
+      parseNutritionValueFromText(calories) !== null ? 'kcal' : undefined,
+    carbohydrates: parseNutritionValueFromText(carbohydrates) ?? undefined,
+    carbohydratesUnit:
+      parseNutritionValueFromText(carbohydrates) !== null ? 'g' : undefined,
+    sugar: parseNutritionValueFromText(sugar) ?? undefined,
+    sugarUnit: parseNutritionValueFromText(sugar) !== null ? 'g' : undefined,
+    protein: parseNutritionValueFromText(protein) ?? undefined,
+    proteinUnit:
+      parseNutritionValueFromText(protein) !== null ? 'g' : undefined,
+    fat: parseNutritionValueFromText(fat) ?? undefined,
+    fatUnit: parseNutritionValueFromText(fat) !== null ? 'g' : undefined,
+    transFat: parseNutritionValueFromText(transFat) ?? undefined,
+    transFatUnit:
+      parseNutritionValueFromText(transFat) !== null ? 'g' : undefined,
+    saturatedFat: parseNutritionValueFromText(saturatedFat) ?? undefined,
+    saturatedFatUnit:
+      parseNutritionValueFromText(saturatedFat) !== null ? 'g' : undefined,
+    natrium: parseNutritionValueFromText(sodium) ?? undefined,
+    natriumUnit:
+      parseNutritionValueFromText(sodium) !== null ? 'mg' : undefined,
+    cholesterol: parseNutritionValueFromText(cholesterol) ?? undefined,
+    cholesterolUnit:
+      parseNutritionValueFromText(cholesterol) !== null ? 'mg' : undefined,
+    caffeine: parseNutritionValueFromText(caffeine) ?? undefined,
+    caffeineUnit:
+      parseNutritionValueFromText(caffeine) !== null ? 'mg' : undefined,
+  };
+}
+
+function hasAnyNutritionData(nutritions: Nutritions): boolean {
+  return Object.entries(nutritions).some(
+    ([key, value]) => !key.endsWith('Unit') && value !== null
+  );
+}
+
+async function extractNutritionData(page: Page): Promise<Nutritions | null> {
+  try {
+    // Wait for the page to fully load and for AJAX requests to complete
+    await page.waitForTimeout(5000);
+
+    // Take a debug screenshot to see the page state
+    await takeDebugScreenshot(page, 'nutrition-debug');
+
+    // First check if nutrition data is available by checking the serving size element
+    const hasNutritionInfo = await checkNutritionInfoExists(page);
+
+    if (!hasNutritionInfo) {
+      logger.warn('No nutrition info section found on page');
+      return null;
+    }
+
+    // Wait for nutrition content to be populated
+    await waitForNutritionContent(page);
+
+    // Extract serving size information
+    const servingSize = await extractServingSize(page);
+
+    // Check if nutrition values are populated (they might be loaded via AJAX)
+    const { caloriesText, proteinText } =
+      await checkNutritionValuesPopulated(page);
+
+    // If nutrition values are empty or not loaded, return minimal data with serving size
+    if (!hasValidNutritionValues(caloriesText, proteinText)) {
+      return createMinimalNutrition(servingSize);
+    }
+
+    // Extract all nutrition values
+    const nutritionValues = await extractAllNutritionValues(page);
+
+    const nutritions = createNutritionObject(servingSize, nutritionValues);
+
+    // Log the extracted values
+    logger.info(`Extracted nutrition data: ${JSON.stringify(nutritions)}`);
+
+    // Only return nutrition data if at least one nutrition field has a value
+    return hasAnyNutritionData(nutritions) ? nutritions : null;
+  } catch (error) {
+    logger.error('Error extracting nutrition data:', error);
+    return null;
+  }
+}
+
 async function extractProductData(page: Page): Promise<Product> {
   const [
     name,
@@ -126,6 +369,9 @@ async function extractProductData(page: Page): Promise<Product> {
     cleanName = name.replace(nameEn, '').trim();
   }
 
+  // Extract nutrition data
+  const nutritions = await extractNutritionData(page);
+
   return {
     name: cleanName,
     nameEn,
@@ -136,6 +382,7 @@ async function extractProductData(page: Page): Promise<Product> {
     externalUrl,
     price: null,
     category: 'Drinks',
+    nutritions,
   };
 }
 

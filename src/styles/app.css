@@ -1,13 +1,15 @@
 /* Optimized single font import combining all fonts with display=swap for performance */
-@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Sunflower:wght@300&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=Sunflower:wght@300&display=swap");
 
 @import "tailwindcss";
+
 @plugin "daisyui" {
   themes:
     autumn --default,
     business --prefersdark,
     wireframe;
 }
+
 @plugin 'daisyui/theme' {
   name: "autumn";
   default: true;
