@@ -49,13 +49,18 @@ async function getAllStorageFiles(): Promise<Id<'_storage'>[]> {
         `Fetching page ${pageCount}${cursor ? ` (cursor: ${cursor.slice(0, 8)}...)` : ''}...`
       );
 
-      const result = await client.query(api.storage.getAllStorageFiles, {
+      const result: {
+        files: Id<'_storage'>[];
+        nextCursor: Id<'_storage'> | null | undefined;
+        hasMore: boolean;
+        total: number;
+      } = await client.query(api.storage.getAllStorageFiles, {
         cursor: cursor || undefined,
         limit: 8000,
       });
 
       allStorageIds.push(...result.files);
-      cursor = result.nextCursor;
+      cursor = result.nextCursor || null;
       hasMore = result.hasMore;
 
       logger.info(
@@ -79,7 +84,8 @@ async function getCafeReferences(): Promise<StorageReference[]> {
       table: 'cafes',
       field: 'imageStorageId',
       recordId: cafe._id,
-      storageId: cafe.imageStorageId,
+      // biome-ignore lint/style/noNonNullAssertion: safe by query
+      storageId: cafe.imageStorageId!,
     });
   }
   return references;
@@ -93,7 +99,8 @@ async function getProductReferences(): Promise<StorageReference[]> {
       table: 'products',
       field: 'imageStorageId',
       recordId: product._id,
-      storageId: product.imageStorageId,
+      // biome-ignore lint/style/noNonNullAssertion: safe by query
+      storageId: product.imageStorageId!,
     });
   }
   return references;
@@ -103,7 +110,8 @@ async function getReviewReferences(): Promise<StorageReference[]> {
   const references: StorageReference[] = [];
   const reviews = await client.query(api.reviews.getAllWithImages);
   for (const review of reviews) {
-    for (const storageId of review.imageStorageIds) {
+    // biome-ignore lint/style/noNonNullAssertion: safe by query
+    for (const storageId of review.imageStorageIds!) {
       references.push({
         table: 'reviews',
         field: 'imageStorageIds',
@@ -123,7 +131,8 @@ async function getUserReferences(): Promise<StorageReference[]> {
       table: 'users',
       field: 'imageStorageId',
       recordId: user._id,
-      storageId: user.imageStorageId,
+      // biome-ignore lint/style/noNonNullAssertion: safe by query
+      storageId: user.imageStorageId!,
     });
   }
   return references;
@@ -178,7 +187,6 @@ async function findDanglingFiles(): Promise<DanglingFile[]> {
     for (const result of metadataResults) {
       danglingFiles.push({
         storageId: result.storageId,
-        filename: result.metadata?.filename,
         size: result.metadata?.size,
         contentType: result.metadata?.contentType,
       });
