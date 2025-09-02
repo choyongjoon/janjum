@@ -23,8 +23,22 @@ export const getByCafe = query({
       }))
     );
 
-    // Sort by addedAt in descending order (recently created first)
-    return productsWithImages.sort((a, b) => b.addedAt - a.addedAt);
+    const convertTimestampToDate = (timestamp: number) => {
+      const date = new Date(timestamp);
+      return Math.floor(date.getTime() / (1000 * 60 * 60 * 24));
+    };
+
+    // Sort products by date (newest first), then by time (oldest first) within same date
+    return productsWithImages.sort((a, b) => {
+      const aAddedAtDateStamp = convertTimestampToDate(a.addedAt);
+      const bAddedAtDateStamp = convertTimestampToDate(b.addedAt);
+
+      if (aAddedAtDateStamp === bAddedAtDateStamp) {
+        return a.addedAt - b.addedAt;
+      }
+
+      return bAddedAtDateStamp - aAddedAtDateStamp;
+    });
   },
 });
 
