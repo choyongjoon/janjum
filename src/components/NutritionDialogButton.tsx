@@ -26,7 +26,7 @@ export const NutritionDialogButton = ({
       <dialog
         className="modal"
         id="nutritions-modal"
-        style={{ height: '100dvh' }}
+        style={{ height: '100vh' }}
       >
         <div className="modal-box w-auto p-0">
           <NutritionTable nutritions={nutritions} />
