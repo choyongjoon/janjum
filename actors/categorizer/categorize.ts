@@ -18,9 +18,12 @@ import type {
 const categorizer = new ProductCategorizer();
 
 // Parse command line arguments
-function parseArgs(): { options: CategorizeOptions; cafeSlugs: string[] } {
+function parseArgs(): {
+  options: CategorizeOptions & { file?: string };
+  cafeSlugs: string[];
+} {
   const args = process.argv.slice(2);
-  const options: CategorizeOptions = {};
+  const options: CategorizeOptions & { file?: string } = {};
   const cafeSlugs: string[] = [];
 
   // Parse flags and cafe slugs
@@ -36,6 +39,10 @@ function parseArgs(): { options: CategorizeOptions; cafeSlugs: string[] } {
         break;
       case '--verbose':
         options.verbose = true;
+        break;
+      case '--file':
+        options.file = args[i + 1];
+        i++; // Skip next argument
         break;
       case '--confidence':
         options.confidence = args[i + 1] as 'all' | 'low' | 'medium';
@@ -67,8 +74,8 @@ function parseArgs(): { options: CategorizeOptions; cafeSlugs: string[] } {
     }
   }
 
-  // If no cafes specified, use all cafes
-  if (cafeSlugs.length === 0) {
+  // If no cafes specified and no file specified, use all cafes
+  if (cafeSlugs.length === 0 && !options.file) {
     cafeSlugs.push(...Object.keys(AVAILABLE_CAFES));
   }
 
@@ -467,7 +474,7 @@ function printSummary(
 
 // Main categorization function
 async function categorizeProducts(
-  options: CategorizeOptions,
+  options: CategorizeOptions & { file?: string },
   cafeSlugs: string[]
 ): Promise<void> {
   const stats: CategorizeStats = {
@@ -482,15 +489,27 @@ async function categorizeProducts(
   const startTime = Date.now();
 
   try {
-    // Process recent crawler JSON files for specified cafes
-    logger.info(
-      `🤖 Processing most recent crawler files for cafes: ${cafeSlugs.join(', ')}`
-    );
-    const filesToProcess = findRecentCrawlerFiles(cafeSlugs);
+    let filesToProcess: string[] = [];
 
-    if (filesToProcess.length === 0) {
-      logger.warn('⚠️  No recent crawler files found. Run crawlers first.');
-      return;
+    if (options.file) {
+      // Process specific file
+      if (!fs.existsSync(options.file)) {
+        logger.error(`File not found: ${options.file}`);
+        return;
+      }
+      filesToProcess = [options.file];
+      logger.info(`🗂️  Processing specific file: ${options.file}`);
+    } else {
+      // Process recent crawler JSON files for specified cafes
+      logger.info(
+        `🤖 Processing most recent crawler files for cafes: ${cafeSlugs.join(', ')}`
+      );
+      filesToProcess = findRecentCrawlerFiles(cafeSlugs);
+
+      if (filesToProcess.length === 0) {
+        logger.warn('⚠️  No recent crawler files found. Run crawlers first.');
+        return;
+      }
     }
 
     // Process each file

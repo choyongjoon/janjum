@@ -147,24 +147,17 @@ class ProductUploader {
     cafeSlug: string,
     dryRun: boolean,
     downloadImages: boolean,
-    optimizeImages: boolean
+    _optimizeImages: boolean
   ): Promise<UploadResult> {
     const uploadSecret = process.env.CONVEX_UPLOAD_SECRET;
     if (!uploadSecret) {
       throw new Error('CONVEX_UPLOAD_SECRET environment variable is required');
     }
 
-    // If image optimization is enabled, preprocess the products
-    let processedProducts = products;
-    if (optimizeImages && downloadImages) {
-      logger.info(
-        'Image optimization enabled - processing images before upload...'
-      );
-      processedProducts = await this.optimizeProductImages(products);
-    }
-
+    // Send products to server without preprocessing images
+    // The server will handle image optimization on-demand for new products only
     return await this.client.mutation(api.dataUploader.uploadProductsFromJson, {
-      products: processedProducts,
+      products,
       cafeSlug,
       dryRun,
       downloadImages,
@@ -173,155 +166,59 @@ class ProductUploader {
   }
 
   /**
-   * Optimize images in product data before upload
-   * Downloads images, optimizes them using Sharp (same approach as imageOptimizer), and returns base64 data
+   * Optimize a single image on-demand (only when needed)
+   * This method is now called by the server-side logic when uploading new products
    */
-  private async optimizeProductImages(
-    products: ProductData[]
-  ): Promise<ProductData[]> {
-    const optimizedProducts: ProductData[] = [];
-    const stats = { optimizedCount: 0, totalSizeBefore: 0, totalSizeAfter: 0 };
-
-    for (const [index, product] of products.entries()) {
-      const result = await this.processProductImage(
-        product,
-        index + 1,
-        products.length,
-        stats
-      );
-      optimizedProducts.push(result);
-
-      // Add small delay to avoid overwhelming servers
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-
-    this.logOptimizationResults(stats);
-    return optimizedProducts;
+  async optimizeImageIfNeeded(
+    imageUrl: string,
+    productName: string
+  ): Promise<{
+    originalSize: number;
+    optimizedSize: number;
+    storageId: string;
+    wasOptimized: boolean;
+  } | null> {
+    return await this.downloadAndOptimizeImage(imageUrl, productName);
   }
 
   /**
-   * Process a single product's image optimization
+   * Check if a product already has a valid image in storage
+   * Returns the existing storage ID if image exists and doesn't need optimization
    */
-  private async processProductImage(
-    product: ProductData,
-    currentIndex: number,
-    totalCount: number,
-    stats: {
-      optimizedCount: number;
-      totalSizeBefore: number;
-      totalSizeAfter: number;
-    }
-  ): Promise<ProductData> {
-    const imageUrl = product.externalImageUrl;
-    const existingStorageId = product.imageStorageId;
-    logger.info(
-      `Processing product ${currentIndex}/${totalCount}: ${product.name || 'Unknown'} (Image: ${imageUrl ? 'Yes' : 'No'}, Storage: ${existingStorageId ? 'Yes' : 'No'})`
-    );
-
-    const optimizedProduct = { ...product };
-
-    // Try to process existing storage first
-    if (existingStorageId) {
-      const result = await this.processExistingStorage(
-        existingStorageId,
-        product.name || 'Unknown',
-        stats
-      );
-      if (result) {
-        return { ...optimizedProduct, imageStorageId: result.storageId };
-      }
-    }
-
-    // Fallback to downloading from external URL
-    return await this.processExternalImage(optimizedProduct, imageUrl, stats);
-  }
-
-  private async processExistingStorage(
-    storageId: string,
-    productName: string,
-    stats: {
-      optimizedCount: number;
-      totalSizeBefore: number;
-      totalSizeAfter: number;
-    }
-  ): Promise<{ storageId: string } | null> {
+  async checkExistingImage(
+    cafeSlug: string,
+    externalId: string
+  ): Promise<string | null> {
     try {
-      const needsOptimization =
-        await this.checkIfStorageNeedsOptimization(storageId);
-      if (!needsOptimization) {
-        logger.info(
-          `Image for ${productName} is already optimized (WebP), skipping`
+      // Query the product to check if it has an existing imageStorageId
+      const existingProduct = await this.client.query(
+        api.products.getByExternalId,
+        {
+          cafeSlug,
+          externalId,
+        }
+      );
+
+      if (existingProduct?.imageStorageId) {
+        // Check if the stored image is already optimized (WebP)
+        const needsOptimization = await this.checkIfStorageNeedsOptimization(
+          existingProduct.imageStorageId
         );
-        return { storageId };
-      }
 
-      logger.info(
-        `Image for ${productName} needs optimization, processing stored image...`
-      );
-      const imageResult = await this.downloadAndOptimizeStoredImage(
-        storageId,
-        productName
-      );
-
-      if (imageResult) {
-        this.updateStats(stats, imageResult);
-        return { storageId: imageResult.storageId };
+        if (!needsOptimization) {
+          logger.info(
+            `Product ${existingProduct.name} already has optimized image, skipping`
+          );
+          return existingProduct.imageStorageId;
+        }
       }
     } catch (error) {
-      logger.warn(
-        `Failed to optimize stored image for ${productName}, will re-download: ${error}`
-      );
+      logger.warn(`Could not check existing image for ${externalId}: ${error}`);
     }
     return null;
   }
 
-  private async processExternalImage(
-    product: ProductData,
-    imageUrl: string | null,
-    stats: {
-      optimizedCount: number;
-      totalSizeBefore: number;
-      totalSizeAfter: number;
-    }
-  ): Promise<ProductData> {
-    if (!imageUrl || typeof imageUrl !== 'string') {
-      return product;
-    }
-
-    try {
-      const imageResult = await this.downloadAndOptimizeImage(
-        imageUrl,
-        product.name || 'Unknown'
-      );
-      if (imageResult) {
-        this.updateStats(stats, imageResult);
-        return { ...product, imageStorageId: imageResult.storageId };
-      }
-    } catch (error) {
-      logger.error(`Failed to optimize image for ${product.name}:`, error);
-    }
-
-    return product;
-  }
-
-  private updateStats(
-    stats: {
-      optimizedCount: number;
-      totalSizeBefore: number;
-      totalSizeAfter: number;
-    },
-    imageResult: {
-      originalSize: number;
-      optimizedSize: number;
-      wasOptimized: boolean;
-    }
-  ): void {
-    stats.totalSizeBefore += imageResult.originalSize;
-    stats.totalSizeAfter += imageResult.optimizedSize;
-    if (imageResult.wasOptimized) {
-      stats.optimizedCount++;
-    }
-  }
+  // Removed updateStats method as we no longer batch process images upfront
 
   /**
    * Check if stored image needs optimization by checking its metadata
@@ -351,43 +248,6 @@ class ProductUploader {
     } catch (error) {
       logger.error(`Error checking storage metadata for ${storageId}:`, error);
       return true; // Re-download on error
-    }
-  }
-
-  /**
-   * Download and optimize an existing stored image
-   */
-  private async downloadAndOptimizeStoredImage(
-    storageId: string,
-    productName: string
-  ): Promise<{
-    originalSize: number;
-    optimizedSize: number;
-    storageId: string;
-    wasOptimized: boolean;
-  } | null> {
-    try {
-      logger.info(
-        `Downloading stored image for optimization: ${productName} (${storageId})`
-      );
-
-      // Get URL for the stored image
-      const imageUrl = await this.client.query(api.http.getStorageUrl, {
-        storageId: storageId as Id<'_storage'>,
-      });
-
-      if (!imageUrl) {
-        throw new Error(`No URL found for storage ID: ${storageId}`);
-      }
-
-      // Download and optimize the stored image
-      return await this.downloadAndOptimizeImage(imageUrl, productName);
-    } catch (error) {
-      logger.error(
-        `Failed to download and optimize stored image ${storageId}:`,
-        error
-      );
-      return null;
     }
   }
 
@@ -504,36 +364,8 @@ class ProductUploader {
   }
 
   /**
-   * Log optimization results
+   * Log individual image optimization result
    */
-  private logOptimizationResults(stats: {
-    optimizedCount: number;
-    totalSizeBefore: number;
-    totalSizeAfter: number;
-  }): void {
-    if (stats.optimizedCount === 0) {
-      return;
-    }
-
-    const totalReduction =
-      stats.totalSizeBefore > 0
-        ? (
-            ((stats.totalSizeBefore - stats.totalSizeAfter) /
-              stats.totalSizeBefore) *
-            100
-          ).toFixed(1)
-        : '0';
-    const sizeMB = (bytes: number) => (bytes / 1024 / 1024).toFixed(2);
-
-    logger.info('=== Image Optimization Results ===');
-    logger.info(`Images optimized: ${stats.optimizedCount}`);
-    logger.info(`Total size before: ${sizeMB(stats.totalSizeBefore)} MB`);
-    logger.info(`Total size after: ${sizeMB(stats.totalSizeAfter)} MB`);
-    logger.info(`Total reduction: ${totalReduction}%`);
-    logger.info(
-      `Space saved: ${sizeMB(stats.totalSizeBefore - stats.totalSizeAfter)} MB`
-    );
-  }
 
   private handleUploadResult(
     result: UploadResult,

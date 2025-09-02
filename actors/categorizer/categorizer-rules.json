@@ -86,6 +86,7 @@
           "모카",
           "마키아또",
           "마끼아또",
+          "마키아토",
           "콜드브루",
           "헛개리카노",
           "메가리카노"
@@ -600,6 +601,7 @@
       "condition": {
         "nameContains": [
           "초코 라떼",
+          "초코라떼",
           "딸기 크림 라떼",
           "딸기크림라떼",
           "딸기라떼",
@@ -610,7 +612,21 @@
           "콩가루라떼",
           "콩가루 라떼",
           "메론바나라떼",
-          "메론바나 라떼"
+          "메론바나 라떼",
+          "꿀밤라떼",
+          "녹차라떼",
+          "대추라떼",
+          "바나나 라떼",
+          "바나나라떼",
+          "블랙펄라떼",
+          "우리쌀라떼",
+          "쌍화라떼",
+          "토피넛라떼",
+          "초콜릿 라떼",
+          "잉글리쉬 브렉퍼스트 라떼",
+          "차이 라떼",
+          "아이스크림라떼",
+          "아이스크림 라떼"
         ]
       },
       "targetCategory": "그 외",
@@ -624,20 +640,39 @@
     {
       "type": "pattern",
       "condition": {
-        "nameContains": [
-          "스콘",
-          "휘낭시에",
-          "피낭시에",
-          "마들렌",
-          "쿠키",
-          "머핀"
-        ]
+        "nameContains": ["스콘", "휘낭시에", "피낭시에", "마들렌", "머핀"]
       },
       "targetCategory": "그 외",
       "confidence": "high",
       "createdBy": "system",
-      "priority": 1,
+      "priority": -1,
       "id": "custom-1754652620513-a87874rid",
+      "createdAt": 1754652620513,
+      "usageCount": 0
+    },
+    {
+      "type": "pattern",
+      "condition": {
+        "nameEndsWith": ["쿠키", "마카롱"]
+      },
+      "targetCategory": "그 외",
+      "confidence": "high",
+      "createdBy": "system",
+      "priority": -2,
+      "id": "pattern-standalone-food-items",
+      "createdAt": 1754652620513,
+      "usageCount": 0
+    },
+    {
+      "type": "pattern",
+      "condition": {
+        "nameContains": ["잔 세트", "머그컵", "텀블러", "컵홀더", "MD"]
+      },
+      "targetCategory": "그 외",
+      "confidence": "high",
+      "createdBy": "system",
+      "priority": -3,
+      "id": "pattern-merchandise-items",
       "createdAt": 1754652620513,
       "usageCount": 0
     }

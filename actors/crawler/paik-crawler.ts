@@ -2,13 +2,7 @@ import { PlaywrightCrawler, type Request } from 'crawlee';
 import type { Locator, Page } from 'playwright';
 import { logger } from '../../shared/logger';
 import type { Nutritions } from '../../shared/nutritions';
-import {
-  type Product,
-  takeDebugScreenshot,
-  waitForLoad,
-  writeProductsToJson,
-} from './crawlerUtils';
-import { extractNutritionFromText } from './nutritionUtils';
+import { type Product, waitForLoad, writeProductsToJson } from './crawlerUtils';
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
@@ -67,28 +61,99 @@ const CRAWLER_CONFIG = {
 // DATA EXTRACTION FUNCTIONS
 // ================================================
 
-// Extract nutrition data from .ingredient_table_box selector
+// Regex for parsing serving size from Paik nutrition label
+const SERVING_SIZE_REGEX = /(\d+)\s*oz/;
+
+// Helper function to extract serving size from basis text
+function parseServingSize(
+  basisText: string
+): { size: number; unit: string } | null {
+  const servingSizeMatch = basisText.match(SERVING_SIZE_REGEX);
+  if (servingSizeMatch) {
+    // Convert oz to ml (1 oz = 29.5735 ml)
+    const ozValue = Number.parseInt(servingSizeMatch[1], 10);
+    return {
+      size: Math.round(ozValue * 29.5735),
+      unit: 'ml',
+    };
+  }
+  return null;
+}
+
+// Helper function to parse nutrition item from table row
+function parseNutritionItem(label: string, value: string): Partial<Nutritions> {
+  const numValue = Number.parseFloat(value);
+  if (Number.isNaN(numValue)) {
+    return {};
+  }
+
+  const normalizedLabel = label.trim().toLowerCase();
+
+  if (normalizedLabel.includes('카페인')) {
+    return { caffeine: numValue, caffeineUnit: 'mg' };
+  }
+  if (normalizedLabel.includes('칼로리')) {
+    return { calories: numValue, caloriesUnit: 'kcal' };
+  }
+  if (normalizedLabel.includes('나트륨')) {
+    return { natrium: numValue, natriumUnit: 'mg' };
+  }
+  if (normalizedLabel.includes('당류')) {
+    return { sugar: numValue, sugarUnit: 'g' };
+  }
+  if (normalizedLabel.includes('포화지방')) {
+    return { saturatedFat: numValue, saturatedFatUnit: 'g' };
+  }
+  if (normalizedLabel.includes('단백질')) {
+    return { protein: numValue, proteinUnit: 'g' };
+  }
+
+  return {};
+}
+
+// Extract nutrition data from .ingredient_table_box selector with structured parsing
 async function extractNutritionData(
   menuItem: Locator
 ): Promise<Nutritions | null> {
   try {
-    // Look for nutrition data in the ingredient table box
     const nutritionBox = menuItem.locator('.ingredient_table_box');
 
-    // Check if nutrition box exists
-    const nutritionBoxCount = await nutritionBox.count();
-    if (nutritionBoxCount === 0) {
+    if ((await nutritionBox.count()) === 0) {
       return null;
     }
 
-    // Extract the text content from the nutrition box
-    const nutritionText = await nutritionBox.textContent().catch(() => '');
+    const nutrition: Nutritions = {};
 
-    if (!nutritionText) {
-      return null;
+    // Extract serving size from the basis text
+    const basisText = await nutritionBox
+      .locator('.menu_ingredient_basis')
+      .textContent()
+      .catch(() => '');
+
+    if (basisText) {
+      const servingData = parseServingSize(basisText);
+      if (servingData) {
+        nutrition.servingSize = servingData.size;
+        nutrition.servingSizeUnit = servingData.unit;
+      }
     }
 
-    return extractNutritionFromText(nutritionText);
+    // Extract nutrition values from the structured table
+    const nutritionItems = await nutritionBox
+      .locator('.ingredient_table li')
+      .all();
+
+    for (const item of nutritionItems) {
+      const divs = await item.locator('div').allTextContents();
+      if (divs.length !== 2) {
+        continue;
+      }
+
+      const itemData = parseNutritionItem(divs[0], divs[1]);
+      Object.assign(nutrition, itemData);
+    }
+
+    return Object.keys(nutrition).length > 0 ? nutrition : null;
   } catch (error) {
     logger.debug(
       'Failed to extract nutrition data from Paik menu item:',
@@ -351,7 +416,8 @@ async function handleMainMenuPage(
   logger.info('Processing main menu page to discover categories');
 
   await waitForLoad(page);
-  await takeDebugScreenshot(page, 'paik-main-menu');
+  // Debug screenshot removed for performance
+  // await takeDebugScreenshot(page, 'paik-main-menu');
 
   const categories = await extractCategoryUrls(page);
 

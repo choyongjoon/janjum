@@ -2,12 +2,7 @@ import { PlaywrightCrawler } from 'crawlee';
 import type { Page } from 'playwright';
 import { logger } from '../../shared/logger';
 import type { Nutritions } from '../../shared/nutritions';
-import {
-  type Product,
-  takeDebugScreenshot,
-  waitForLoad,
-  writeProductsToJson,
-} from './crawlerUtils';
+import { type Product, waitForLoad, writeProductsToJson } from './crawlerUtils';
 import { extractNutritionFromText } from './nutritionUtils';
 
 // ================================================
@@ -278,7 +273,8 @@ async function handleMenuListPage(
   logger.info('Processing Mammoth Coffee menu list page');
 
   await waitForLoad(page);
-  await takeDebugScreenshot(page, 'mammoth-menu-list');
+  // Debug screenshot removed for performance
+  // await takeDebugScreenshot(page, 'mammoth-menu-list');
 
   // Extract product URLs from the list page
   try {

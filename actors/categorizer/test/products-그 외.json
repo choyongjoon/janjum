@@ -56,11 +56,51 @@
     "externalCategory": "FOOD"
   },
   {
+    "name": "꿀밤라떼",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "녹차라떼",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "대추라떼",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "바나나 라떼",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "블랙펄라떼",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "우리쌀라떼",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "쌍화라떼",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "초코라떼",
+    "externalCategory": "BEVERAGE"
+  },
+  {
     "name": "초코 라떼",
     "externalCategory": "BEVERAGE"
   },
   {
     "name": "딸기 크림 라떼",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "아이스크림라떼",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "아이스크림 라떼",
     "externalCategory": "BEVERAGE"
   },
   {
@@ -77,6 +117,38 @@
   },
   {
     "name": "메론바나 라떼",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "토피넛라떼",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "초콜릿 라떼",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "잉글리쉬 브렉퍼스트 라떼",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "차이 라떼",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "로얄 밀크티 스모어 쿠키",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "유니콘프라페 마카롱",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "에스프레소 잔 세트(블랙)",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "에스프레소 잔 세트(화이트)",
     "externalCategory": "BEVERAGE"
   }
 ]

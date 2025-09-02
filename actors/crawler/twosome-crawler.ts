@@ -731,7 +731,7 @@ async function pushProductsInBatches(
   }
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: <explanation>
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Complex menu parsing logic needs multiple nested conditions
 async function handleMainMenuPage(
   page: Page,
   crawlerInstance: PlaywrightCrawler

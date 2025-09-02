@@ -21,10 +21,10 @@ export const waitFor = async (ms: number) => {
   await new Promise((resolve) => setTimeout(resolve, ms));
 };
 
-export const waitForLoad = async (page: Page, timeout = 30_000) => {
+export const waitForLoad = async (page: Page, timeout = 15_000) => {
   try {
     await page.waitForLoadState('domcontentloaded', { timeout });
-    // await page.waitForTimeout(200); // Reduced from 500ms to 200ms
+    // Skip additional wait - content should be available after domcontentloaded
   } catch {
     logger.warn(`⚠️ Page load timeout after ${timeout}ms, continuing anyway...`);
     // Don't throw - continue with whatever content is available

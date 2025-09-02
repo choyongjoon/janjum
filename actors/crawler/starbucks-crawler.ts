@@ -2,12 +2,7 @@ import { PlaywrightCrawler, type Request } from 'crawlee';
 import type { Page } from 'playwright';
 import { logger } from '../../shared/logger';
 import type { Nutritions } from '../../shared/nutritions';
-import {
-  type Product,
-  takeDebugScreenshot,
-  waitForLoad,
-  writeProductsToJson,
-} from './crawlerUtils';
+import { type Product, waitForLoad, writeProductsToJson } from './crawlerUtils';
 import { parseNutritionValueFromText } from './nutritionUtils';
 
 // ================================================
@@ -76,13 +71,23 @@ const maxRequestsInTestMode = isTestMode
   : 200;
 
 const CRAWLER_CONFIG = {
-  maxConcurrency: 5, // Increased from 3 to 5
-  maxRequestsPerCrawl: isTestMode ? maxRequestsInTestMode : 300, // Increased to 300 to handle all products (183 found + buffer)
-  maxRequestRetries: 2,
-  requestHandlerTimeoutSecs: isTestMode ? 20 : 45, // Increased timeout for better success rate
+  maxConcurrency: isTestMode ? 3 : 10, // Higher concurrency for production
+  maxRequestsPerCrawl: isTestMode ? maxRequestsInTestMode : 300,
+  maxRequestRetries: 1, // Reduced retries - fail fast
+  requestHandlerTimeoutSecs: isTestMode ? 15 : 25, // Reduced timeout
   launchOptions: {
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-web-security',
+      '--disable-features=VizDisplayCompositor',
+      '--disable-background-timer-throttling',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding',
+      '--no-zygote',
+      '--single-process',
+    ],
   },
 };
 
@@ -94,7 +99,7 @@ async function checkNutritionInfoExists(page: Page): Promise<boolean> {
   return (await page.locator('#product_info01').count()) > 0;
 }
 
-async function waitForNutritionContent(page: Page): Promise<void> {
+async function _waitForNutritionContent(page: Page): Promise<void> {
   await page
     .waitForFunction(
       () => {
@@ -104,7 +109,7 @@ async function waitForNutritionContent(page: Page): Promise<void> {
           servingElement.textContent.trim().length > 0
         );
       },
-      { timeout: 10_000 }
+      { timeout: 5000 }
     )
     .catch(() => {
       logger.warn('Serving size not populated within timeout');
@@ -279,10 +284,11 @@ function hasAnyNutritionData(nutritions: Nutritions): boolean {
 async function extractNutritionData(page: Page): Promise<Nutritions | null> {
   try {
     // Wait for the page to fully load and for AJAX requests to complete
-    await page.waitForTimeout(5000);
+    // Wait for content to load with faster timeout
+    await page.waitForTimeout(1500);
 
-    // Take a debug screenshot to see the page state
-    await takeDebugScreenshot(page, 'nutrition-debug');
+    // Skip debug screenshot for better performance
+    // await takeDebugScreenshot(page, 'nutrition-debug');
 
     // First check if nutrition data is available by checking the serving size element
     const hasNutritionInfo = await checkNutritionInfoExists(page);
@@ -293,7 +299,8 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
     }
 
     // Wait for nutrition content to be populated
-    await waitForNutritionContent(page);
+    // Skip waiting for nutrition content to load dynamically - extract what's available
+    // await waitForNutritionContent(page);
 
     // Extract serving size information
     const servingSize = await extractServingSize(page);
@@ -324,6 +331,7 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
 }
 
 async function extractProductData(page: Page): Promise<Product> {
+  // Use Promise.all for parallel extraction (faster than sequential)
   const [
     name,
     nameEn,
@@ -489,7 +497,8 @@ async function handleMainMenuPage(
   logger.info('Processing drink list page');
 
   await waitForLoad(page);
-  await takeDebugScreenshot(page, 'starbucks-main-menu');
+  // Skip debug screenshot for performance
+  // await takeDebugScreenshot(page, 'starbucks-main-menu');
 
   const productIds = await extractProductIds(page);
 
@@ -533,7 +542,7 @@ async function handleProductPage(
     await waitForLoad(page);
     // Wait for the main product element to ensure content is loaded
     await page.waitForSelector(SELECTORS.productDetails.name, {
-      timeout: 10_000,
+      timeout: 5000,
     });
 
     const product = await extractProductData(page);
