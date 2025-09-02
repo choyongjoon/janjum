@@ -96,6 +96,14 @@
     "externalCategory": "BEVERAGE"
   },
   {
+    "name": "아이스크림라떼",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "아이스크림 라떼",
+    "externalCategory": "BEVERAGE"
+  },
+  {
     "name": "옥수수 라떼",
     "externalCategory": "BEVERAGE"
   },
@@ -113,6 +121,34 @@
   },
   {
     "name": "토피넛라떼",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "초콜릿 라떼",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "잉글리쉬 브렉퍼스트 라떼",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "차이 라떼",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "로얄 밀크티 스모어 쿠키",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "유니콘프라페 마카롱",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "에스프레소 잔 세트(블랙)",
+    "externalCategory": "BEVERAGE"
+  },
+  {
+    "name": "에스프레소 잔 세트(화이트)",
     "externalCategory": "BEVERAGE"
   }
 ]
