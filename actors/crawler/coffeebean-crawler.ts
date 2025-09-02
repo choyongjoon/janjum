@@ -106,11 +106,11 @@ async function extractNutritionData(
       if (label.includes('열량') || label.includes('kcal')) {
         nutritions.calories = value;
       } else if (label.includes('나트륨') || label.includes('sodium')) {
-        nutritions.sodium = value;
+        nutritions.natrium = value;
       } else if (label.includes('탄수화물') || label.includes('carbohydrate')) {
-        nutritions.carbohydrate = value;
+        nutritions.carbohydrates = value;
       } else if (label.includes('당') || label.includes('sugar')) {
-        nutritions.sugars = value;
+        nutritions.sugar = value;
       } else if (label.includes('단백질') || label.includes('protein')) {
         nutritions.protein = value;
       } else if (label.includes('카페인') || label.includes('caffeine')) {

@@ -58,6 +58,7 @@ export default defineSchema({
     .index('by_cafe', ['cafeId'])
     .index('by_category', ['category'])
     .index('by_external_id', ['externalId'])
+    .index('by_cafe_external_id', ['cafeId', 'externalId'])
     .index('by_cafe_active', ['cafeId', 'isActive'])
     .index('by_short_id', ['shortId'])
     .index('by_rating', ['averageRating']),
