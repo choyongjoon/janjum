@@ -8,7 +8,6 @@ import {
   waitForLoad,
   writeProductsToJson,
 } from './crawlerUtils';
-import { extractNutritionFromText } from './nutritionUtils';
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
@@ -26,6 +25,8 @@ const SITE_CONFIG = {
 
 // Regex patterns for performance optimization
 const GIFT_SUFFIX_REGEX = /\s*선물하기\s*$/;
+const SERVING_SIZE_ML_REGEX = /(\d+(?:\.\d+)?)ml/;
+const NUTRITION_VALUE_REGEX = /\(([0-9.]+)(?:kcal|g|mg)\)/;
 
 const SELECTORS = {
   // Category discovery selectors
@@ -213,27 +214,81 @@ async function extractCategoryValues(
   }
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: refactor later
 async function extractNutritionData(
   container: Locator
 ): Promise<Nutritions | null> {
   try {
-    // Look for nutrition data in the .pro_comp selector
     const nutritionElement = container.locator('.pro_comp');
 
-    // Check if nutrition element exists
-    const nutritionElementCount = await nutritionElement.count();
-    if (nutritionElementCount === 0) {
+    if ((await nutritionElement.count()) === 0) {
       return null;
     }
 
-    // Extract the text content from the nutrition element
-    const nutritionText = await nutritionElement.textContent().catch(() => '');
+    const nutrition: Nutritions = {};
 
-    if (!nutritionText) {
-      return null;
+    // Extract serving size from .pro_size element
+    const sizeElement = nutritionElement.locator('.pro_size');
+    if ((await sizeElement.count()) > 0) {
+      const sizeText = await sizeElement.textContent();
+      if (sizeText) {
+        const sizeMatch = sizeText.match(SERVING_SIZE_ML_REGEX);
+        if (sizeMatch) {
+          nutrition.servingSize = Number.parseFloat(sizeMatch[1]);
+          nutrition.servingSizeUnit = 'ml';
+        }
+      }
     }
 
-    return extractNutritionFromText(nutritionText);
+    // Extract nutrition data from .pro_nutri dl elements
+    const nutritionItems = await nutritionElement
+      .locator('.pro_nutri dl')
+      .all();
+
+    for (const item of nutritionItems) {
+      const dtElement = item.locator('dt');
+      const ddElement = item.locator('dd');
+
+      if ((await dtElement.count()) === 0 || (await ddElement.count()) === 0) {
+        continue;
+      }
+
+      const label = (await dtElement.textContent())?.trim().toLowerCase() || '';
+      const valueText = (await ddElement.textContent())?.trim() || '';
+
+      // Extract numeric value from parentheses
+      const valueMatch = valueText.match(NUTRITION_VALUE_REGEX);
+      if (!valueMatch) {
+        continue;
+      }
+
+      const numValue = Number.parseFloat(valueMatch[1]);
+      if (Number.isNaN(numValue)) {
+        continue;
+      }
+
+      if (label.includes('칼로리')) {
+        nutrition.calories = numValue;
+        nutrition.caloriesUnit = 'kcal';
+      } else if (label.includes('당류')) {
+        nutrition.sugar = numValue;
+        nutrition.sugarUnit = 'g';
+      } else if (label.includes('단백질')) {
+        nutrition.protein = numValue;
+        nutrition.proteinUnit = 'g';
+      } else if (label.includes('포화지방')) {
+        nutrition.saturatedFat = numValue;
+        nutrition.saturatedFatUnit = 'g';
+      } else if (label.includes('나트륨')) {
+        nutrition.natrium = numValue;
+        nutrition.natriumUnit = 'mg';
+      } else if (label.includes('카페인')) {
+        nutrition.caffeine = numValue;
+        nutrition.caffeineUnit = 'mg';
+      }
+    }
+
+    return Object.keys(nutrition).length > 0 ? nutrition : null;
   } catch (error) {
     logger.debug(
       'Failed to extract nutrition data from Ediya menu item:',

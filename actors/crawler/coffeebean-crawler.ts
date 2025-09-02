@@ -8,7 +8,6 @@ import {
   waitForLoad,
   writeProductsToJson,
 } from './crawlerUtils';
-import { extractNutritionFromText } from './nutritionUtils';
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
@@ -69,6 +68,7 @@ const CRAWLER_CONFIG = {
 // DATA EXTRACTION FUNCTIONS
 // ================================================
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: refactor later
 async function extractNutritionData(
   container: Locator
 ): Promise<Nutritions | null> {
@@ -82,14 +82,53 @@ async function extractNutritionData(
       return null;
     }
 
-    // Extract the text content from the nutrition element
-    const nutritionText = await nutritionElement.textContent().catch(() => '');
+    // Extract nutrition data from dl elements
+    const dlElements = nutritionElement.locator('dl');
+    const dlCount = await dlElements.count();
 
-    if (!nutritionText) {
+    if (dlCount === 0) {
       return null;
     }
 
-    return extractNutritionFromText(nutritionText);
+    const nutritions: Partial<Nutritions> = {};
+
+    for (let i = 0; i < dlCount; i++) {
+      const dl = dlElements.nth(i);
+      const dt = await dl.locator('dt').textContent();
+      const dd = await dl.locator('dd').textContent();
+
+      if (!(dt && dd)) {
+        continue;
+      }
+
+      const value = Number.parseInt(dt.trim(), 10);
+      if (Number.isNaN(value)) {
+        continue;
+      }
+
+      const label = dd.replace(/\s+/g, ' ').trim().toLowerCase();
+
+      if (label.includes('열량') || label.includes('kcal')) {
+        nutritions.calories = value;
+      } else if (label.includes('나트륨') || label.includes('sodium')) {
+        nutritions.sodium = value;
+      } else if (label.includes('탄수화물') || label.includes('carbohydrate')) {
+        nutritions.carbohydrate = value;
+      } else if (label.includes('당') || label.includes('sugar')) {
+        nutritions.sugars = value;
+      } else if (label.includes('단백질') || label.includes('protein')) {
+        nutritions.protein = value;
+      } else if (label.includes('카페인') || label.includes('caffeine')) {
+        nutritions.caffeine = value;
+      } else if (label.includes('포화지방') || label.includes('saturated')) {
+        nutritions.saturatedFat = value;
+      }
+    }
+
+    // Return nutritions object only if we found at least one value
+    return Object.keys(nutritions).length > 0
+      ? (nutritions as Nutritions)
+      : null;
   } catch (error) {
     logger.debug(
       'Failed to extract nutrition data from Coffeebean menu item:',

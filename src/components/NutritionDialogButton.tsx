@@ -23,7 +23,11 @@ export const NutritionDialogButton = ({
       >
         영앙정보 보기
       </button>
-      <dialog className="modal" id="nutritions-modal">
+      <dialog
+        className="modal"
+        id="nutritions-modal"
+        style={{ height: '100dvh' }}
+      >
         <div className="modal-box w-auto p-0">
           <NutritionTable nutritions={nutritions} />
         </div>
