@@ -222,7 +222,12 @@ function scheduleImageDownloadIfNeeded(
   productId: Id<'products'>,
   shouldDownload: boolean
 ): void {
-  if (shouldDownload && args.downloadImages && args.externalImageUrl) {
+  if (
+    shouldDownload &&
+    args.downloadImages &&
+    args.externalImageUrl &&
+    !args.imageStorageId
+  ) {
     ctx.scheduler.runAfter(0, api.imageDownloader.downloadAndStoreImageAction, {
       imageUrl: args.externalImageUrl,
       productId,
@@ -350,6 +355,34 @@ export const getById = query({
   args: { productId: v.id('products') },
   handler: async (ctx, { productId }) => {
     return await ctx.db.get(productId);
+  },
+});
+
+export const getByExternalId = query({
+  args: {
+    cafeSlug: v.string(),
+    externalId: v.string(),
+  },
+  handler: async (ctx, { cafeSlug, externalId }) => {
+    // First find the cafe by slug
+    const cafe = await ctx.db
+      .query('cafes')
+      .withIndex('by_slug', (q) => q.eq('slug', cafeSlug))
+      .first();
+
+    if (!cafe) {
+      return null;
+    }
+
+    // Then find the product by cafeId and externalId
+    const product = await ctx.db
+      .query('products')
+      .withIndex('by_cafe_external_id', (q) =>
+        q.eq('cafeId', cafe._id).eq('externalId', externalId)
+      )
+      .first();
+
+    return product;
   },
 });
 

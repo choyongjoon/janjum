@@ -2,12 +2,7 @@ import { PlaywrightCrawler } from 'crawlee';
 import type { Locator, Page } from 'playwright';
 import { logger } from '../../shared/logger';
 import type { Nutritions } from '../../shared/nutritions';
-import {
-  type Product,
-  takeDebugScreenshot,
-  waitForLoad,
-  writeProductsToJson,
-} from './crawlerUtils';
+import { type Product, waitForLoad, writeProductsToJson } from './crawlerUtils';
 import { extractNutritionFromText } from './nutritionUtils';
 
 // ================================================
@@ -511,7 +506,8 @@ async function handleMenuPage(page: Page, crawlerInstance: PlaywrightCrawler) {
   logger.info('Processing Paul Bassett menu page');
 
   await waitForLoad(page);
-  await takeDebugScreenshot(page, 'paulbassett-menu');
+  // Debug screenshot removed for performance
+  // await takeDebugScreenshot(page, 'paulbassett-menu');
 
   const products = await extractProductsFromPage(page);
 

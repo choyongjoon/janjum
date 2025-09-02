@@ -2,12 +2,7 @@ import { PlaywrightCrawler, type Request } from 'crawlee';
 import type { Locator, Page } from 'playwright';
 import { logger } from '../../shared/logger';
 import type { Nutritions } from '../../shared/nutritions';
-import {
-  type Product,
-  takeDebugScreenshot,
-  waitForLoad,
-  writeProductsToJson,
-} from './crawlerUtils';
+import { type Product, waitForLoad, writeProductsToJson } from './crawlerUtils';
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
@@ -510,7 +505,8 @@ async function handleMainMenuPage(
   logger.info('Processing main menu page to discover categories');
 
   await waitForLoad(page);
-  await takeDebugScreenshot(page, 'ediya-main-menu');
+  // Debug screenshot removed for performance
+  // await takeDebugScreenshot(page, 'ediya-main-menu');
 
   const categories = await extractCategoryValues(page);
 

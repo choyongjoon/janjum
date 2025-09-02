@@ -2,12 +2,7 @@ import { PlaywrightCrawler, type Request } from 'crawlee';
 import type { Page } from 'playwright';
 import { logger } from '../../shared/logger';
 import type { Nutritions } from '../../shared/nutritions';
-import {
-  type Product,
-  takeDebugScreenshot,
-  waitForLoad,
-  writeProductsToJson,
-} from './crawlerUtils';
+import { type Product, waitForLoad, writeProductsToJson } from './crawlerUtils';
 import { extractNutritionFromText } from './nutritionUtils';
 
 // ================================================
@@ -605,7 +600,8 @@ async function handleMainMenuPage(
   logger.info('Processing Hollys menu page');
 
   await waitForLoad(page);
-  await takeDebugScreenshot(page, 'hollys-main-menu');
+  // Debug screenshot removed for performance
+  // await takeDebugScreenshot(page, 'hollys-main-menu');
 
   const categories = await extractCategoriesFromMenu(page);
 

@@ -2,12 +2,7 @@ import { PlaywrightCrawler } from 'crawlee';
 import type { Locator, Page } from 'playwright';
 import { logger } from '../../shared/logger';
 import type { Nutritions } from '../../shared/nutritions';
-import {
-  type Product,
-  takeDebugScreenshot,
-  waitForLoad,
-  writeProductsToJson,
-} from './crawlerUtils';
+import { type Product, waitForLoad, writeProductsToJson } from './crawlerUtils';
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
@@ -472,7 +467,8 @@ async function handleMainMenuPage(
   logger.info('Processing coffeebean menu page');
 
   await waitForLoad(page);
-  await takeDebugScreenshot(page, 'coffeebean-main-menu');
+  // Debug screenshot removed for performance
+  // await takeDebugScreenshot(page, 'coffeebean-main-menu');
 
   // Try to extract categories from navigation, but fallback to processing current page
   const categories = await extractCategoriesFromMenu(page);

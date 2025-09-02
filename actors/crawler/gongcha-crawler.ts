@@ -2,12 +2,7 @@ import { PlaywrightCrawler } from 'crawlee';
 import type { Locator, Page } from 'playwright';
 import { logger } from '../../shared/logger';
 import type { Nutritions } from '../../shared/nutritions';
-import {
-  type Product,
-  takeDebugScreenshot,
-  waitForLoad,
-  writeProductsToJson,
-} from './crawlerUtils';
+import { type Product, waitForLoad, writeProductsToJson } from './crawlerUtils';
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
@@ -36,13 +31,21 @@ const maxRequestsInTestMode = isTestMode
   : 150;
 
 const CRAWLER_CONFIG = {
-  maxConcurrency: 1, // Single concurrency for reliable modal handling
+  maxConcurrency: isTestMode ? 1 : 3, // Increase concurrency for production
   maxRequestsPerCrawl: isTestMode ? maxRequestsInTestMode : 150,
-  maxRequestRetries: 1, // Reduce retries
-  requestHandlerTimeoutSecs: isTestMode ? 120 : 180, // Much longer timeout for modal interactions
+  maxRequestRetries: 1,
+  requestHandlerTimeoutSecs: isTestMode ? 60 : 90, // Reduced timeout
   launchOptions: {
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-web-security',
+      '--disable-features=VizDisplayCompositor',
+      '--disable-background-timer-throttling',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding',
+    ],
   },
 };
 
@@ -64,44 +67,24 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
       return null;
     }
 
-    // Extract nutrition values from table cells
-    const nutritionValues = await Promise.all([
-      nutritionTable
-        .locator('td')
-        .nth(2)
-        .textContent()
-        .catch(() => ''), // Serving size (ml)
-      nutritionTable
-        .locator('td')
-        .nth(3)
-        .textContent()
-        .catch(() => ''), // Calories (kcal)
-      nutritionTable
-        .locator('td')
-        .nth(4)
-        .textContent()
-        .catch(() => ''), // Sugar (g)
-      nutritionTable
-        .locator('td')
-        .nth(5)
-        .textContent()
-        .catch(() => ''), // Protein (g)
-      nutritionTable
-        .locator('td')
-        .nth(6)
-        .textContent()
-        .catch(() => ''), // Saturated fat (g)
-      nutritionTable
-        .locator('td')
-        .nth(7)
-        .textContent()
-        .catch(() => ''), // Sodium (mg)
-      nutritionTable
-        .locator('td')
-        .nth(8)
-        .textContent()
-        .catch(() => ''), // Caffeine (mg)
-    ]);
+    // Extract nutrition values from table cells using batch evaluation for better performance
+    const nutritionValues = await page.evaluate(() => {
+      const table = document.querySelector('.table-list table tbody tr');
+      if (!table) {
+        return ['', '', '', '', '', '', ''];
+      }
+
+      const cells = table.querySelectorAll('td');
+      return [
+        cells[2]?.textContent?.trim() || '', // Serving size (ml)
+        cells[3]?.textContent?.trim() || '', // Calories (kcal)
+        cells[4]?.textContent?.trim() || '', // Sugar (g)
+        cells[5]?.textContent?.trim() || '', // Protein (g)
+        cells[6]?.textContent?.trim() || '', // Saturated fat (g)
+        cells[7]?.textContent?.trim() || '', // Sodium (mg)
+        cells[8]?.textContent?.trim() || '', // Caffeine (mg)
+      ];
+    });
 
     const [
       servingSizeText,
@@ -198,18 +181,18 @@ async function navigateToProductDetail(
   );
 
   await productLink.scrollIntoViewIfNeeded();
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(200); // Reduced wait time
 
-  await productLink.click({ timeout: 8000 });
-  await page.waitForTimeout(2000); // Wait longer for page to fully load
+  await productLink.click({ timeout: 5000 });
+  await page.waitForTimeout(1000); // Reduced wait time
 
-  // Only take screenshot in test mode for debugging
-  if (isTestMode) {
-    await takeDebugScreenshot(
-      page,
-      `gongcha-detail-${productName.replace(/\s+/g, '_')}`
-    );
-  }
+  // Skip screenshots for better performance
+  // if (isTestMode) {
+  //   await takeDebugScreenshot(
+  //     page,
+  //     `gongcha-detail-${productName.replace(/\s+/g, '_')}`
+  //   );
+  // }
 }
 
 // Helper function to check if text is a valid product description
@@ -325,7 +308,7 @@ async function extractProductFromContainer(
 
     // Navigate back to the category page
     await page.goto(currentUrl);
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(500); // Reduced wait time
 
     const externalId = generateExternalId(imageSrc || '');
 
@@ -382,7 +365,7 @@ async function extractProductsFromPage(
   const products: Product[] = [];
 
   // Wait for products to load
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(500); // Reduced wait time
 
   // Find product containers - look for list items that contain product detail links
   const productContainers = await page
@@ -413,7 +396,7 @@ async function extractProductsFromPage(
     }
 
     // Small delay between products to avoid overwhelming the server
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(300); // Reduced delay
   }
 
   return products;
@@ -428,7 +411,8 @@ async function handleStartPage(
   );
 
   await waitForLoad(page);
-  await takeDebugScreenshot(page, 'gongcha-start-page');
+  // Skip debug screenshot for better performance
+  // await takeDebugScreenshot(page, 'gongcha-start-page');
 
   try {
     // First, process products on the current page (since start page is a category page)
@@ -490,7 +474,8 @@ async function handleCategoryPage(
   logger.info('Processing Gongcha subcategory page');
 
   await waitForLoad(page);
-  await takeDebugScreenshot(page, 'gongcha-subcategory');
+  // Skip debug screenshot for better performance
+  // await takeDebugScreenshot(page, 'gongcha-subcategory');
 
   try {
     const categoryName = await extractCategoryName(page);

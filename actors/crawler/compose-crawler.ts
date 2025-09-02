@@ -2,12 +2,7 @@ import { PlaywrightCrawler, type Request } from 'crawlee';
 import type { Locator, Page } from 'playwright';
 import { logger } from '../../shared/logger';
 import type { Nutritions } from '../../shared/nutritions';
-import {
-  type Product,
-  takeDebugScreenshot,
-  waitForLoad,
-  writeProductsToJson,
-} from './crawlerUtils';
+import { type Product, waitForLoad, writeProductsToJson } from './crawlerUtils';
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
@@ -336,7 +331,8 @@ async function handleMainMenuPage(
   logger.info('Processing main menu page to discover categories');
 
   await waitForLoad(page);
-  await takeDebugScreenshot(page, 'compose-main-menu');
+  // Debug screenshot removed for performance
+  // await takeDebugScreenshot(page, 'compose-main-menu');
 
   const categoryData = await extractCategoryData(page);
 
@@ -375,7 +371,8 @@ async function handleCategoryPage(
 
   // Take a screenshot for debugging (only for first category)
   if (categoryId === '207002' && currentPage === 1) {
-    await takeDebugScreenshot(page, `compose-category-${categoryId}`);
+    // Debug screenshot removed for performance
+    // await takeDebugScreenshot(page, `compose-category-${categoryId}`);
   }
 
   try {
