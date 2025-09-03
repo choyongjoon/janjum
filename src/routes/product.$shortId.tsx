@@ -2,12 +2,11 @@ import { convexQuery } from '@convex-dev/react-query';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import type { Id } from 'convex/_generated/dataModel';
-import { NutritionDialogButton } from '~/components/NutritionDialogButton';
+import { NutritionInfoSection } from '~/components/NutritionInfoSection';
 import { RatingSummary } from '~/components/RatingSummary';
 import { api } from '../../convex/_generated/api';
 import { BackLink } from '../components/BackLink';
 import { ExternalLinkIcon } from '../components/icons';
-import { ProductCard } from '../components/ProductCard';
 import { ReviewSection } from '../components/reviews/ReviewSection';
 import { seo } from '../utils/seo';
 
@@ -99,7 +98,7 @@ function ProductPage() {
             <div>
               <div className="mb-2 flex items-start justify-between gap-4">
                 <h1
-                  className={`font-bold text-3xl ${isActive ? '' : 'text-base-content/50'}`}
+                  className={`break-keep font-bold text-3xl ${isActive ? '' : 'text-base-content/50'}`}
                 >
                   {product.name}
                 </h1>
@@ -115,17 +114,22 @@ function ProductPage() {
                 </p>
               )}
 
-              {/* Category Badge */}
-              {product.category && (
-                <div className="flex items-center gap-2">
-                  <div className="badge badge-neutral badge-lg">
-                    {product.category}
-                  </div>
-                  <div className="badge badge-neutral badge-lg">
-                    {product.externalCategory}
-                  </div>
+              {/* Category Badges */}
+              {(product.category || product.externalCategory) && (
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  {product.category && (
+                    <div className="badge badge-neutral badge-lg">
+                      {product.category}
+                    </div>
+                  )}
+                  {product.externalCategory && (
+                    <div className="badge badge-neutral badge-lg">
+                      {product.externalCategory}
+                    </div>
+                  )}
                 </div>
               )}
+
               {/* Rating Display */}
               <RatingSummary className="mt-4" reviewStats={reviewStats} />
             </div>
@@ -144,36 +148,33 @@ function ProductPage() {
 
             {/* Description */}
             {product.description && (
-              <p className="whitespace-pre-wrap text-base-content/80">
+              <p className="whitespace-pre-wrap break-keep text-base-content/80">
                 {product.description}
               </p>
             )}
 
-            {product.nutritions && (
-              <NutritionDialogButton nutritions={product.nutritions} />
-            )}
+            {/* Nutrition Information Section */}
+            <NutritionInfoSection nutritions={product.nutritions} />
 
             {/* Product Metadata */}
 
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-base-content/60">등록일:</span>
-                <span>
+            <div className="space-y-2 text-right text-sm">
+              <div>
+                <span className="text-base-content/60">등록일: </span>
+                <span className="inline-block w-21">
                   {new Date(product.addedAt).toLocaleDateString('ko-KR')}
                 </span>
               </div>
-
-              <div className="flex justify-between">
-                <span className="text-base-content/60">최종 업데이트:</span>
-                <span>
+              <div>
+                <span className="text-base-content/60">최종 수정일: </span>
+                <span className="inline-block w-21">
                   {new Date(product.updatedAt).toLocaleDateString('ko-KR')}
                 </span>
               </div>
-
               {product.removedAt && (
-                <div className="flex justify-between">
-                  <span className="text-base-content/60">단종일:</span>
-                  <span>
+                <div>
+                  <span className="text-base-content/60">단종일: </span>
+                  <span className="inline-block w-21">
                     {new Date(product.removedAt).toLocaleDateString('ko-KR')}
                   </span>
                 </div>
@@ -199,57 +200,10 @@ function ProductPage() {
 
         {/* Reviews Section */}
         <div className="mt-16">
-          <div className="divider">
-            <h2 className="font-bold text-2xl">후기</h2>
-          </div>
+          <div className="divider" />
           <ReviewSection productId={product._id} />
         </div>
-
-        {/* Related Products */}
-        {cafe && (
-          <div className="mt-16">
-            <div className="divider">
-              <h2 className="font-bold text-2xl">같은 카페의 다른 상품</h2>
-            </div>
-            <RelatedProducts
-              cafeId={product.cafeId}
-              currentProductId={product._id}
-            />
-          </div>
-        )}
       </div>
-    </div>
-  );
-}
-
-function RelatedProducts({
-  cafeId,
-  currentProductId,
-}: {
-  cafeId: Id<'cafes'>;
-  currentProductId: Id<'products'>;
-}) {
-  const { data: products } = useSuspenseQuery(
-    convexQuery(api.products.getByCafe, { cafeId })
-  );
-
-  const relatedProducts = products
-    ?.filter((p) => p._id !== currentProductId && p.isActive)
-    ?.slice(0, 8);
-
-  if (!relatedProducts || relatedProducts.length === 0) {
-    return (
-      <div className="py-8 text-center">
-        <p className="text-base-content/60">관련 상품이 없습니다.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-      {relatedProducts.map((product) => (
-        <ProductCard key={product._id} product={product} />
-      ))}
     </div>
   );
 }
