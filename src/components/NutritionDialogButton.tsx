@@ -13,7 +13,7 @@ export const NutritionDialogButton = ({
   return (
     <>
       <button
-        className="btn btn-info"
+        className="btn btn-neutral btn-xs"
         onClick={() =>
           (
             document.getElementById('nutritions-modal') as HTMLDialogElement
@@ -21,7 +21,7 @@ export const NutritionDialogButton = ({
         }
         type="button"
       >
-        영앙정보 보기
+        자세한 영앙정보 보기
       </button>
       <dialog className="modal" id="nutritions-modal">
         <div className="modal-box w-auto p-0">
