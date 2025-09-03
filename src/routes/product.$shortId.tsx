@@ -113,23 +113,6 @@ function ProductPage() {
                   {product.nameEn}
                 </p>
               )}
-
-              {/* Category Badges */}
-              {(product.category || product.externalCategory) && (
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  {product.category && (
-                    <div className="badge badge-neutral badge-lg">
-                      {product.category}
-                    </div>
-                  )}
-                  {product.externalCategory && (
-                    <div className="badge badge-neutral badge-lg">
-                      {product.externalCategory}
-                    </div>
-                  )}
-                </div>
-              )}
-
               {/* Rating Display */}
               <RatingSummary className="mt-4" reviewStats={reviewStats} />
             </div>

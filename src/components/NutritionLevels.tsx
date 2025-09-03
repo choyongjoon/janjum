@@ -9,13 +9,13 @@ export interface NutritionLevelsProps {
 function levelTextToProgressValue(levelText: string): number {
   switch (levelText) {
     case '거의 없음':
-      return 10;
+      return 5;
     case '적음':
       return 35;
     case '보통':
       return 65;
     case '많음':
-      return 90;
+      return 95;
     default:
       return 0;
   }
@@ -54,7 +54,11 @@ export function NutritionLevels({ nutritions }: NutritionLevelsProps) {
 
   return (
     <div className="space-y-2">
-      {nutritionItems.map(({ key, label, level }) => {
+      {nutritionItems.flatMap(({ key, label, level }) => {
+        if (!level) {
+          return [];
+        }
+
         const progressValue = levelTextToProgressValue(level.text);
         const progressColorClass = `progress-${level.color}`;
 
@@ -64,7 +68,7 @@ export function NutritionLevels({ nutritions }: NutritionLevelsProps) {
               {label}
             </div>
             <progress
-              className={` progress progress-sm flex-1 ${progressColorClass}`}
+              className={`progress flex-1 ${progressColorClass}`}
               max="100"
               value={progressValue}
             />
