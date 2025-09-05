@@ -55,46 +55,90 @@ const CRAWLER_CONFIG = {
 
 // Regex patterns for performance
 const FILE_EXTENSION_REGEX = /\.[^.]*$/;
+const NUMERIC_REGEX = /^\d+$/;
+const UNIT_EXTRACTION_REGEX = /\(([^)]+)\)/;
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: refactor later
 async function extractNutritionData(page: Page): Promise<Nutritions | null> {
   try {
     // Look for the nutrition table on the detail page
-    const nutritionTable = page.locator('.table-list table tbody tr').first();
+    const nutritionTable = page.locator('.table-list table');
 
     if ((await nutritionTable.count()) === 0) {
       logger.warn('No nutrition table found on page');
       return null;
     }
 
-    // Extract nutrition values from table cells using batch evaluation for better performance
-    const nutritionValues = await page.evaluate(() => {
-      const table = document.querySelector('.table-list table tbody tr');
+    // Extract both headers and values using batch evaluation for better performance
+    const nutritionData = await page.evaluate(() => {
+      const table = document.querySelector('.table-list table');
       if (!table) {
-        return ['', '', '', '', '', '', ''];
+        return { tableHeaders: [], tableRows: [] };
       }
 
-      const cells = table.querySelectorAll('td');
-      return [
-        cells[2]?.textContent?.trim() || '', // Serving size (ml)
-        cells[3]?.textContent?.trim() || '', // Calories (kcal)
-        cells[4]?.textContent?.trim() || '', // Sugar (g)
-        cells[5]?.textContent?.trim() || '', // Protein (g)
-        cells[6]?.textContent?.trim() || '', // Saturated fat (g)
-        cells[7]?.textContent?.trim() || '', // Sodium (mg)
-        cells[8]?.textContent?.trim() || '', // Caffeine (mg)
-      ];
+      // Get headers from thead
+      const headerCells = table.querySelectorAll('thead tr th');
+      const tableHeaders = Array.from(headerCells).map(
+        (cell) => cell.textContent?.trim().replace(/\s+/g, ' ') || ''
+      );
+
+      // Get all rows from tbody
+      const bodyRows = table.querySelectorAll('tbody tr');
+      const tableRows = Array.from(bodyRows).map((row) => {
+        const cells = row.querySelectorAll('td');
+        return Array.from(cells).map((cell) => cell.textContent?.trim() || '');
+      });
+
+      return { tableHeaders, tableRows };
     });
 
-    const [
-      servingSizeText,
-      caloriesText,
-      sugarText,
-      proteinText,
-      saturatedFatText,
-      sodiumText,
-      caffeineText,
-    ] = nutritionValues;
+    const { tableHeaders: headers, tableRows: allRows } = nutritionData;
+
+    if (headers.length === 0 || allRows.length === 0) {
+      logger.warn('No nutrition data found in table');
+      return null;
+    }
+
+    logger.info(`Gongcha nutrition headers: ${headers.join(', ')}`);
+    logger.info(
+      `Gongcha nutrition all rows: ${allRows.map((row) => `[${row.join(', ')}]`).join(' | ')}`
+    );
+
+    // Find the row that contains actual numeric nutrition values (not size indicators like 'J', 'L')
+    let nutritionRow: string[] = [];
+    for (const row of allRows) {
+      // Skip rows where the second column (after category) is a size indicator
+      if (row.length >= 3 && !['J', 'L', 'XL'].includes(row[1])) {
+        // Check if this row has numeric values for nutrition data
+        const hasNumericValues = row
+          .slice(2)
+          .some((value) => NUMERIC_REGEX.test(value));
+        if (hasNumericValues) {
+          nutritionRow = row;
+          break;
+        }
+      }
+    }
+
+    // If no proper row found, use the first row with the most columns
+    if (nutritionRow.length === 0 && allRows.length > 0) {
+      nutritionRow = allRows.reduce((longest, current) =>
+        current.length > longest.length ? current : longest
+      );
+    }
+
+    if (nutritionRow.length === 0) {
+      logger.warn('No valid nutrition row found');
+      return null;
+    }
+
+    logger.info(`Using nutrition row: [${nutritionRow.join(', ')}]`);
+
+    // Create a mapping from headers to values using the selected row
+    const nutritionMap = new Map<string, string>();
+    for (let i = 0; i < Math.min(headers.length, nutritionRow.length); i++) {
+      nutritionMap.set(headers[i], nutritionRow[i]);
+    }
 
     // Parse nutrition values
     const parseValue = (text: string | null): number | null => {
@@ -105,21 +149,71 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
       return Number.isNaN(parsed) ? null : parsed;
     };
 
+    // Map headers to nutrition fields based on Korean text
+    // Handle both possible serving size units
+    let servingSizeText = '';
+    let servingSizeUnit = '';
+
+    // Try different variations of serving size headers (with/without spaces)
+    const servingSizeHeaders = [
+      '1회 제공량(g)',
+      '1회 제공량 (g)',
+      '1회 제공량(ml)',
+      '1회 제공량 (ml)',
+    ];
+
+    for (const header of servingSizeHeaders) {
+      if (nutritionMap.has(header)) {
+        servingSizeText = nutritionMap.get(header) || '';
+        // Extract unit from header
+        const unitMatch = header.match(UNIT_EXTRACTION_REGEX);
+        servingSizeUnit = unitMatch ? unitMatch[1] : 'g';
+        break;
+      }
+    }
+
+    // If still not found, try pattern matching
+    if (!servingSizeText) {
+      for (const [header, value] of nutritionMap) {
+        if (header.includes('1회 제공량')) {
+          servingSizeText = value;
+          // Extract unit from header like '1회 제공량(g)' or '1회 제공량(ml)'
+          const unitMatch = header.match(UNIT_EXTRACTION_REGEX);
+          servingSizeUnit = unitMatch ? unitMatch[1] : 'g';
+          break;
+        }
+      }
+    }
+
+    // Map other nutrition fields with various possible formats (with/without spaces)
+    const caloriesText =
+      nutritionMap.get('열량(kcal)') || nutritionMap.get('열량 (kcal)') || '';
+    const sodiumText =
+      nutritionMap.get('나트륨(mg)') || nutritionMap.get('나트륨 (mg)') || '';
+    const sugarText =
+      nutritionMap.get('당류(g)') || nutritionMap.get('당류 (g)') || '';
+    const saturatedFatText =
+      nutritionMap.get('포화지방(g)') || nutritionMap.get('포화지방 (g)') || '';
+    const proteinText =
+      nutritionMap.get('단백질(g)') || nutritionMap.get('단백질 (g)') || '';
+    const caffeineText =
+      nutritionMap.get('카페인(mg)') || nutritionMap.get('카페인 (mg)') || '';
+
     const servingSize = parseValue(servingSizeText);
     const calories = parseValue(caloriesText);
-    const sugar = parseValue(sugarText);
-    const protein = parseValue(proteinText);
-    const saturatedFat = parseValue(saturatedFatText);
     const sodium = parseValue(sodiumText);
+    const sugar = parseValue(sugarText);
+    const saturatedFat = parseValue(saturatedFatText);
+    const protein = parseValue(proteinText);
     const caffeine = parseValue(caffeineText);
 
     logger.info(
-      `Gongcha nutrition values: serving=${servingSizeText}, calories=${caloriesText}, sugar=${sugarText}, protein=${proteinText}, saturatedFat=${saturatedFatText}, sodium=${sodiumText}, caffeine=${caffeineText}`
+      `Gongcha parsed nutrition values: serving=${servingSize}${servingSizeUnit}, calories=${calories}kcal, sodium=${sodium}mg, sugar=${sugar}g, saturatedFat=${saturatedFat}g, protein=${protein}g, caffeine=${caffeine}mg`
     );
 
     const nutritions: Nutritions = {
       servingSize: servingSize ?? undefined,
-      servingSizeUnit: servingSize !== null ? 'ml' : undefined,
+      servingSizeUnit: servingSize !== null ? servingSizeUnit : undefined,
       calories: calories ?? undefined,
       caloriesUnit: calories !== null ? 'kcal' : undefined,
       carbohydrates: undefined, // Gongcha doesn't provide carbohydrates data
@@ -299,6 +393,12 @@ async function extractProductFromContainer(
     // Store current page URL to navigate back
     const currentUrl = page.url();
 
+    // Get the product detail URL before navigation
+    const productHref = await productLink.getAttribute('href').catch(() => '');
+    const productDetailUrl = productHref
+      ? new URL(productHref, SITE_CONFIG.baseUrl).href
+      : currentUrl;
+
     const { description, nutritions } =
       await extractDescriptionAndNutritionFromDetailPage(
         page,
@@ -321,7 +421,7 @@ async function extractProductFromContainer(
       externalImageUrl: imageSrc
         ? new URL(imageSrc, SITE_CONFIG.baseUrl).href
         : '',
-      externalUrl: currentUrl,
+      externalUrl: productDetailUrl,
       price: null,
       category: categoryName,
       nutritions,
