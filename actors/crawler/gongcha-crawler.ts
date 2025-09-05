@@ -56,6 +56,7 @@ const CRAWLER_CONFIG = {
 // Regex patterns for performance
 const FILE_EXTENSION_REGEX = /\.[^.]*$/;
 const NUMERIC_REGEX = /^\d+$/;
+const DECIMAL_NUMERIC_REGEX = /^\d*\.?\d+$/;
 const UNIT_EXTRACTION_REGEX = /\(([^)]+)\)/;
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: refactor later
@@ -104,40 +105,82 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
       `Gongcha nutrition all rows: ${allRows.map((row) => `[${row.join(', ')}]`).join(' | ')}`
     );
 
-    // Find the row that contains actual numeric nutrition values (not size indicators like 'J', 'L')
-    let nutritionRow: string[] = [];
+    // Convert table to object format by finding the best row with most complete nutrition data
+    let bestNutritionData: { [key: string]: string | number } = {};
+    let bestScore = 0;
+
     for (const row of allRows) {
-      // Skip rows where the second column (after category) is a size indicator
-      if (row.length >= 3 && !['J', 'L', 'XL'].includes(row[1])) {
-        // Check if this row has numeric values for nutrition data
-        const hasNumericValues = row
-          .slice(2)
-          .some((value) => NUMERIC_REGEX.test(value));
-        if (hasNumericValues) {
-          nutritionRow = row;
+      if (row.length === 0) {
+        continue;
+      }
+
+      // Create object from this row
+      const rowData: { [key: string]: string | number } = {};
+
+      // Handle the first column(s) which might be category info like "Cold L" or "Hot J"
+      let categoryInfo = '';
+      let dataStartIndex = 0;
+
+      // Find where the actual numeric nutrition data starts
+      for (let i = 0; i < row.length; i++) {
+        if (DECIMAL_NUMERIC_REGEX.test(row[i])) {
+          dataStartIndex = i;
           break;
         }
+        categoryInfo += (categoryInfo ? ' ' : '') + row[i];
       }
+
+      // Add category info
+      if (categoryInfo && headers.length > 0) {
+        rowData[headers[0]] = categoryInfo;
+      }
+
+      // Map the remaining headers to data values
+      let headerIndex = 1; // Start from second header since first is category
+      for (
+        let i = dataStartIndex;
+        i < row.length && headerIndex < headers.length;
+        i++, headerIndex++
+      ) {
+        const header = headers[headerIndex];
+        const value = row[i];
+
+        // Try to parse as number if it looks numeric
+        if (DECIMAL_NUMERIC_REGEX.test(value)) {
+          rowData[header] = Number.parseFloat(value);
+        } else {
+          rowData[header] = value;
+        }
+      }
+
+      // Score this row based on how many numeric nutrition values it has
+      let score = 0;
+      for (const [_key, value] of Object.entries(rowData)) {
+        if (typeof value === 'number' && value > 0) {
+          score++;
+        }
+      }
+
+      // Prefer rows with more complete nutrition data
+      if (score > bestScore) {
+        bestScore = score;
+        bestNutritionData = rowData;
+      }
+
+      logger.info(`Row data: ${JSON.stringify(rowData)}, Score: ${score}`);
     }
 
-    // If no proper row found, use the first row with the most columns
-    if (nutritionRow.length === 0 && allRows.length > 0) {
-      nutritionRow = allRows.reduce((longest, current) =>
-        current.length > longest.length ? current : longest
-      );
-    }
-
-    if (nutritionRow.length === 0) {
-      logger.warn('No valid nutrition row found');
+    if (Object.keys(bestNutritionData).length === 0) {
+      logger.warn('No valid nutrition data found in any row');
       return null;
     }
 
-    logger.info(`Using nutrition row: [${nutritionRow.join(', ')}]`);
+    logger.info(`Best nutrition data: ${JSON.stringify(bestNutritionData)}`);
 
-    // Create a mapping from headers to values using the selected row
+    // Create a mapping from headers to values using the best row
     const nutritionMap = new Map<string, string>();
-    for (let i = 0; i < Math.min(headers.length, nutritionRow.length); i++) {
-      nutritionMap.set(headers[i], nutritionRow[i]);
+    for (const [key, value] of Object.entries(bestNutritionData)) {
+      nutritionMap.set(key, String(value));
     }
 
     // Parse nutrition values
@@ -185,6 +228,52 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
       }
     }
 
+    // The table structure issue: when serving size column shows size indicators (L, J),
+    // we need to skip that and find actual numeric serving size data
+    // Let's try a different approach - look for a row that has numeric serving size
+
+    // If serving size is not numeric (like 'L', 'J'), try to find actual serving size from other rows
+    if (!(servingSizeText && NUMERIC_REGEX.test(servingSizeText))) {
+      logger.info(
+        `Serving size '${servingSizeText}' is not numeric, looking for alternative rows...`
+      );
+
+      // Look for alternative rows that might have numeric serving sizes
+      for (const row of allRows) {
+        if (row.length >= headers.length) {
+          const rowMap = new Map<string, string>();
+          for (let i = 0; i < Math.min(headers.length, row.length); i++) {
+            rowMap.set(headers[i], row[i]);
+          }
+
+          // Check if this row has a numeric serving size
+          for (const header of servingSizeHeaders) {
+            const value = rowMap.get(header);
+            if (value && NUMERIC_REGEX.test(value)) {
+              servingSizeText = value;
+              const unitMatch = header.match(UNIT_EXTRACTION_REGEX);
+              servingSizeUnit = unitMatch ? unitMatch[1] : 'ml';
+
+              // Update nutritionMap to this row's values
+              nutritionMap.clear();
+              for (let i = 0; i < Math.min(headers.length, row.length); i++) {
+                nutritionMap.set(headers[i], row[i]);
+              }
+
+              logger.info(
+                `Found numeric serving size in alternative row: ${servingSizeText}${servingSizeUnit}`
+              );
+              break;
+            }
+          }
+
+          if (servingSizeText && NUMERIC_REGEX.test(servingSizeText)) {
+            break;
+          }
+        }
+      }
+    }
+
     // Map other nutrition fields with various possible formats (with/without spaces)
     const caloriesText =
       nutritionMap.get('열량(kcal)') || nutritionMap.get('열량 (kcal)') || '';
@@ -208,7 +297,7 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
     const caffeine = parseValue(caffeineText);
 
     logger.info(
-      `Gongcha parsed nutrition values: serving=${servingSize}${servingSizeUnit}, calories=${calories}kcal, sodium=${sodium}mg, sugar=${sugar}g, saturatedFat=${saturatedFat}g, protein=${protein}g, caffeine=${caffeine}mg`
+      `Gongcha final nutrition values: serving=${servingSize}${servingSizeUnit}, calories=${calories}kcal, sodium=${sodium}mg, sugar=${sugar}g, saturatedFat=${saturatedFat}g, protein=${protein}g, caffeine=${caffeine}mg`
     );
 
     const nutritions: Nutritions = {
