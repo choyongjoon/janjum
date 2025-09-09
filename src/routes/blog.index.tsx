@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { getBlogPosts } from '~/utils/blogData';
+import { formatDateKorean } from '~/utils/dateFormat';
 import { seo } from '~/utils/seo';
 
 export const Route = createFileRoute('/blog/')({
@@ -45,9 +46,7 @@ function BlogIndex() {
 
                 <div className="flex items-center justify-between text-base-content/60 text-sm">
                   <div className="flex items-center gap-4">
-                    <span>
-                      {new Date(post.publishedAt).toLocaleDateString('ko-KR')}
-                    </span>
+                    <span>{formatDateKorean(post.publishedAt)}</span>
                   </div>
                 </div>
               </div>
