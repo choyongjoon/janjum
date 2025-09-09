@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { marked } from 'marked';
 import { getBlogPost } from '~/utils/blogData';
+import { formatDateKorean } from '~/utils/dateFormat';
 import { seo } from '~/utils/seo';
 
 // Configure marked options with post-processing
@@ -87,9 +88,7 @@ function BlogPost() {
 
             <div className="mb-6 flex items-center gap-6 text-base-content/70">
               <div className="flex items-center gap-2">조용준</div>
-              <span>
-                {new Date(post.publishedAt).toLocaleDateString('ko-KR')}
-              </span>
+              <span>{formatDateKorean(post.publishedAt)}</span>
             </div>
 
             <div className="h-px w-full bg-base-300" />
