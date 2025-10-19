@@ -478,7 +478,8 @@ export const getAllWithImages = query({
       .filter((q) => q.neq(q.field('imageStorageIds'), undefined))
       .collect();
 
-    return reviews;
+    // Sort by _creationTime (latest first) to prioritize recent uploads
+    return reviews.sort((a, b) => b._creationTime - a._creationTime);
   },
 });
 

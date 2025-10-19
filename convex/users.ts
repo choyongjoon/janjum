@@ -234,7 +234,8 @@ export const getAllWithImages = query({
       .filter((q) => q.neq(q.field('imageStorageId'), undefined))
       .collect();
 
-    return users;
+    // Sort by _creationTime (latest first) to prioritize recent uploads
+    return users.sort((a, b) => b._creationTime - a._creationTime);
   },
 });
 

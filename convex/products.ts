@@ -474,7 +474,8 @@ export const getAllWithImages = query({
       .filter((q) => q.neq(q.field('imageStorageId'), undefined))
       .collect();
 
-    return products;
+    // Sort by updatedAt (latest first) to prioritize recent uploads
+    return products.sort((a, b) => b.updatedAt - a.updatedAt);
   },
 });
 

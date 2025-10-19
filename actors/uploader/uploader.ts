@@ -5,7 +5,6 @@ import { ConvexClient } from 'convex/browser';
 import dotenv from 'dotenv';
 import sharp from 'sharp';
 import { api } from '../../convex/_generated/api';
-import type { Id } from '../../convex/_generated/dataModel';
 import { logger } from '../../shared/logger';
 
 // Load environment variables from .env.local
@@ -72,10 +71,9 @@ class ProductUploader {
 
     // Images are always downloaded and optimized
     const downloadImages = true;
-    const optimizeImages = true;
 
     const filePath = this.resolveFilePath(file);
-    const products = this.readAndValidateFile(filePath, verbose);
+    const products = this.readAndValidateFile(filePath);
 
     if (verbose) {
       this.logUploadInfo(filePath, cafeSlug, dryRun);
@@ -88,8 +86,7 @@ class ProductUploader {
         products,
         cafeSlug,
         dryRun,
-        downloadImages,
-        optimizeImages
+        downloadImages
       );
       this.handleUploadResult(result, verbose, dryRun);
       return result;
@@ -112,10 +109,7 @@ class ProductUploader {
     return filePath;
   }
 
-  private readAndValidateFile(
-    filePath: string,
-    _verbose: boolean
-  ): ProductData[] {
+  private readAndValidateFile(filePath: string): ProductData[] {
     const fileContent = fs.readFileSync(filePath, 'utf-8');
     let products: ProductData[];
 
@@ -146,109 +140,78 @@ class ProductUploader {
     products: ProductData[],
     cafeSlug: string,
     dryRun: boolean,
-    downloadImages: boolean,
-    _optimizeImages: boolean
+    downloadImages: boolean
   ): Promise<UploadResult> {
     const uploadSecret = process.env.CONVEX_UPLOAD_SECRET;
     if (!uploadSecret) {
       throw new Error('CONVEX_UPLOAD_SECRET environment variable is required');
     }
 
-    // Send products to server without preprocessing images
-    // The server will handle image optimization on-demand for new products only
+    // Pre-process images if downloadImages is enabled
+    // Download, optimize to WebP, and upload to storage before sending product data
+    const processedProducts = downloadImages
+      ? await this.preprocessImages(products)
+      : products;
+
+    // Send products to server with pre-processed images (already in WebP format)
+    // downloadImages=false tells server not to download again since we already did it
     return await this.client.mutation(api.dataUploader.uploadProductsFromJson, {
-      products,
+      products: processedProducts,
       cafeSlug,
       dryRun,
-      downloadImages,
+      downloadImages: false, // Images already processed and uploaded
       uploadSecret,
     });
   }
 
   /**
-   * Optimize a single image on-demand (only when needed)
-   * This method is now called by the server-side logic when uploading new products
+   * Pre-process images for all products
+   * Downloads, converts to WebP, and uploads to storage
    */
-  async optimizeImageIfNeeded(
-    imageUrl: string,
-    productName: string
-  ): Promise<{
-    originalSize: number;
-    optimizedSize: number;
-    storageId: string;
-    wasOptimized: boolean;
-  } | null> {
-    return await this.downloadAndOptimizeImage(imageUrl, productName);
-  }
+  private async preprocessImages(
+    products: ProductData[]
+  ): Promise<ProductData[]> {
+    logger.info(`Pre-processing images for ${products.length} products...`);
 
-  /**
-   * Check if a product already has a valid image in storage
-   * Returns the existing storage ID if image exists and doesn't need optimization
-   */
-  async checkExistingImage(
-    cafeSlug: string,
-    externalId: string
-  ): Promise<string | null> {
-    try {
-      // Query the product to check if it has an existing imageStorageId
-      const existingProduct = await this.client.query(
-        api.products.getByExternalId,
-        {
-          cafeSlug,
-          externalId,
+    const processedProducts = await Promise.all(
+      products.map(async (product) => {
+        if (!product.externalImageUrl) {
+          return product;
         }
-      );
 
-      if (existingProduct?.imageStorageId) {
-        // Check if the stored image is already optimized (WebP)
-        const needsOptimization = await this.checkIfStorageNeedsOptimization(
-          existingProduct.imageStorageId
-        );
-
-        if (!needsOptimization) {
-          logger.info(
-            `Product ${existingProduct.name} already has optimized image, skipping`
+        try {
+          const result = await this.downloadAndOptimizeImage(
+            product.externalImageUrl,
+            product.name
           );
-          return existingProduct.imageStorageId;
+
+          if (result) {
+            logger.info(
+              `✓ Processed image for ${product.name}: ${result.storageId}`
+            );
+            return {
+              ...product,
+              imageStorageId: result.storageId,
+            };
+          }
+
+          logger.warn(`✗ Failed to process image for ${product.name}`);
+          return product;
+        } catch (error) {
+          logger.error(`Error processing image for ${product.name}:`, error);
+          return product;
         }
-      }
-    } catch (error) {
-      logger.warn(`Could not check existing image for ${externalId}: ${error}`);
-    }
-    return null;
-  }
+      })
+    );
 
-  // Removed updateStats method as we no longer batch process images upfront
+    const successCount = processedProducts.filter(
+      (p) => p.imageStorageId
+    ).length;
+    logger.info(
+      `Completed image pre-processing: ${successCount}/${products.length} images optimized`
+    );
 
-  /**
-   * Check if stored image needs optimization by checking its metadata
-   */
-  private async checkIfStorageNeedsOptimization(
-    storageId: string
-  ): Promise<boolean> {
-    try {
-      const metadata = await this.client.query(api.http.getStorageMetadata, {
-        storageId: storageId as Id<'_storage'>,
-      });
-
-      if (!metadata) {
-        logger.warn(`No metadata found for storage ID: ${storageId}`);
-        return true; // Re-download if we can't get metadata
-      }
-
-      // Check if the stored file is already WebP
-      const contentType = metadata.contentType;
-      const isWebP = contentType === 'image/webp';
-
-      logger.debug(
-        `Storage ${storageId} metadata: ${contentType}, isWebP: ${isWebP}`
-      );
-
-      return !isWebP; // Return true if needs optimization (not WebP)
-    } catch (error) {
-      logger.error(`Error checking storage metadata for ${storageId}:`, error);
-      return true; // Re-download on error
-    }
+    return processedProducts;
   }
 
   /**
@@ -362,10 +325,6 @@ class ProductUploader {
       }
     }
   }
-
-  /**
-   * Log individual image optimization result
-   */
 
   private handleUploadResult(
     result: UploadResult,
