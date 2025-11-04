@@ -400,6 +400,42 @@ export const getByExternalId = query({
   },
 });
 
+export const getByExternalIds = query({
+  args: {
+    cafeSlug: v.string(),
+    externalIds: v.array(v.string()),
+  },
+  handler: async (ctx, { cafeSlug, externalIds }) => {
+    // First find the cafe by slug
+    const cafe = await ctx.db
+      .query('cafes')
+      .withIndex('by_slug', (q) => q.eq('slug', cafeSlug))
+      .first();
+
+    if (!cafe) {
+      return [];
+    }
+
+    // Query products by cafeId and filter by externalIds
+    const products = await ctx.db
+      .query('products')
+      .withIndex('by_cafe', (q) => q.eq('cafeId', cafe._id))
+      .filter((q) =>
+        q.or(
+          ...externalIds.map((externalId) =>
+            q.eq(q.field('externalId'), externalId)
+          )
+        )
+      )
+      .collect();
+
+    return products.map((product) => ({
+      externalId: product.externalId,
+      imageStorageId: product.imageStorageId,
+    }));
+  },
+});
+
 export const getByShortId = query({
   args: { shortId: v.string() },
   handler: async (ctx, { shortId }) => {
