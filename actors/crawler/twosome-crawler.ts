@@ -75,9 +75,9 @@ const maxRequestsInTestMode = isTestMode
 
 const CRAWLER_CONFIG = {
   maxConcurrency: 1, // Reduce concurrency to avoid timeouts
-  maxRequestsPerCrawl: isTestMode ? maxRequestsInTestMode : 50,
+  maxRequestsPerCrawl: isTestMode ? maxRequestsInTestMode : 200, // Increased to handle all products with nutrition data
   maxRequestRetries: 2, // Reduce retries
-  requestHandlerTimeoutSecs: isTestMode ? 60 : 180, // Reduce timeout
+  requestHandlerTimeoutSecs: isTestMode ? 60 : 600, // 10 minutes to handle all categories with nutrition data
   navigationTimeoutSecs: 30, // Reduce navigation timeout
   launchOptions: {
     headless: true,
