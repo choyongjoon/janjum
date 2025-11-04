@@ -150,7 +150,7 @@ class ProductUploader {
     // Pre-process images if downloadImages is enabled
     // Download, optimize to WebP, and upload to storage before sending product data
     const processedProducts = downloadImages
-      ? await this.preprocessImages(products)
+      ? await this.preprocessImages(products, cafeSlug)
       : products;
 
     // Send products to server with pre-processed images (already in WebP format)
@@ -165,18 +165,69 @@ class ProductUploader {
   }
 
   /**
+   * Get existing products from database with their image storage IDs
+   */
+  private async getExistingProductsWithImages(
+    cafeSlug: string,
+    externalIds: string[]
+  ): Promise<Map<string, { imageStorageId?: string }>> {
+    try {
+      const existingProducts = await this.client.query(
+        api.products.getByExternalIds,
+        {
+          cafeSlug,
+          externalIds,
+        }
+      );
+
+      const productMap = new Map<string, { imageStorageId?: string }>();
+      for (const product of existingProducts) {
+        productMap.set(product.externalId, {
+          imageStorageId: product.imageStorageId,
+        });
+      }
+
+      return productMap;
+    } catch (error) {
+      logger.warn('Failed to fetch existing products from database:', error);
+      // Return empty map to continue with normal processing
+      return new Map();
+    }
+  }
+
+  /**
    * Pre-process images for all products
    * Downloads, converts to WebP, and uploads to storage
+   * Skips products that already have images in the database
    */
   private async preprocessImages(
-    products: ProductData[]
+    products: ProductData[],
+    cafeSlug: string
   ): Promise<ProductData[]> {
     logger.info(`Pre-processing images for ${products.length} products...`);
+
+    // Get existing products from database to check for images
+    const existingProductsMap = await this.getExistingProductsWithImages(
+      cafeSlug,
+      products.map((p) => p.externalId)
+    );
 
     const processedProducts = await Promise.all(
       products.map(async (product) => {
         if (!product.externalImageUrl) {
           return product;
+        }
+
+        // Check if product already has an image in database
+        const existingProduct = existingProductsMap.get(product.externalId);
+        if (existingProduct?.imageStorageId) {
+          logger.info(
+            `⏭️  Skipping image for ${product.name} (already has image: ${existingProduct.imageStorageId})`
+          );
+          return {
+            ...product,
+            imageStorageId: existingProduct.imageStorageId,
+          };
         }
 
         try {
@@ -207,8 +258,11 @@ class ProductUploader {
     const successCount = processedProducts.filter(
       (p) => p.imageStorageId
     ).length;
+    const skippedCount = products.filter(
+      (p) => existingProductsMap.get(p.externalId)?.imageStorageId
+    ).length;
     logger.info(
-      `Completed image pre-processing: ${successCount}/${products.length} images optimized`
+      `Completed image pre-processing: ${successCount}/${products.length} images (${skippedCount} skipped, ${successCount - skippedCount} newly processed)`
     );
 
     return processedProducts;
