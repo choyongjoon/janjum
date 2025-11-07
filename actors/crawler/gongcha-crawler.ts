@@ -32,9 +32,9 @@ const maxRequestsInTestMode = isTestMode
 
 const CRAWLER_CONFIG = {
   maxConcurrency: isTestMode ? 1 : 3, // Increase concurrency for production
-  maxRequestsPerCrawl: isTestMode ? maxRequestsInTestMode : 150,
+  maxRequestsPerCrawl: isTestMode ? maxRequestsInTestMode : 200,
   maxRequestRetries: 1,
-  requestHandlerTimeoutSecs: isTestMode ? 60 : 90, // Reduced timeout
+  requestHandlerTimeoutSecs: isTestMode ? 60 : 300,
   launchOptions: {
     headless: true,
     args: [
