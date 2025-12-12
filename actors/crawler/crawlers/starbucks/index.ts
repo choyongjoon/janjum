@@ -89,6 +89,13 @@ class StarbucksCrawler extends ListDetailCrawler {
       const urlParams = new URLSearchParams(new URL(page.url()).search);
       const externalId = urlParams.get('product_cd') || productId;
 
+      // Get category from page (same selector as v1)
+      const categoryText = await page
+        .locator('.cate')
+        .textContent()
+        .catch(() => '');
+      const externalCategory = categoryText?.trim() || 'Drinks';
+
       const product: Product = {
         name: productData.name,
         nameEn: productData.nameEn,
@@ -96,8 +103,8 @@ class StarbucksCrawler extends ListDetailCrawler {
         price: null,
         externalImageUrl: productData.imageUrl,
         category: 'Drinks',
-        externalCategory: 'Drinks',
-        externalId: `starbucks_${externalId}`,
+        externalCategory,
+        externalId,
         externalUrl: page.url(),
         nutritions,
       };

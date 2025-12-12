@@ -1,7 +1,6 @@
 import type { Locator, Page } from 'playwright';
 import type { Nutritions } from '../../../../shared/nutritions';
 import { defineCrawler, type ExtractorContext } from '../../core';
-import { parseNumericValue } from '../../extractors';
 
 // ================================================
 // SITE CONFIGURATION
@@ -42,6 +41,74 @@ const SERVING_SIZE_ML_REGEX = /(\d+(?:\.\d+)?)ml/;
 const NUTRITION_VALUE_REGEX = /\(([0-9.]+)(?:kcal|g|mg)\)/;
 
 // ================================================
+// NUTRITION EXTRACTION HELPERS
+// ================================================
+
+function parseServingSize(sizeText: string | null): {
+  servingSize?: number;
+  servingSizeUnit?: string;
+} {
+  if (!sizeText) {
+    return {};
+  }
+  const sizeMatch = sizeText.match(SERVING_SIZE_ML_REGEX);
+  if (!sizeMatch) {
+    return {};
+  }
+  return {
+    servingSize: Number.parseFloat(sizeMatch[1]),
+    servingSizeUnit: 'ml',
+  };
+}
+
+function mapNutritionLabel(
+  label: string,
+  numValue: number
+): Partial<Nutritions> {
+  const labelMap: Record<string, () => Partial<Nutritions>> = {
+    칼로리: () => ({ calories: numValue, caloriesUnit: 'kcal' }),
+    당류: () => ({ sugar: numValue, sugarUnit: 'g' }),
+    단백질: () => ({ protein: numValue, proteinUnit: 'g' }),
+    포화지방: () => ({ saturatedFat: numValue, saturatedFatUnit: 'g' }),
+    나트륨: () => ({ natrium: numValue, natriumUnit: 'mg' }),
+    카페인: () => ({ caffeine: numValue, caffeineUnit: 'mg' }),
+  };
+
+  for (const [key, getValue] of Object.entries(labelMap)) {
+    if (label.includes(key)) {
+      return getValue();
+    }
+  }
+  return {};
+}
+
+async function extractNutritionItem(
+  item: Locator
+): Promise<Partial<Nutritions>> {
+  const dtElement = item.locator('dt');
+  const ddElement = item.locator('dd');
+
+  if ((await dtElement.count()) === 0 || (await ddElement.count()) === 0) {
+    return {};
+  }
+
+  const label = (await dtElement.textContent())?.trim().toLowerCase() || '';
+  const valueText = (await ddElement.textContent())?.trim() || '';
+
+  const valueMatch = valueText.match(NUTRITION_VALUE_REGEX);
+  if (!valueMatch) {
+    return {};
+  }
+
+  const numValue = Number.parseFloat(valueMatch[1]);
+  if (Number.isNaN(numValue)) {
+    return {};
+  }
+
+  return mapNutritionLabel(label, numValue);
+}
+
+// ================================================
 // NUTRITION EXTRACTION
 // ================================================
 
@@ -58,17 +125,11 @@ export async function extractEdiyaNutrition(
 
     const nutrition: Nutritions = {};
 
-    // Extract serving size from .pro_size element
+    // Extract serving size
     const sizeElement = nutritionElement.locator('.pro_size');
     if ((await sizeElement.count()) > 0) {
       const sizeText = await sizeElement.textContent();
-      if (sizeText) {
-        const sizeMatch = sizeText.match(SERVING_SIZE_ML_REGEX);
-        if (sizeMatch) {
-          nutrition.servingSize = Number.parseFloat(sizeMatch[1]);
-          nutrition.servingSizeUnit = 'ml';
-        }
-      }
+      Object.assign(nutrition, parseServingSize(sizeText));
     }
 
     // Extract nutrition data from .pro_nutri dl elements
@@ -77,46 +138,8 @@ export async function extractEdiyaNutrition(
       .all();
 
     for (const item of nutritionItems) {
-      const dtElement = item.locator('dt');
-      const ddElement = item.locator('dd');
-
-      if ((await dtElement.count()) === 0 || (await ddElement.count()) === 0) {
-        continue;
-      }
-
-      const label = (await dtElement.textContent())?.trim().toLowerCase() || '';
-      const valueText = (await ddElement.textContent())?.trim() || '';
-
-      // Extract numeric value from parentheses
-      const valueMatch = valueText.match(NUTRITION_VALUE_REGEX);
-      if (!valueMatch) {
-        continue;
-      }
-
-      const numValue = Number.parseFloat(valueMatch[1]);
-      if (Number.isNaN(numValue)) {
-        continue;
-      }
-
-      if (label.includes('칼로리')) {
-        nutrition.calories = numValue;
-        nutrition.caloriesUnit = 'kcal';
-      } else if (label.includes('당류')) {
-        nutrition.sugar = numValue;
-        nutrition.sugarUnit = 'g';
-      } else if (label.includes('단백질')) {
-        nutrition.protein = numValue;
-        nutrition.proteinUnit = 'g';
-      } else if (label.includes('포화지방')) {
-        nutrition.saturatedFat = numValue;
-        nutrition.saturatedFatUnit = 'g';
-      } else if (label.includes('나트륨')) {
-        nutrition.natrium = numValue;
-        nutrition.natriumUnit = 'mg';
-      } else if (label.includes('카페인')) {
-        nutrition.caffeine = numValue;
-        nutrition.caffeineUnit = 'mg';
-      }
+      const itemNutrition = await extractNutritionItem(item);
+      Object.assign(nutrition, itemNutrition);
     }
 
     return Object.keys(nutrition).length > 0 ? nutrition : null;
@@ -131,7 +154,7 @@ export async function extractEdiyaNutrition(
 
 export async function extractEdiyaCategories(
   page: Page,
-  context: ExtractorContext
+  _context: ExtractorContext
 ): Promise<Array<{ name: string; url: string }>> {
   const categories: Array<{ name: string; url: string }> = [];
 

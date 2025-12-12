@@ -56,6 +56,181 @@ const DECIMAL_NUMERIC_REGEX = /^\d*\.?\d+$/;
 const UNIT_EXTRACTION_REGEX = /\(([^)]+)\)/;
 
 // ================================================
+// NUTRITION EXTRACTION HELPERS
+// ================================================
+
+interface NutritionTableData {
+  tableHeaders: string[];
+  tableRows: string[][];
+}
+
+function parseNutritionValue(text: string | null): number | null {
+  if (!text || text.trim() === '' || text.trim() === '-') {
+    return null;
+  }
+  const parsed = Number.parseFloat(text.trim());
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function findDataStartIndex(row: string[]): number {
+  for (let i = 0; i < row.length; i++) {
+    if (DECIMAL_NUMERIC_REGEX.test(row[i])) {
+      return i;
+    }
+  }
+  return 0;
+}
+
+function createRowMapping(
+  row: string[],
+  headers: string[]
+): Map<string, string> {
+  const dataStartIndex = findDataStartIndex(row);
+  const rowMap = new Map<string, string>();
+  let headerIndex = 1;
+
+  for (
+    let i = dataStartIndex;
+    i < row.length && headerIndex < headers.length;
+    i++, headerIndex++
+  ) {
+    rowMap.set(headers[headerIndex], row[i]);
+  }
+  return rowMap;
+}
+
+function scoreRowMap(rowMap: Map<string, string>): number {
+  let score = 0;
+  for (const value of rowMap.values()) {
+    if (DECIMAL_NUMERIC_REGEX.test(value)) {
+      score++;
+    }
+  }
+  return score;
+}
+
+function findBestNutritionRow(
+  allRows: string[][],
+  headers: string[]
+): Map<string, string> {
+  let bestMap = new Map<string, string>();
+  let bestScore = 0;
+
+  for (const row of allRows) {
+    if (row.length === 0) {
+      continue;
+    }
+    const rowMap = createRowMapping(row, headers);
+    const score = scoreRowMap(rowMap);
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestMap = rowMap;
+    }
+  }
+  return bestMap;
+}
+
+function extractServingSize(nutritionMap: Map<string, string>): {
+  text: string;
+  unit: string;
+} {
+  const headers = [
+    '1회 제공량(g)',
+    '1회 제공량 (g)',
+    '1회 제공량(ml)',
+    '1회 제공량 (ml)',
+  ];
+
+  for (const header of headers) {
+    if (nutritionMap.has(header)) {
+      const unitMatch = header.match(UNIT_EXTRACTION_REGEX);
+      return {
+        text: nutritionMap.get(header) || '',
+        unit: unitMatch ? unitMatch[1] : 'g',
+      };
+    }
+  }
+  return { text: '', unit: 'g' };
+}
+
+function getMapValue(map: Map<string, string>, ...keys: string[]): string {
+  for (const key of keys) {
+    const val = map.get(key);
+    if (val) {
+      return val;
+    }
+  }
+  return '';
+}
+
+function buildNutritions(nutritionMap: Map<string, string>): Nutritions {
+  const { text: servingSizeText, unit: servingSizeUnit } =
+    extractServingSize(nutritionMap);
+
+  const servingSize = parseNutritionValue(servingSizeText);
+  const calories = parseNutritionValue(
+    getMapValue(nutritionMap, '열량(kcal)', '열량 (kcal)')
+  );
+  const sodium = parseNutritionValue(
+    getMapValue(nutritionMap, '나트륨(mg)', '나트륨 (mg)')
+  );
+  const sugar = parseNutritionValue(
+    getMapValue(nutritionMap, '당류(g)', '당류 (g)')
+  );
+  const saturatedFat = parseNutritionValue(
+    getMapValue(nutritionMap, '포화지방(g)', '포화지방 (g)')
+  );
+  const protein = parseNutritionValue(
+    getMapValue(nutritionMap, '단백질(g)', '단백질 (g)')
+  );
+  const caffeine = parseNutritionValue(
+    getMapValue(nutritionMap, '카페인(mg)', '카페인 (mg)')
+  );
+
+  return {
+    servingSize: servingSize ?? undefined,
+    servingSizeUnit: servingSize !== null ? servingSizeUnit : undefined,
+    calories: calories ?? undefined,
+    caloriesUnit: calories !== null ? 'kcal' : undefined,
+    sugar: sugar ?? undefined,
+    sugarUnit: sugar !== null ? 'g' : undefined,
+    protein: protein ?? undefined,
+    proteinUnit: protein !== null ? 'g' : undefined,
+    saturatedFat: saturatedFat ?? undefined,
+    saturatedFatUnit: saturatedFat !== null ? 'g' : undefined,
+    natrium: sodium ?? undefined,
+    natriumUnit: sodium !== null ? 'mg' : undefined,
+    caffeine: caffeine ?? undefined,
+    caffeineUnit: caffeine !== null ? 'mg' : undefined,
+  };
+}
+
+async function fetchNutritionTableData(
+  page: Page
+): Promise<NutritionTableData> {
+  return await page.evaluate(() => {
+    const table = document.querySelector('.table-list table');
+    if (!table) {
+      return { tableHeaders: [], tableRows: [] };
+    }
+
+    const headerCells = table.querySelectorAll('thead tr th');
+    const tableHeaders = Array.from(headerCells).map(
+      (cell) => cell.textContent?.trim().replace(/\s+/g, ' ') || ''
+    );
+
+    const bodyRows = table.querySelectorAll('tbody tr');
+    const tableRows = Array.from(bodyRows).map((row) => {
+      const cells = row.querySelectorAll('td');
+      return Array.from(cells).map((cell) => cell.textContent?.trim() || '');
+    });
+
+    return { tableHeaders, tableRows };
+  });
+}
+
+// ================================================
 // NUTRITION EXTRACTION
 // ================================================
 
@@ -71,143 +246,20 @@ export async function extractGongchaNutrition(
       return null;
     }
 
-    // Extract both headers and values using batch evaluation
-    const nutritionData = await page.evaluate(() => {
-      const table = document.querySelector('.table-list table');
-      if (!table) {
-        return { tableHeaders: [], tableRows: [] };
-      }
-
-      const headerCells = table.querySelectorAll('thead tr th');
-      const tableHeaders = Array.from(headerCells).map(
-        (cell) => cell.textContent?.trim().replace(/\s+/g, ' ') || ''
-      );
-
-      const bodyRows = table.querySelectorAll('tbody tr');
-      const tableRows = Array.from(bodyRows).map((row) => {
-        const cells = row.querySelectorAll('td');
-        return Array.from(cells).map((cell) => cell.textContent?.trim() || '');
-      });
-
-      return { tableHeaders, tableRows };
-    });
-
-    const { tableHeaders: headers, tableRows: allRows } = nutritionData;
+    const { tableHeaders: headers, tableRows: allRows } =
+      await fetchNutritionTableData(page);
 
     if (headers.length === 0 || allRows.length === 0) {
       return null;
     }
 
-    // Find best row with most complete nutrition data
-    let bestNutritionMap = new Map<string, string>();
-    let bestScore = 0;
-
-    for (const row of allRows) {
-      if (row.length === 0) {
-        continue;
-      }
-
-      // Find where numeric data starts
-      let dataStartIndex = 0;
-      for (let i = 0; i < row.length; i++) {
-        if (DECIMAL_NUMERIC_REGEX.test(row[i])) {
-          dataStartIndex = i;
-          break;
-        }
-      }
-
-      // Create mapping from headers to values
-      const rowMap = new Map<string, string>();
-      let headerIndex = 1;
-      for (
-        let i = dataStartIndex;
-        i < row.length && headerIndex < headers.length;
-        i++, headerIndex++
-      ) {
-        rowMap.set(headers[headerIndex], row[i]);
-      }
-
-      // Score this row
-      let score = 0;
-      for (const value of rowMap.values()) {
-        if (DECIMAL_NUMERIC_REGEX.test(value)) {
-          score++;
-        }
-      }
-
-      if (score > bestScore) {
-        bestScore = score;
-        bestNutritionMap = rowMap;
-      }
-    }
+    const bestNutritionMap = findBestNutritionRow(allRows, headers);
 
     if (bestNutritionMap.size === 0) {
       return null;
     }
 
-    // Parse values helper
-    const parseValue = (text: string | null): number | null => {
-      if (!text || text.trim() === '' || text.trim() === '-') {
-        return null;
-      }
-      const parsed = Number.parseFloat(text.trim());
-      return Number.isNaN(parsed) ? null : parsed;
-    };
-
-    // Extract serving size
-    let servingSizeText = '';
-    let servingSizeUnit = '';
-    const servingSizeHeaders = [
-      '1회 제공량(g)',
-      '1회 제공량 (g)',
-      '1회 제공량(ml)',
-      '1회 제공량 (ml)',
-    ];
-
-    for (const header of servingSizeHeaders) {
-      if (bestNutritionMap.has(header)) {
-        servingSizeText = bestNutritionMap.get(header) || '';
-        const unitMatch = header.match(UNIT_EXTRACTION_REGEX);
-        servingSizeUnit = unitMatch ? unitMatch[1] : 'g';
-        break;
-      }
-    }
-
-    // Extract nutrition values
-    const getValue = (...headers: string[]) => {
-      for (const h of headers) {
-        const val = bestNutritionMap.get(h);
-        if (val) {
-          return val;
-        }
-      }
-      return '';
-    };
-
-    const servingSize = parseValue(servingSizeText);
-    const calories = parseValue(getValue('열량(kcal)', '열량 (kcal)'));
-    const sodium = parseValue(getValue('나트륨(mg)', '나트륨 (mg)'));
-    const sugar = parseValue(getValue('당류(g)', '당류 (g)'));
-    const saturatedFat = parseValue(getValue('포화지방(g)', '포화지방 (g)'));
-    const protein = parseValue(getValue('단백질(g)', '단백질 (g)'));
-    const caffeine = parseValue(getValue('카페인(mg)', '카페인 (mg)'));
-
-    const nutritions: Nutritions = {
-      servingSize: servingSize ?? undefined,
-      servingSizeUnit: servingSize !== null ? servingSizeUnit : undefined,
-      calories: calories ?? undefined,
-      caloriesUnit: calories !== null ? 'kcal' : undefined,
-      sugar: sugar ?? undefined,
-      sugarUnit: sugar !== null ? 'g' : undefined,
-      protein: protein ?? undefined,
-      proteinUnit: protein !== null ? 'g' : undefined,
-      saturatedFat: saturatedFat ?? undefined,
-      saturatedFatUnit: saturatedFat !== null ? 'g' : undefined,
-      natrium: sodium ?? undefined,
-      natriumUnit: sodium !== null ? 'mg' : undefined,
-      caffeine: caffeine ?? undefined,
-      caffeineUnit: caffeine !== null ? 'mg' : undefined,
-    };
+    const nutritions = buildNutritions(bestNutritionMap);
 
     const hasData = Object.entries(nutritions).some(
       ([key, value]) => !key.endsWith('Unit') && value !== null
@@ -224,10 +276,10 @@ export async function extractGongchaNutrition(
 // CATEGORY EXTRACTION
 // ================================================
 
-export async function extractGongchaCategories(
+export function extractGongchaCategories(
   _page: Page,
   context: ExtractorContext
-): Promise<Array<{ name: string; url: string; id?: string }>> {
+): Array<{ name: string; url: string; id?: string }> {
   // Use predefined categories
   return GONGCHA_CATEGORIES.map((cat) => ({
     name: cat.name,

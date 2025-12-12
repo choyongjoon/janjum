@@ -1,5 +1,5 @@
 import type { PlaywrightCrawler } from 'crawlee';
-import type { Locator, Page } from 'playwright';
+import type { Page } from 'playwright';
 import { logger } from '../../../../shared/logger';
 import { registerCrawler } from '../../core';
 import type { Product } from '../../core/types';
@@ -103,7 +103,7 @@ class MegaCrawler extends InlineDataCrawler {
           description: productData.description,
           price: null,
           externalImageUrl: productData.imageUrl,
-          category: null,
+          category: 'Drinks',
           externalCategory: categoryName,
           externalId: `${this.brand}_${productData.name}`,
           externalUrl: page.url(),
@@ -155,21 +155,23 @@ class MegaCrawler extends InlineDataCrawler {
   }
 }
 
-// Create and register the Mega crawler
-const megaCrawler = new MegaCrawler(megaDefinition);
+// Factory function to create Mega crawler
+function createMegaCrawler(): MegaCrawler {
+  return new MegaCrawler(megaDefinition);
+}
 
-registerCrawler(megaDefinition.config.brand, {
-  definition: megaDefinition,
-  crawler: megaCrawler,
-});
+// Register the crawler factory
+registerCrawler(megaDefinition.config.brand, createMegaCrawler);
 
 export { megaDefinition } from './config';
-export { megaCrawler };
+export { createMegaCrawler };
 
 // Run if executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
-  megaCrawler.run().catch((error) => {
-    logger.error('Crawler execution failed:', error);
-    process.exit(1);
-  });
+  createMegaCrawler()
+    .run()
+    .catch((error) => {
+      logger.error('Crawler execution failed:', error);
+      process.exit(1);
+    });
 }

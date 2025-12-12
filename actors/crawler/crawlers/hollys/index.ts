@@ -4,7 +4,8 @@
 
 import { logger } from '../../../../shared/logger';
 import { defineCrawler, registerCrawler } from '../../core';
-import { createHollysCrawler, runHollysCrawler } from '../../hollys-crawler';
+import type { BaseCrawler } from '../../core/BaseCrawler';
+import { runHollysCrawler } from '../../hollys-crawler';
 
 // Define the crawler configuration for registry
 export const hollysDefinition = defineCrawler({
@@ -29,20 +30,23 @@ export const hollysDefinition = defineCrawler({
   },
 });
 
-// Create a wrapper object that matches the BaseCrawler interface
-const hollysCrawlerWrapper = {
-  create: createHollysCrawler,
-  run: runHollysCrawler,
-};
+// Create a wrapper class that implements the BaseCrawler interface
+class HollysCrawlerWrapper {
+  async run(): Promise<void> {
+    await runHollysCrawler();
+  }
+}
+
+// Factory function to create the wrapper
+function createHollysCrawler(): BaseCrawler {
+  return new HollysCrawlerWrapper() as unknown as BaseCrawler;
+}
 
 // Register with the crawler registry
-registerCrawler('hollys', {
-  definition: hollysDefinition,
-  crawler: hollysCrawlerWrapper as never,
-});
+registerCrawler('hollys', createHollysCrawler);
 
 export { hollysDefinition as definition };
-export { hollysCrawlerWrapper as hollysCrawler };
+export { createHollysCrawler };
 
 // Run if executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {

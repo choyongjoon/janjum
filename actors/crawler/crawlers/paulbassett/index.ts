@@ -4,10 +4,8 @@
 
 import { logger } from '../../../../shared/logger';
 import { defineCrawler, registerCrawler } from '../../core';
-import {
-  createPaulBassettCrawler,
-  runPaulBassettCrawler,
-} from '../../paulbassett-crawler';
+import type { BaseCrawler } from '../../core/BaseCrawler';
+import { runPaulBassettCrawler } from '../../paulbassett-crawler';
 
 // Define the crawler configuration for registry
 export const paulbassettDefinition = defineCrawler({
@@ -32,20 +30,23 @@ export const paulbassettDefinition = defineCrawler({
   },
 });
 
-// Create a wrapper object that matches the BaseCrawler interface
-const paulbassettCrawlerWrapper = {
-  create: createPaulBassettCrawler,
-  run: runPaulBassettCrawler,
-};
+// Create a wrapper class that implements the BaseCrawler interface
+class PaulBassettCrawlerWrapper {
+  async run(): Promise<void> {
+    await runPaulBassettCrawler();
+  }
+}
+
+// Factory function to create the wrapper
+function createPaulBassettCrawler(): BaseCrawler {
+  return new PaulBassettCrawlerWrapper() as unknown as BaseCrawler;
+}
 
 // Register with the crawler registry
-registerCrawler('paulbassett', {
-  definition: paulbassettDefinition,
-  crawler: paulbassettCrawlerWrapper as never,
-});
+registerCrawler('paulbassett', createPaulBassettCrawler);
 
 export { paulbassettDefinition as definition };
-export { paulbassettCrawlerWrapper as paulbassettCrawler };
+export { createPaulBassettCrawler };
 
 // Run if executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {

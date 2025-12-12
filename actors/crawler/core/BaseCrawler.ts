@@ -217,15 +217,16 @@ export abstract class BaseCrawler {
         );
       }
 
+      const categoryName = context.categoryName || 'Default';
       return {
         name,
         nameEn,
         description,
         price: null,
         externalImageUrl: imageUrl,
-        category: null,
-        externalCategory: context.categoryName || 'Default',
-        externalId: `${this.brand}_${name}`,
+        category: 'Drinks',
+        externalCategory: categoryName,
+        externalId: `${this.brand}_${categoryName}_${name}`,
         externalUrl: context.pageUrl || '',
         nutritions,
       };
@@ -251,15 +252,17 @@ export abstract class BaseCrawler {
     },
     context: ExtractorContext
   ): Product {
+    const categoryName = context.categoryName || 'Default';
     return {
       name: data.name,
       nameEn: data.nameEn,
       description: data.description,
       price: data.price || null,
       externalImageUrl: data.imageUrl,
-      category: null,
-      externalCategory: context.categoryName || 'Default',
-      externalId: data.externalId || `${this.brand}_${data.name}`,
+      category: 'Drinks',
+      externalCategory: categoryName,
+      externalId:
+        data.externalId || `${this.brand}_${categoryName}_${data.name}`,
       externalUrl: data.externalUrl || context.pageUrl || '',
       nutritions: data.nutritions || null,
     };
@@ -278,7 +281,7 @@ export abstract class BaseCrawler {
   ): Promise<Nutritions | null> {
     // Use custom extractor if provided
     if (this.definition.extractNutrition) {
-      return this.definition.extractNutrition(container, context);
+      return await this.definition.extractNutrition(container, context);
     }
 
     // Default: no nutrition extraction
@@ -294,7 +297,7 @@ export abstract class BaseCrawler {
   ): Promise<Nutritions | null> {
     // Use custom extractor if provided
     if (this.definition.extractNutrition) {
-      return this.definition.extractNutrition(page, context);
+      return await this.definition.extractNutrition(page, context);
     }
 
     return null;
@@ -481,13 +484,14 @@ export abstract class BaseCrawler {
   /**
    * Handle product detail page - default implementation
    */
-  protected async handleProductPage(
+  protected handleProductPage(
     _page: Page,
     _request: { url: string; userData: Record<string, unknown> },
     _crawler: PlaywrightCrawler
   ): Promise<void> {
     // To be implemented by subclasses that need detail page handling
     logger.warn('handleProductPage not implemented');
+    return Promise.resolve();
   }
 
   /**

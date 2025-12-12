@@ -249,21 +249,23 @@ class GongchaCrawler extends ListDetailCrawler {
   }
 }
 
-// Create and register the Gongcha crawler
-const gongchaCrawler = new GongchaCrawler(gongchaDefinition);
+// Factory function to create Gongcha crawler
+function createGongchaCrawler(): GongchaCrawler {
+  return new GongchaCrawler(gongchaDefinition);
+}
 
-registerCrawler(gongchaDefinition.config.brand, {
-  definition: gongchaDefinition,
-  crawler: gongchaCrawler,
-});
+// Register the crawler factory
+registerCrawler(gongchaDefinition.config.brand, createGongchaCrawler);
 
 export { gongchaDefinition } from './config';
-export { gongchaCrawler };
+export { createGongchaCrawler };
 
 // Run if executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
-  gongchaCrawler.run().catch((error) => {
-    logger.error('Crawler execution failed:', error);
-    process.exit(1);
-  });
+  createGongchaCrawler()
+    .run()
+    .catch((error) => {
+      logger.error('Crawler execution failed:', error);
+      process.exit(1);
+    });
 }

@@ -5,7 +5,8 @@
 
 import { logger } from '../../../../shared/logger';
 import { defineCrawler, registerCrawler } from '../../core';
-import { createTwosomeCrawler, runTwosomeCrawler } from '../../twosome-crawler';
+import type { BaseCrawler } from '../../core/BaseCrawler';
+import { runTwosomeCrawler } from '../../twosome-crawler';
 
 // Define the crawler configuration for registry
 export const twosomeDefinition = defineCrawler({
@@ -32,20 +33,23 @@ export const twosomeDefinition = defineCrawler({
   },
 });
 
-// Create a wrapper object that matches the BaseCrawler interface
-const twosomeCrawlerWrapper = {
-  create: createTwosomeCrawler,
-  run: runTwosomeCrawler,
-};
+// Create a wrapper class that implements the BaseCrawler interface
+class TwosomeCrawlerWrapper {
+  async run(): Promise<void> {
+    await runTwosomeCrawler();
+  }
+}
+
+// Factory function to create the wrapper
+function createTwosomeCrawler(): BaseCrawler {
+  return new TwosomeCrawlerWrapper() as unknown as BaseCrawler;
+}
 
 // Register with the crawler registry
-registerCrawler('twosome', {
-  definition: twosomeDefinition,
-  crawler: twosomeCrawlerWrapper as never,
-});
+registerCrawler('twosome', createTwosomeCrawler);
 
 export { twosomeDefinition as definition };
-export { twosomeCrawlerWrapper as twosomeCrawler };
+export { createTwosomeCrawler };
 
 // Run if executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {

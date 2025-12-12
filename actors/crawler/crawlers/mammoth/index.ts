@@ -4,7 +4,8 @@
 
 import { logger } from '../../../../shared/logger';
 import { defineCrawler, registerCrawler } from '../../core';
-import { createMammothCrawler, runMammothCrawler } from '../../mammoth-crawler';
+import type { BaseCrawler } from '../../core/BaseCrawler';
+import { runMammothCrawler } from '../../mammoth-crawler';
 
 // Define the crawler configuration for registry
 export const mammothDefinition = defineCrawler({
@@ -29,20 +30,23 @@ export const mammothDefinition = defineCrawler({
   },
 });
 
-// Create a wrapper object that matches the BaseCrawler interface
-const mammothCrawlerWrapper = {
-  create: createMammothCrawler,
-  run: runMammothCrawler,
-};
+// Create a wrapper class that implements the BaseCrawler interface
+class MammothCrawlerWrapper {
+  async run(): Promise<void> {
+    await runMammothCrawler();
+  }
+}
+
+// Factory function to create the wrapper
+function createMammothCrawler(): BaseCrawler {
+  return new MammothCrawlerWrapper() as unknown as BaseCrawler;
+}
 
 // Register with the crawler registry
-registerCrawler('mammoth', {
-  definition: mammothDefinition,
-  crawler: mammothCrawlerWrapper as never,
-});
+registerCrawler('mammoth', createMammothCrawler);
 
 export { mammothDefinition as definition };
-export { mammothCrawlerWrapper as mammothCrawler };
+export { createMammothCrawler };
 
 // Run if executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
