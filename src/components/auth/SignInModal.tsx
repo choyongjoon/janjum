@@ -31,8 +31,8 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
 
       await signIn.authenticateWithRedirect({
         strategy: provider.clerkStrategy,
-        redirectUrl: `${window.location.origin}/oauth-callback`,
-        redirectUrlComplete: `${window.location.origin}/`,
+        redirectUrl: '/oauth-callback',
+        redirectUrlComplete: window.location.pathname,
       });
     } catch (_error) {
       // Error is logged by Clerk, so we just reset loading state
