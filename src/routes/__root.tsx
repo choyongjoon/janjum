@@ -27,13 +27,30 @@ import appCss from '~/styles/app.css?url';
 import { seo } from '~/utils/seo';
 
 const fetchClerkAuth = createServerFn({ method: 'GET' }).handler(async () => {
-  const auth = await getAuth(getWebRequest());
-  const token = await auth.getToken({ template: 'convex' });
+  try {
+    const auth = await getAuth(getWebRequest());
 
-  return {
-    userId: auth.userId,
-    token,
-  };
+    // If user is not authenticated, return null values
+    if (!auth.userId) {
+      return {
+        userId: null,
+        token: null,
+      };
+    }
+
+    const token = await auth.getToken({ template: 'convex' });
+
+    return {
+      userId: auth.userId,
+      token,
+    };
+  } catch (_error) {
+    // Handle session not found errors (e.g., after logout)
+    return {
+      userId: null,
+      token: null,
+    };
+  }
 });
 
 export const Route = createRootRouteWithContext<{
