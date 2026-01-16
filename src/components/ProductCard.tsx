@@ -48,8 +48,10 @@ export function ProductCard({
         <img
           alt={product.name}
           className="aspect-square w-full object-cover"
+          height={300}
           loading={priority ? 'eager' : 'lazy'}
           src={product.imageUrl || product.externalImageUrl}
+          width={300}
         />
       </figure>
       <div className="card-body overflow-hidden p-2 md:p-4">

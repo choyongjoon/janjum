@@ -16,8 +16,10 @@ export function CafeCard({
         <img
           alt={cafe.name}
           className="aspect-square w-full object-cover"
+          height={200}
           loading="eager"
           src={cafe.imageUrl}
+          width={200}
         />
       </figure>
       <div className="card-body items-center px-1 py-4 text-center">

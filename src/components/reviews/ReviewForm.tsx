@@ -87,16 +87,16 @@ export function ReviewForm({
       alert('최대 2장까지 업로드할 수 있습니다.');
       return;
     }
-    setImages([...images, ...files]);
+    setImages((prev) => [...prev, ...files]);
   };
 
   const removeExistingImage = (index: number) => {
-    setExistingImageUrls(existingImageUrls.filter((_, i) => i !== index));
-    setImageStorageIds(imageStorageIds.filter((_, i) => i !== index));
+    setExistingImageUrls((prev) => prev.filter((_, i) => i !== index));
+    setImageStorageIds((prev) => prev.filter((_, i) => i !== index));
   };
 
   const removeNewImage = (index: number) => {
-    setImages(images.filter((_, i) => i !== index));
+    setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -229,11 +229,12 @@ export function ReviewForm({
                       />
                     </div>
                     <button
+                      aria-label="이미지 삭제"
                       className="-top-2 -right-2 btn btn-circle btn-xs btn-error absolute"
                       onClick={() => removeExistingImage(index)}
                       type="button"
                     >
-                      ×
+                      <span aria-hidden="true">×</span>
                     </button>
                   </div>
                 ))}
@@ -252,11 +253,12 @@ export function ReviewForm({
                       />
                     </div>
                     <button
+                      aria-label="이미지 삭제"
                       className="-top-2 -right-2 btn btn-circle btn-xs btn-error absolute"
                       onClick={() => removeNewImage(index)}
                       type="button"
                     >
-                      ×
+                      <span aria-hidden="true">×</span>
                     </button>
                   </div>
                 ))}

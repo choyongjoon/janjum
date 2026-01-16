@@ -87,8 +87,10 @@ function ProductPage() {
               <img
                 alt={product.name}
                 className="aspect-square w-full object-cover"
-                loading="lazy"
+                height={448}
+                loading="eager"
                 src={product.imageUrl || product.externalImageUrl}
+                width={448}
               />
             </div>
           </div>

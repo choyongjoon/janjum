@@ -34,6 +34,7 @@ export function ProfileForm({
           <fieldset className="fieldset">
             <legend className="fieldset-legend">이름</legend>
             <input
+              autoComplete="name"
               className="input input-primary"
               id="name"
               name="name"
@@ -48,12 +49,14 @@ export function ProfileForm({
             <label className="input input-primary">
               @
               <input
+                autoComplete="username"
                 className="grow"
                 id="handle"
                 name="handle"
                 onChange={onInputChange}
                 pattern="^[a-zA-Z0-9_-]+$"
                 required
+                spellCheck="false"
                 type="text"
                 value={formData.handle}
               />

@@ -1,5 +1,5 @@
 import { useSignIn } from '@clerk/tanstack-react-start';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   type SocialProviderConfig,
   socialProviders,
@@ -15,6 +15,18 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
   const { signIn, isLoaded } = useSignIn();
   const [isLoading, setIsLoading] = useState<string | null>(null);
   const { trackSignIn } = usePostHogEvents();
+
+  // Handle Escape key to close modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen && onClose) {
+        trackSignIn('cancelled');
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isOpen, onClose, trackSignIn]);
 
   const handleOAuthSignIn = async (provider: SocialProviderConfig) => {
     if (!(isLoaded && signIn)) {

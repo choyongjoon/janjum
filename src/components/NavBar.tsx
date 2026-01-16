@@ -55,21 +55,30 @@ export function NavBar() {
         </Link>
       </div>
       <div className="navbar-end">
-        <Link className="btn btn-ghost btn-circle" to="/search">
-          <SearchIcon aria-label="Search" />
+        <Link
+          aria-label="검색"
+          className="btn btn-ghost btn-circle"
+          to="/search"
+        >
+          <SearchIcon aria-hidden="true" />
         </Link>
         <Authenticated>
-          <Link className="btn btn-ghost btn-circle ml-2" to="/profile">
-            <BookmarkIcon />
+          <Link
+            aria-label="내 프로필"
+            className="btn btn-ghost btn-circle ml-2"
+            to="/profile"
+          >
+            <BookmarkIcon aria-hidden="true" />
           </Link>
         </Authenticated>
         <Unauthenticated>
           <button
+            aria-label="로그인"
             className="btn btn-ghost btn-circle"
             onClick={() => setShowSignIn(true)}
             type="button"
           >
-            <UserIcon />
+            <UserIcon aria-hidden="true" />
           </button>
         </Unauthenticated>
 

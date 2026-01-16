@@ -47,14 +47,21 @@ export function NameSearchInput({
         <span className="label-text font-medium">검색어</span>
       </label>
       <input
+        aria-autocomplete="list"
+        aria-controls="search-suggestions"
+        aria-expanded={
+          showSuggestions && value.length > 0 && (suggestions?.length ?? 0) > 0
+        }
+        autoComplete="off"
         className="input input-bordered w-full"
         id="search-input"
         onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
         onChange={onChange}
         onFocus={() => setShowSuggestions(true)}
         onKeyDown={onKeyDown}
-        placeholder="음료명을 입력하세요"
-        type="text"
+        placeholder="음료명을 입력하세요…"
+        role="combobox"
+        type="search"
         value={value}
       />
 
@@ -64,19 +71,21 @@ export function NameSearchInput({
         suggestions &&
         suggestions.length > 0 && (
           <div className="absolute top-full z-10 mt-1 w-full">
-            <ul className="menu overflow-y-auto rounded-box bg-base-100 shadow-lg">
+            <div
+              className="menu overflow-y-auto rounded-box bg-base-100 shadow-lg"
+              id="search-suggestions"
+            >
               {suggestions.map((suggestion) => (
-                <li key={suggestion.name}>
-                  <button
-                    className="flex justify-between"
-                    onClick={() => handleSuggestionClick(suggestion)}
-                    type="button"
-                  >
-                    <span>{suggestion.name}</span>
-                  </button>
-                </li>
+                <button
+                  className="flex w-full justify-between px-4 py-2 text-left hover:bg-base-200"
+                  key={suggestion.name}
+                  onClick={() => handleSuggestionClick(suggestion)}
+                  type="button"
+                >
+                  <span>{suggestion.name}</span>
+                </button>
               ))}
-            </ul>
+            </div>
           </div>
         )}
     </div>
