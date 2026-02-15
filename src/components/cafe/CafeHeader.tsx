@@ -8,7 +8,7 @@ function CafeHeader({
   numProducts: number | undefined;
 }) {
   return (
-    <div className="bg-primary py-12 text-primary-content">
+    <div className="bg-primary py-8 text-primary-content">
       <div className="container mx-auto px-4">
         <div className="flex items-center gap-6">
           <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary-content/20">

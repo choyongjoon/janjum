@@ -2,8 +2,11 @@ import { convexQuery } from '@convex-dev/react-query';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import type { Id } from 'convex/_generated/dataModel';
+import { useMemo, useState } from 'react';
 import { z } from 'zod';
 import CafeHeader from '~/components/cafe/CafeHeader';
+import { CategoryFilter } from '~/components/cafe/CategoryFilter';
+import { ProductSearchInput } from '~/components/cafe/ProductSearchInput';
 import { api } from '../../convex/_generated/api';
 import { ProductCard } from '../components/ProductCard';
 import { getOrderedCategories } from '../utils/categories';
@@ -49,14 +52,26 @@ function CafePage() {
     enabled: !!cafe?._id,
   });
 
+  const [searchQuery, setSearchQuery] = useState('');
+
   const availableCategories = Array.from(
     new Set(products?.map((p) => p.category).filter(Boolean) || [])
   );
   const categories = getOrderedCategories(availableCategories as string[]);
-  const filteredProducts =
-    selectedCategory === undefined
-      ? products
-      : products?.filter((p) => p.category === selectedCategory);
+
+  const filteredProducts = useMemo(() => {
+    let result =
+      selectedCategory === undefined
+        ? products
+        : products?.filter((p) => p.category === selectedCategory);
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.trim().toLowerCase();
+      result = result?.filter((p) => p.name.toLowerCase().includes(query));
+    }
+
+    return result;
+  }, [products, selectedCategory, searchQuery]);
 
   const handleCategoryChange = (newCategory: string) => {
     if (!cafe) {
@@ -83,40 +98,14 @@ function CafePage() {
       <CafeHeader cafe={cafe} numProducts={products?.length} />
 
       <div className="container mx-auto px-4 py-8">
-        {/* Category Filter */}
-        <div className="mb-8">
-          <h2 className="mb-4 font-semibold text-xl">카테고리</h2>
-          <div className="flex flex-wrap gap-2">
-            <button
-              className={`btn btn-sm ${selectedCategory === undefined ? 'btn-primary' : 'btn-outline'}`}
-              onClick={() => handleCategoryChange('전체')}
-              type="button"
-            >
-              전체
-            </button>
-            {productsLoading
-              ? // Category loading skeleton
-                Array.from({ length: 4 }, (_, i) => (
-                  <div
-                    className="h-8 w-16 animate-pulse rounded bg-base-300"
-                    key={`category-skeleton-${
-                      // biome-ignore lint/suspicious/noArrayIndexKey: skeleton
-                      i
-                    }`}
-                  />
-                ))
-              : categories.map((category) => (
-                  <button
-                    className={`btn btn-sm ${selectedCategory === category ? 'btn-primary' : 'btn-outline'}`}
-                    key={category}
-                    onClick={() => handleCategoryChange(category)}
-                    type="button"
-                  >
-                    {category}
-                  </button>
-                ))}
-          </div>
-        </div>
+        <ProductSearchInput onChange={setSearchQuery} value={searchQuery} />
+
+        <CategoryFilter
+          categories={categories}
+          isLoading={productsLoading}
+          onCategoryChange={handleCategoryChange}
+          selectedCategory={selectedCategory}
+        />
 
         {/* Products Grid */}
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
@@ -149,7 +138,11 @@ function CafePage() {
 
         {!productsLoading && filteredProducts?.length === 0 && (
           <div className="py-12 text-center">
-            <p className="text-base-content/70">상품이 없습니다.</p>
+            <p className="text-base-content/70">
+              {searchQuery.trim()
+                ? `"${searchQuery.trim()}"에 대한 검색 결과가 없습니다.`
+                : '상품이 없습니다.'}
+            </p>
           </div>
         )}
       </div>
