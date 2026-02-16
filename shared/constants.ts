@@ -47,4 +47,8 @@ export const AVAILABLE_CAFES = {
     name: '우지커피',
     slug: 'oozy',
   },
+  theventi: {
+    name: '더벤티',
+    slug: 'theventi',
+  },
 } as const;
