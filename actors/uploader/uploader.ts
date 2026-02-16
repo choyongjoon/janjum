@@ -7,6 +7,8 @@ import sharp from 'sharp';
 import { api } from '../../convex/_generated/api';
 import { logger } from '../../shared/logger';
 
+const IMAGE_CONCURRENCY = 10;
+
 // Load environment variables from .env.local
 dotenv.config({ path: '.env.local' });
 
@@ -212,48 +214,21 @@ class ProductUploader {
       products.map((p) => p.externalId)
     );
 
-    const processedProducts = await Promise.all(
-      products.map(async (product) => {
-        if (!product.externalImageUrl) {
-          return product;
-        }
+    const processedProducts: ProductData[] = [];
 
-        // Check if product already has an image in database
-        const existingProduct = existingProductsMap.get(product.externalId);
-        if (existingProduct?.imageStorageId) {
-          logger.info(
-            `⏭️  Skipping image for ${product.name} (already has image: ${existingProduct.imageStorageId})`
-          );
-          return {
-            ...product,
-            imageStorageId: existingProduct.imageStorageId,
-          };
-        }
+    for (let i = 0; i < products.length; i += IMAGE_CONCURRENCY) {
+      const batch = products.slice(i, i + IMAGE_CONCURRENCY);
+      logger.info(
+        `Processing image batch ${Math.floor(i / IMAGE_CONCURRENCY) + 1}/${Math.ceil(products.length / IMAGE_CONCURRENCY)} (${batch.length} products)`
+      );
 
-        try {
-          const result = await this.downloadAndOptimizeImage(
-            product.externalImageUrl,
-            product.name
-          );
-
-          if (result) {
-            logger.info(
-              `✓ Processed image for ${product.name}: ${result.storageId}`
-            );
-            return {
-              ...product,
-              imageStorageId: result.storageId,
-            };
-          }
-
-          logger.warn(`✗ Failed to process image for ${product.name}`);
-          return product;
-        } catch (error) {
-          logger.error(`Error processing image for ${product.name}:`, error);
-          return product;
-        }
-      })
-    );
+      const batchResults = await Promise.all(
+        batch.map((product) =>
+          this.processProductImage(product, existingProductsMap)
+        )
+      );
+      processedProducts.push(...batchResults);
+    }
 
     const successCount = processedProducts.filter(
       (p) => p.imageStorageId
@@ -266,6 +241,49 @@ class ProductUploader {
     );
 
     return processedProducts;
+  }
+
+  private async processProductImage(
+    product: ProductData,
+    existingProductsMap: Map<string, { imageStorageId?: string }>
+  ): Promise<ProductData> {
+    if (!product.externalImageUrl) {
+      return product;
+    }
+
+    const existingProduct = existingProductsMap.get(product.externalId);
+    if (existingProduct?.imageStorageId) {
+      logger.info(
+        `⏭️  Skipping image for ${product.name} (already has image: ${existingProduct.imageStorageId})`
+      );
+      return {
+        ...product,
+        imageStorageId: existingProduct.imageStorageId,
+      };
+    }
+
+    try {
+      const result = await this.downloadAndOptimizeImage(
+        product.externalImageUrl,
+        product.name
+      );
+
+      if (result) {
+        logger.info(
+          `✓ Processed image for ${product.name}: ${result.storageId}`
+        );
+        return {
+          ...product,
+          imageStorageId: result.storageId,
+        };
+      }
+
+      logger.warn(`✗ Failed to process image for ${product.name}`);
+      return product;
+    } catch (error) {
+      logger.error(`Error processing image for ${product.name}:`, error);
+      return product;
+    }
   }
 
   /**

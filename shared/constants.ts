@@ -43,4 +43,8 @@ export const AVAILABLE_CAFES = {
     name: '공차',
     slug: 'gongcha',
   },
+  oozy: {
+    name: '우지커피',
+    slug: 'oozy',
+  },
 } as const;
