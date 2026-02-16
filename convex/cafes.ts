@@ -58,6 +58,40 @@ export const getAllWithImages = query({
   },
 });
 
+export const create = mutation({
+  args: {
+    name: v.string(),
+    slug: v.string(),
+    imageStorageId: v.optional(v.id('_storage')),
+    rank: v.optional(v.number()),
+    uploadSecret: v.optional(v.string()),
+  },
+  handler: async (ctx, { name, slug, imageStorageId, rank, uploadSecret }) => {
+    const expectedSecret = process.env.CONVEX_UPLOAD_SECRET;
+    if (expectedSecret && uploadSecret !== expectedSecret) {
+      throw new Error('Unauthorized: Invalid upload secret');
+    }
+
+    const existing = await ctx.db
+      .query('cafes')
+      .withIndex('by_slug', (q) => q.eq('slug', slug))
+      .first();
+
+    if (existing) {
+      throw new Error(`Cafe with slug "${slug}" already exists`);
+    }
+
+    const cafeId = await ctx.db.insert('cafes', {
+      name,
+      slug,
+      imageStorageId,
+      rank,
+    });
+
+    return cafeId;
+  },
+});
+
 export const updateImage = mutation({
   args: {
     cafeId: v.id('cafes'),

@@ -18,7 +18,8 @@
     "test:e2e": "playwright test",
     "prepare": "husky",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "add-cafe": "tsx actors/uploader/add-cafe.ts"
   },
   "dependencies": {
     "@clerk/tanstack-react-start": "^0.21.5",
