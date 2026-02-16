@@ -24,6 +24,7 @@ on:
           - "mammoth"
           - "gongcha"
           - "oozy"
+          - "theventi"
         default: "all"
 
 jobs:
@@ -72,7 +73,7 @@ jobs:
     needs: [setup]
     strategy:
       matrix:
-        cafe: ${{ (github.event.inputs.target_cafe == 'all' || github.event.inputs.target_cafe == '' || !github.event.inputs.target_cafe) && fromJSON('["starbucks", "mega", "paik", "ediya", "coffeebean", "hollys", "paulbassett", "mammoth", "gongcha", "oozy"]') || fromJSON(format('["{0}"]', github.event.inputs.target_cafe)) }}
+        cafe: ${{ (github.event.inputs.target_cafe == 'all' || github.event.inputs.target_cafe == '' || !github.event.inputs.target_cafe) && fromJSON('["starbucks", "mega", "paik", "ediya", "coffeebean", "hollys", "paulbassett", "mammoth", "gongcha", "oozy", "theventi"]') || fromJSON(format('["{0}"]', github.event.inputs.target_cafe)) }}
       fail-fast: false # Don't cancel other jobs if one fails
       max-parallel: 4 # Limit concurrent crawlers to avoid rate limiting
 
@@ -153,7 +154,7 @@ jobs:
     if: ${{ always() }}
     strategy:
       matrix:
-        cafe: ${{ (github.event.inputs.target_cafe == 'all' || github.event.inputs.target_cafe == '' || !github.event.inputs.target_cafe) && fromJSON('["starbucks", "mega", "paik", "ediya", "coffeebean", "hollys", "paulbassett", "mammoth", "gongcha", "oozy"]') || fromJSON(format('["{0}"]', github.event.inputs.target_cafe)) }}
+        cafe: ${{ (github.event.inputs.target_cafe == 'all' || github.event.inputs.target_cafe == '' || !github.event.inputs.target_cafe) && fromJSON('["starbucks", "mega", "paik", "ediya", "coffeebean", "hollys", "paulbassett", "mammoth", "gongcha", "oozy", "theventi"]') || fromJSON(format('["{0}"]', github.event.inputs.target_cafe)) }}
       fail-fast: false # Don't cancel other jobs if one fails
       max-parallel: 4 # Limit concurrent categorization jobs
 
@@ -236,7 +237,7 @@ jobs:
     if: ${{ always() }}
     strategy:
       matrix:
-        cafe: ${{ (github.event.inputs.target_cafe == 'all' || github.event.inputs.target_cafe == '' || !github.event.inputs.target_cafe) && fromJSON('["starbucks", "mega", "paik", "ediya", "coffeebean", "hollys", "paulbassett", "mammoth", "gongcha", "oozy"]') || fromJSON(format('["{0}"]', github.event.inputs.target_cafe)) }}
+        cafe: ${{ (github.event.inputs.target_cafe == 'all' || github.event.inputs.target_cafe == '' || !github.event.inputs.target_cafe) && fromJSON('["starbucks", "mega", "paik", "ediya", "coffeebean", "hollys", "paulbassett", "mammoth", "gongcha", "oozy", "theventi"]') || fromJSON(format('["{0}"]', github.event.inputs.target_cafe)) }}
       fail-fast: false # Don't cancel other jobs if one fails
       max-parallel: 2 # Limit concurrent uploads to avoid database overload
 
