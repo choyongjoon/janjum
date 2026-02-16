@@ -99,7 +99,7 @@ ${Object.entries(AVAILABLE_CAFES)
 
 Description:
   Categorizes products from crawler JSON files. Runs between crawl and upload commands.
-  Assigns Korean categories: 커피, 차, 블렌디드, 스무디, 주스, 에이드, 그 외
+  Assigns Korean categories: 커피, 차, 블렌디드, 스무디, 주스, 에이드, 아이스크림, 그 외
   Processes the most recent crawler files for specified cafes.
 
 Options:
@@ -247,6 +247,7 @@ function getHumanCategoryChoice(
     '스무디',
     '주스',
     '에이드',
+    '아이스크림',
     '그 외',
   ];
 
@@ -260,9 +261,9 @@ function getHumanCategoryChoice(
   });
 
   return new Promise((resolve) => {
-    rl.question('\nSelect category (1-7): ', (answer) => {
+    rl.question('\nSelect category (1-8): ', (answer) => {
       const choice = Number.parseInt(answer, 10);
-      if (choice >= 1 && choice <= 7) {
+      if (choice >= 1 && choice <= 8) {
         resolve(categories[choice - 1]);
       } else {
         logger.info('Invalid choice, defaulting to "그 외"');

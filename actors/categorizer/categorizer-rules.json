@@ -397,7 +397,7 @@
       "condition": {
         "externalCategory": "아이스크림/디저트"
       },
-      "targetCategory": "그 외",
+      "targetCategory": "아이스크림",
       "confidence": "high",
       "createdBy": "system",
       "createdAt": 1754055200000,
@@ -556,7 +556,7 @@
       "condition": {
         "externalCategory": "ICE-CREAM"
       },
-      "targetCategory": "그 외",
+      "targetCategory": "아이스크림",
       "confidence": "high",
       "createdBy": "system",
       "priority": 1,
@@ -636,6 +636,50 @@
       "id": "custom-1754652620513-bu8w49owq",
       "createdAt": 1754652620513,
       "usageCount": 0
+    },
+    {
+      "id": "direct-ice-cream-bingsu",
+      "type": "direct",
+      "condition": {
+        "externalCategory": "아이스크림/빙수"
+      },
+      "targetCategory": "아이스크림",
+      "confidence": "high",
+      "createdBy": "system",
+      "createdAt": 1739750400000,
+      "usageCount": 0
+    },
+    {
+      "id": "pattern-ice-cream-ending",
+      "type": "pattern",
+      "condition": {
+        "nameEndsWith": [
+          "아이스크림",
+          "아이스크림 (컵)",
+          "아이스크림 (콘)",
+          "아이스크림(컵)",
+          "아이스크림(콘)"
+        ]
+      },
+      "targetCategory": "아이스크림",
+      "confidence": "high",
+      "createdBy": "system",
+      "createdAt": 1739750400000,
+      "usageCount": 0,
+      "priority": 0
+    },
+    {
+      "id": "pattern-affogato-ice-cream",
+      "type": "pattern",
+      "condition": {
+        "nameContains": ["아포가토"]
+      },
+      "targetCategory": "아이스크림",
+      "confidence": "high",
+      "createdBy": "system",
+      "createdAt": 1739750400000,
+      "usageCount": 0,
+      "priority": 1
     },
     {
       "type": "pattern",
