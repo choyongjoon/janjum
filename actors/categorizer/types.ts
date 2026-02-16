@@ -5,6 +5,7 @@ export type Category =
   | '스무디'
   | '주스'
   | '에이드'
+  | '아이스크림'
   | '그 외';
 
 export interface CategorizerInput {
