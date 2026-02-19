@@ -92,7 +92,7 @@ export function ReviewInUserPage({ review }: { review: Review }) {
             {review.imageUrls.map((imageUrl, index) => (
               <div
                 className="aspect-square overflow-hidden rounded-lg"
-                key={`${review._id}-image-${index}`}
+                key={imageUrl}
               >
                 <img
                   alt={`후기 이미지 ${index + 1}`}
