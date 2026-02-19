@@ -7,37 +7,42 @@ interface ProfileImageUploadProps {
   onImageChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
+interface ProfileImageProps {
+  previewUrl: string;
+  currentUserImageUrl: string | undefined;
+}
+
+function ProfileImage({ previewUrl, currentUserImageUrl }: ProfileImageProps) {
+  if (previewUrl) {
+    return (
+      <img
+        alt="새 프로필 이미지"
+        className="h-full w-full object-cover"
+        src={previewUrl}
+      />
+    );
+  }
+  if (currentUserImageUrl) {
+    return (
+      <img
+        alt="현재 프로필 이미지"
+        className="h-full w-full object-cover"
+        src={currentUserImageUrl}
+      />
+    );
+  }
+  return (
+    <div className="flex h-full w-full items-center justify-center bg-base-200">
+      <span className="text-2xl">👤</span>
+    </div>
+  );
+}
+
 export function ProfileImageUpload({
   previewUrl,
   onImageChange,
 }: ProfileImageUploadProps) {
   const { data: currentUser } = useQuery(convexQuery(api.users.current, {}));
-
-  const renderProfileImage = () => {
-    if (previewUrl) {
-      return (
-        <img
-          alt="새 프로필 이미지"
-          className="h-full w-full object-cover"
-          src={previewUrl}
-        />
-      );
-    }
-    if (currentUser?.imageUrl) {
-      return (
-        <img
-          alt="현재 프로필 이미지"
-          className="h-full w-full object-cover"
-          src={currentUser?.imageUrl}
-        />
-      );
-    }
-    return (
-      <div className="flex h-full w-full items-center justify-center bg-base-200">
-        <span className="text-2xl">👤</span>
-      </div>
-    );
-  };
 
   return (
     <fieldset className="fieldset">
@@ -45,7 +50,10 @@ export function ProfileImageUpload({
 
       <div className="avatar">
         <div className="h-24 w-24 rounded-full ring ring-primary ring-offset-2 ring-offset-base-100">
-          {renderProfileImage()}
+          <ProfileImage
+            currentUserImageUrl={currentUser?.imageUrl}
+            previewUrl={previewUrl}
+          />
         </div>
       </div>
 

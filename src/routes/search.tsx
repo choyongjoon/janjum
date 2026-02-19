@@ -1,7 +1,7 @@
 import { convexQuery } from '@convex-dev/react-query';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { usePostHogEvents } from '~/hooks/usePostHogEvents';
 import { api } from '../../convex/_generated/api';
 import { SearchIcon } from '../components/icons';
@@ -54,13 +54,6 @@ function SearchPage() {
   const { data: searchResults } = useSuspenseQuery(
     convexQuery(api.products.search, searchParams)
   );
-
-  // Update form state when URL search params change
-  useEffect(() => {
-    setFormState({
-      searchTerm: searchTerm || '',
-    });
-  }, [searchTerm]);
 
   // Handle form submission
   const handleSearch = (e?: React.FormEvent) => {
