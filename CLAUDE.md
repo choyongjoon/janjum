@@ -30,9 +30,13 @@
 
 ## Project Structure
 
-- `uploader/` - Contains data upload utilities and CLI tools
-- `crawler/` - Contains web crawlers for different cafe chains
-- `convex/` - Contains Convex database schema and mutations
-- `shared/` - Shared utilities like logger configuration
+- `actors/crawler/` - Web crawlers for different cafe chains
+- `actors/uploader/` - Data upload utilities and CLI tools (including `add-cafe.ts`)
+- `actors/categorizer/` - Product auto-categorization scripts
+- `convex/` - Convex database schema, queries, mutations, and HTTP endpoints
+- `shared/` - Shared utilities (logger, constants, nutritions)
+- `scripts/` - Utility scripts (image optimization, storage cleanup, data sync)
+- `src/` - Frontend application (TanStack Start + React)
+- `e2e/` - Playwright end-to-end tests
 - `crawler-outputs/` - Crawler output files (ignored in git)
 - `logs/` - Application logs (ignored in git)

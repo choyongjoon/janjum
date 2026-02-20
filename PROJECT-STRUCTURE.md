@@ -25,7 +25,12 @@ janjum/
 │   ├── cafes.ts                        # Cafe queries & mutations
 │   ├── reviews.ts                      # Review queries & mutations
 │   ├── users.ts                        # User queries & mutations
+│   ├── stats.ts                        # Statistics queries
+│   ├── storage.ts                      # Storage management functions
+│   ├── imageDownloader.ts              # Image downloading utilities
+│   ├── shortId.ts                      # Short ID generation for products
 │   ├── dataUploader.ts                 # Data transformation service
+│   ├── auth.config.ts                  # Clerk authentication configuration
 │   └── http.ts                         # HTTP endpoints
 │
 ├── 📁 scripts/                         # Utility scripts
@@ -33,7 +38,8 @@ janjum/
 │
 ├── 📁 shared/                          # Shared utilities
 │   ├── logger.ts                       # Pino logger configuration
-│   └── constants.ts                    # Shared constants
+│   ├── constants.ts                    # Shared constants
+│   └── nutritions.ts                   # Nutrition data and constants
 │
 ├── 📁 storage/                        # Crawlee storage (crawler cache/state)
 │   ├── datasets/                      # Crawlee dataset storage
@@ -65,14 +71,27 @@ janjum/
 │   │   ├── search/                    # Search components
 │   │   └── icons/                     # Icon components
 │   │
+│   ├── config/                        # App configuration
+│   │   └── socialProviders.tsx        # Social login provider config
+│   │
+│   ├── data/                          # Static data files
+│   │   └── blog-posts/                # Blog post markdown files
+│   │
+│   ├── styles/                        # Global styles
+│   │   └── app.css                    # Global CSS
+│   │
 │   ├── hooks/                         # Custom React hooks
-│   │   ├── usePostHogEvents.ts        # Analytics hooks
+│   │   ├── usePostHogEvents.ts        # Analytics event hooks
+│   │   ├── usePostHogIdentify.ts      # PostHog user identification hook
 │   │   └── useSettingsForm.ts         # Form management hooks
 │   │
 │   ├── utils/                         # Utility functions
 │   │   ├── seo.ts                     # SEO metadata utility
 │   │   ├── blogData.ts                # Blog data management
-│   │   └── categories.ts              # Category utilities
+│   │   ├── categories.ts              # Category utilities
+│   │   ├── dateFormat.ts              # Date formatting utilities
+│   │   ├── nutritionLevel.ts          # Nutrition level display utilities
+│   │   └── toast.ts                   # Toast notification utilities
 │   │
 │   └── app.tsx                        # App root component
 │
@@ -93,9 +112,19 @@ pnpm start                      # Start production server
 pnpm crawl                      # Run web crawlers
 pnpm upload                     # Upload product data (with image optimization)
 pnpm categorize                 # Auto-categorize products
+pnpm add-cafe                   # CLI tool to add a new cafe
 
 # Image Optimization
 pnpm optimize-images:prod       # Optimize existing images in production
+
+# Storage Management
+pnpm cleanup-storage            # Identify and remove dangling storage files
+pnpm cleanup-storage:prod       # Production version of storage cleanup
+pnpm data-sync:prod             # Production data sync shell script
+
+# Storybook
+pnpm storybook                  # Start Storybook development server
+pnpm build-storybook            # Build Storybook for deployment
 
 # Testing
 pnpm test                       # Run unit tests
@@ -188,11 +217,18 @@ pnpm prepare                    # Install husky git hooks
 {
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build && tsc --noEmit", 
+    "build": "vite build && tsc --noEmit",
+    "start": "node .output/server/index.mjs",
     "crawl": "tsx actors/crawler/crawl.ts",
     "upload": "tsx actors/uploader/upload.ts",
     "categorize": "tsx actors/categorizer/categorize.ts",
-    "optimize-images:prod": "dotenv -e .env.prod-upload -- tsx scripts/optimizeImages.ts"
+    "add-cafe": "tsx actors/uploader/add-cafe.ts",
+    "optimize-images:prod": "dotenv -e .env.prod-upload -- tsx scripts/optimizeImages.ts",
+    "cleanup-storage": "tsx scripts/cleanupStorage.ts",
+    "cleanup-storage:prod": "dotenv -e .env.prod-upload -- tsx scripts/cleanupStorage.ts",
+    "data-sync:prod": "scripts/dataSyncProd.sh",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   }
 }
 ```
