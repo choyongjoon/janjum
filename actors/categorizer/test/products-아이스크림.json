@@ -1,0 +1,42 @@
+[
+  {
+    "name": "소프트아이스크림",
+    "externalCategory": "아이스크림/디저트"
+  },
+  {
+    "name": "딸기 소프트아이스크림",
+    "externalCategory": "아이스크림/디저트"
+  },
+  {
+    "name": "바닐라 아이스크림 (컵)",
+    "externalCategory": "아이스크림/빙수"
+  },
+  {
+    "name": "초코 아이스크림 (콘)",
+    "externalCategory": "아이스크림/빙수"
+  },
+  {
+    "name": "망고 아이스크림(컵)",
+    "externalCategory": "ICE-CREAM"
+  },
+  {
+    "name": "딸기 아이스크림(콘)",
+    "externalCategory": "ICE-CREAM"
+  },
+  {
+    "name": "에스프레소 아포가토",
+    "externalCategory": "Dessert"
+  },
+  {
+    "name": "카라멜 아포가토",
+    "externalCategory": "Dessert"
+  },
+  {
+    "name": "녹차 아이스크림",
+    "externalCategory": "Dessert"
+  },
+  {
+    "name": "플레인 아이스크림",
+    "externalCategory": "Dessert"
+  }
+]
