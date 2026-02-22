@@ -392,18 +392,6 @@
       "usageCount": 0
     },
     {
-      "id": "direct-ice-cream-dessert",
-      "type": "direct",
-      "condition": {
-        "externalCategory": "아이스크림/디저트"
-      },
-      "targetCategory": "아이스크림",
-      "confidence": "high",
-      "createdBy": "system",
-      "createdAt": 1754055200000,
-      "usageCount": 0
-    },
-    {
       "id": "direct-paiks-chino",
       "type": "direct",
       "condition": {
@@ -673,6 +661,19 @@
       "type": "pattern",
       "condition": {
         "nameContains": ["아포가토"]
+      },
+      "targetCategory": "아이스크림",
+      "confidence": "high",
+      "createdBy": "system",
+      "createdAt": 1739750400000,
+      "usageCount": 0,
+      "priority": 1
+    },
+    {
+      "id": "pattern-ice-cream-contains",
+      "type": "pattern",
+      "condition": {
+        "nameContains": ["아이스크림"]
       },
       "targetCategory": "아이스크림",
       "confidence": "high",

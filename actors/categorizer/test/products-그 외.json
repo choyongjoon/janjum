@@ -8,8 +8,20 @@
     "externalCategory": "Dessert"
   },
   {
-    "name": "바닐라 아이스크림",
-    "externalCategory": "Ice Cream"
+    "name": "붕어빵(슈크림)",
+    "externalCategory": "아이스크림/디저트"
+  },
+  {
+    "name": "붕어빵(팥)",
+    "externalCategory": "아이스크림/디저트"
+  },
+  {
+    "name": "모나카 딸기초코 맛",
+    "externalCategory": "아이스크림/디저트"
+  },
+  {
+    "name": "모나카 우유 맛",
+    "externalCategory": "아이스크림/디저트"
   },
   {
     "name": "크로와상",
