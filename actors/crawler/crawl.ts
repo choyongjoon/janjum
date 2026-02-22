@@ -79,8 +79,14 @@ function runCrawler(crawlerName: CrawlerName): Promise<void> {
     logger.info(`🚀 Starting ${crawler.name} crawler...`);
 
     const child = spawn('tsx', [crawlerPath], {
-      stdio: 'inherit',
+      stdio: ['inherit', 'inherit', 'pipe'],
       cwd: process.cwd(),
+    });
+
+    const stderrChunks: Buffer[] = [];
+    child.stderr?.on('data', (chunk: Buffer) => {
+      process.stderr.write(chunk);
+      stderrChunks.push(chunk);
     });
 
     child.on('close', (code) => {
@@ -88,11 +94,18 @@ function runCrawler(crawlerName: CrawlerName): Promise<void> {
         logger.info(`✅ ${crawler.name} crawler completed successfully`);
         resolve();
       } else {
+        const stderrOutput = Buffer.concat(stderrChunks).toString().trim();
+        const lastErrorLine = stderrOutput
+          .split('\n')
+          .findLast((l) => l.trim());
+        const reason = lastErrorLine ? `\n  Reason: ${lastErrorLine}` : '';
         logger.error(
-          `❌ ${crawler.name} crawler failed with exit code ${code}`
+          `❌ ${crawler.name} crawler failed with exit code ${code}${reason}`
         );
         reject(
-          new Error(`Crawler ${crawlerName} failed with exit code ${code}`)
+          new Error(
+            `Crawler ${crawlerName} failed with exit code ${code}${reason}`
+          )
         );
       }
     });

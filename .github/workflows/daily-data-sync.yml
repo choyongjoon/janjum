@@ -120,22 +120,18 @@ jobs:
         run: mkdir -p actors/crawler/crawler-outputs
 
       - name: Run crawler for ${{ matrix.cafe }}
-        run: pnpm run crawl ${{ matrix.cafe }}
+        run: |
+          pnpm run crawl ${{ matrix.cafe }} || {
+            echo "❌ Crawler failed for ${{ matrix.cafe }}"
+            echo "Possible causes: site returned 403 (blocked), network error, or no products found"
+            ls -la actors/crawler/crawler-outputs/ 2>/dev/null || echo "No crawler-outputs directory"
+            exit 1
+          }
+          echo "✅ Crawler output found for ${{ matrix.cafe }}"
+          ls -la actors/crawler/crawler-outputs/${{ matrix.cafe }}-*.json
         env:
           NODE_ENV: production
           CI: true
-
-      - name: Check crawler output exists
-        run: |
-          if ls actors/crawler/crawler-outputs/${{ matrix.cafe }}-*.json 1> /dev/null 2>&1; then
-            echo "✅ Crawler output found for ${{ matrix.cafe }}"
-            ls -la actors/crawler/crawler-outputs/${{ matrix.cafe }}-*.json
-          else
-            echo "❌ No crawler output found for ${{ matrix.cafe }}"
-            echo "Expected files matching: actors/crawler/crawler-outputs/${{ matrix.cafe }}-*.json"
-            ls -la actors/crawler/crawler-outputs/ || echo "crawler-outputs directory doesn't exist"
-            exit 1
-          fi
 
       - name: Upload crawler output
         uses: actions/upload-artifact@v4
