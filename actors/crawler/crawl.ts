@@ -79,14 +79,23 @@ function runCrawler(crawlerName: CrawlerName): Promise<void> {
     logger.info(`🚀 Starting ${crawler.name} crawler...`);
 
     const child = spawn('tsx', [crawlerPath], {
-      stdio: ['inherit', 'inherit', 'pipe'],
+      stdio: ['inherit', 'pipe', 'inherit'],
       cwd: process.cwd(),
     });
 
-    const stderrChunks: Buffer[] = [];
-    child.stderr?.on('data', (chunk: Buffer) => {
-      process.stderr.write(chunk);
-      stderrChunks.push(chunk);
+    let lastErrorMsg = '';
+    child.stdout?.on('data', (chunk: Buffer) => {
+      process.stdout.write(chunk);
+      for (const line of chunk.toString().split('\n')) {
+        try {
+          const parsed = JSON.parse(line) as { level?: number; msg?: string };
+          if (parsed.level && parsed.level >= 50 && parsed.msg) {
+            lastErrorMsg = parsed.msg;
+          }
+        } catch {
+          // not a JSON log line
+        }
+      }
     });
 
     child.on('close', (code) => {
@@ -94,11 +103,7 @@ function runCrawler(crawlerName: CrawlerName): Promise<void> {
         logger.info(`✅ ${crawler.name} crawler completed successfully`);
         resolve();
       } else {
-        const stderrOutput = Buffer.concat(stderrChunks).toString().trim();
-        const lastErrorLine = stderrOutput
-          .split('\n')
-          .findLast((l) => l.trim());
-        const reason = lastErrorLine ? `\n  Reason: ${lastErrorLine}` : '';
+        const reason = lastErrorMsg ? `\n  Reason: ${lastErrorMsg}` : '';
         logger.error(
           `❌ ${crawler.name} crawler failed with exit code ${code}${reason}`
         );
