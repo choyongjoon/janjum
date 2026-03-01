@@ -13,7 +13,7 @@ export function ProductSearchInput({
   const inputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <div className="mb-6">
+    <div className="min-w-0 flex-1">
       <label className="input input-bordered flex items-center gap-2">
         <SearchIcon size="sm" />
         <input

@@ -13,7 +13,6 @@ export function CategoryFilter({
 }: CategoryFilterProps) {
   return (
     <div className="mb-8">
-      <h2 className="mb-4 font-semibold text-xl">카테고리</h2>
       <div className="flex flex-wrap gap-2">
         <button
           className={`btn btn-sm ${selectedCategory === undefined ? 'btn-primary' : 'btn-outline'}`}

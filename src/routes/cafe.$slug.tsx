@@ -6,6 +6,10 @@ import { useMemo, useState } from 'react';
 import { z } from 'zod';
 import CafeHeader from '~/components/cafe/CafeHeader';
 import { CategoryFilter } from '~/components/cafe/CategoryFilter';
+import {
+  type OrderOption,
+  OrderSelector,
+} from '~/components/cafe/OrderSelector';
 import { ProductSearchInput } from '~/components/cafe/ProductSearchInput';
 import { api } from '../../convex/_generated/api';
 import { ProductCard } from '../components/ProductCard';
@@ -14,6 +18,10 @@ import { seo } from '../utils/seo';
 
 const searchSchema = z.object({
   category: z.string().optional(),
+  order: z
+    .enum(['latest', 'most-reviews', 'highest-rating'])
+    .optional()
+    .default('latest'),
 });
 
 export const Route = createFileRoute('/cafe/$slug')({
@@ -42,7 +50,8 @@ function CafePage() {
     convexQuery(api.cafes.getBySlug, { slug })
   );
 
-  const { category: selectedCategory } = Route.useSearch();
+  const { category: selectedCategory, order: selectedOrder = 'latest' } =
+    Route.useSearch();
   const navigate = useNavigate();
 
   const { data: products, isLoading: productsLoading } = useQuery({
@@ -73,6 +82,25 @@ function CafePage() {
     return result;
   }, [products, selectedCategory, searchQuery]);
 
+  const sortedProducts = (() => {
+    if (!filteredProducts) {
+      return;
+    }
+    const sorted = [...filteredProducts];
+    switch (selectedOrder) {
+      case 'most-reviews':
+        return sorted.sort(
+          (a, b) => (b.totalReviews ?? 0) - (a.totalReviews ?? 0)
+        );
+      case 'highest-rating':
+        return sorted.sort(
+          (a, b) => (b.averageRating ?? 0) - (a.averageRating ?? 0)
+        );
+      default:
+        return sorted;
+    }
+  })();
+
   const handleCategoryChange = (newCategory: string) => {
     if (!cafe) {
       return;
@@ -81,9 +109,26 @@ function CafePage() {
     navigate({
       to: '/cafe/$slug',
       params: { slug: cafe.slug },
-      search: {
+      search: (prev) => ({
+        ...prev,
         category: newCategory === '전체' ? undefined : newCategory,
-      },
+      }),
+      replace: true,
+    });
+  };
+
+  const handleOrderChange = (newOrder: OrderOption) => {
+    if (!cafe) {
+      return;
+    }
+
+    navigate({
+      to: '/cafe/$slug',
+      params: { slug: cafe.slug },
+      search: (prev) => ({
+        ...prev,
+        order: newOrder === 'latest' ? undefined : newOrder,
+      }),
       replace: true,
     });
   };
@@ -98,7 +143,10 @@ function CafePage() {
       <CafeHeader cafe={cafe} numProducts={products?.length} />
 
       <div className="container mx-auto px-4 py-8">
-        <ProductSearchInput onChange={setSearchQuery} value={searchQuery} />
+        <div className="mb-6 flex items-center gap-2">
+          <ProductSearchInput onChange={setSearchQuery} value={searchQuery} />
+          <OrderSelector onChange={handleOrderChange} value={selectedOrder} />
+        </div>
 
         <CategoryFilter
           categories={categories}
@@ -127,7 +175,7 @@ function CafePage() {
                   </div>
                 </div>
               ))
-            : filteredProducts?.map((product, index) => (
+            : sortedProducts?.map((product, index) => (
                 <ProductCard
                   key={product._id}
                   priority={index < 8}
@@ -136,7 +184,7 @@ function CafePage() {
               ))}
         </div>
 
-        {!productsLoading && filteredProducts?.length === 0 && (
+        {!productsLoading && sortedProducts?.length === 0 && (
           <div className="py-12 text-center">
             <p className="text-base-content/70">
               {searchQuery.trim()
