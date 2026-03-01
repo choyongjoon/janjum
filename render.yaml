@@ -1,0 +1,15 @@
+services:
+  - type: cron
+    name: janjum-blocked-cafe-sync
+    runtime: docker
+    dockerfilePath: ./Dockerfile.cron
+    schedule: "0 0 * * *" # Daily at midnight UTC (9 AM KST)
+    region: singapore
+    plan: starter
+    envVars:
+      - key: VITE_CONVEX_URL
+        sync: false
+      - key: CONVEX_UPLOAD_SECRET
+        sync: false
+      - key: NODE_ENV
+        value: production
