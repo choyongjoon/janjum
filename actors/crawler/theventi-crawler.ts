@@ -85,7 +85,11 @@ async function extractProductLinksFromListing(
   page: Page
 ): Promise<Array<{ uid: string; name: string }>> {
   await waitForLoad(page);
-  await page.waitForTimeout(2000);
+  await page
+    .waitForSelector(SELECTORS.productLink, { timeout: 15_000 })
+    .catch(() => {
+      logger.warn('Timed out waiting for product links, proceeding anyway');
+    });
 
   return page.evaluate(
     ({ selector, uidPattern }) => {

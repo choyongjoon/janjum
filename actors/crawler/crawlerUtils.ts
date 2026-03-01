@@ -46,8 +46,7 @@ export const takeDebugScreenshot = async (page: Page, key: string) => {
 
 export const writeProductsToJson = async (products: Product[], key: string) => {
   if (products.length === 0) {
-    logger.warn('No products extracted');
-    return;
+    throw new Error(`No products extracted for ${key}`);
   }
 
   const outputDir = path.join(
