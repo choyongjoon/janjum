@@ -365,6 +365,71 @@ export const upsertProduct = mutation({
   },
 });
 
+export const getRecent = query({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, { limit }) => {
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const oneDayMs = 24 * 60 * 60 * 1000;
+
+    const products = await ctx.db
+      .query('products')
+      .filter((q) =>
+        q.and(
+          q.eq(q.field('isActive'), true),
+          q.gte(q.field('addedAt'), thirtyDaysAgo)
+        )
+      )
+      .collect();
+
+    // Cache cafe lookups to avoid redundant queries
+    const cafeCache = new Map<string, { name: string; creationTime: number }>();
+    const getCafe = async (cafeId: Id<'cafes'>) => {
+      const cached = cafeCache.get(cafeId);
+      if (cached) {
+        return cached;
+      }
+      const cafe = await ctx.db.get(cafeId);
+      const result = {
+        name: cafe?.name || '',
+        creationTime: cafe?._creationTime ?? 0,
+      };
+      cafeCache.set(cafeId, result);
+      return result;
+    };
+
+    // Exclude bulk-imported products (added within 24h of cafe creation)
+    const filtered: typeof products = [];
+    for (const product of products) {
+      const cafe = await getCafe(product.cafeId);
+      if (product.addedAt - cafe.creationTime >= oneDayMs) {
+        filtered.push(product);
+      }
+    }
+
+    // Sort by addedAt descending (newest first)
+    filtered.sort((a, b) => b.addedAt - a.addedAt);
+
+    const limited = limit ? filtered.slice(0, limit) : filtered;
+
+    const productsWithCafes = await Promise.all(
+      limited.map(async (product) => {
+        const cafe = await getCafe(product.cafeId);
+        return {
+          ...product,
+          cafeName: cafe.name,
+          imageUrl: product.imageStorageId
+            ? (await ctx.storage.getUrl(product.imageStorageId)) || undefined
+            : undefined,
+        };
+      })
+    );
+
+    return { products: productsWithCafes, totalCount: filtered.length };
+  },
+});
+
 export const getById = query({
   args: { productId: v.id('products') },
   handler: async (ctx, { productId }) => {
