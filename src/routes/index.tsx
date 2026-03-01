@@ -2,15 +2,20 @@ import { convexQuery } from '@convex-dev/react-query';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { BrandCafeListSection } from '~/components/BrandCafeListSection';
+import {
+  NewProductsSection,
+  recentProductsQueryOptions,
+} from '~/components/NewProductsSection';
 import { api } from '../../convex/_generated/api';
 import { seo } from '../utils/seo';
 
 export const Route = createFileRoute('/')({
   component: Home,
   loader: async (opts) => {
-    await opts.context.queryClient.ensureQueryData(
-      convexQuery(api.cafes.list, {})
-    );
+    await Promise.all([
+      opts.context.queryClient.ensureQueryData(convexQuery(api.cafes.list, {})),
+      opts.context.queryClient.ensureQueryData(recentProductsQueryOptions),
+    ]);
   },
   head: () => ({
     meta: [
@@ -40,6 +45,7 @@ function Home() {
         </div>
       </div>
 
+      <NewProductsSection />
       <BrandCafeListSection cafes={cafes} />
     </div>
   );

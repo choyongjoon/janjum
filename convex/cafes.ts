@@ -13,7 +13,7 @@ export const list = query({
           : undefined,
       }))
     );
-    return cafesWithImageUrl.sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
+    return cafesWithImageUrl.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
   },
 });
 
