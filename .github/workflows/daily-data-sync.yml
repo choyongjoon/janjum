@@ -13,11 +13,11 @@ on:
         options:
           - "all"
           - "starbucks"
-          # - "compose" # blocked in CI
+          # - "compose" # blocked in CI, synced via Render cron
           - "mega"
           - "paik"
           - "ediya"
-          # - 'twosome' # blocked in CI
+          # - 'twosome' # blocks all cloud IPs, must sync manually
           - "coffeebean"
           - "hollys"
           - "paulbassett"
