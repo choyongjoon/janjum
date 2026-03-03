@@ -13,3 +13,5 @@ services:
         sync: false
       - key: NODE_ENV
         value: production
+      - key: CRAWLER_MAX_CONCURRENCY
+        value: 1
