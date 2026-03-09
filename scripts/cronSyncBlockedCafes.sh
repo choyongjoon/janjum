@@ -5,7 +5,7 @@
 
 set -e
 
-BLOCKED_CAFES=("compose")
+BLOCKED_CAFES=("compose" "oozy")
 
 for cafe in "${BLOCKED_CAFES[@]}"; do
   echo "=== Syncing $cafe ==="
