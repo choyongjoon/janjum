@@ -61,7 +61,8 @@ export default defineSchema({
     .index('by_cafe_external_id', ['cafeId', 'externalId'])
     .index('by_cafe_active', ['cafeId', 'isActive'])
     .index('by_short_id', ['shortId'])
-    .index('by_rating', ['averageRating']),
+    .index('by_rating', ['averageRating'])
+    .index('by_is_active_added_at', ['isActive', 'addedAt']),
   reviews: defineTable({
     productId: v.id('products'),
     userId: v.string(), // Clerk user ID

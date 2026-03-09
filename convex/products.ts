@@ -375,11 +375,8 @@ export const getRecent = query({
 
     const products = await ctx.db
       .query('products')
-      .filter((q) =>
-        q.and(
-          q.eq(q.field('isActive'), true),
-          q.gte(q.field('addedAt'), thirtyDaysAgo)
-        )
+      .withIndex('by_is_active_added_at', (q) =>
+        q.eq('isActive', true).gte('addedAt', thirtyDaysAgo)
       )
       .collect();
 
