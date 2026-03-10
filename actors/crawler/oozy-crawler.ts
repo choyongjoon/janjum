@@ -47,7 +47,9 @@ const maxRequestsInTestMode = isTestMode
   : 50;
 
 const CRAWLER_CONFIG = {
-  maxConcurrency: isTestMode ? 2 : 5,
+  maxConcurrency: isTestMode
+    ? 2
+    : Number.parseInt(process.env.CRAWLER_MAX_CONCURRENCY || '5', 10),
   maxRequestsPerCrawl: isTestMode ? maxRequestsInTestMode : 100,
   maxRequestRetries: 2,
   requestHandlerTimeoutSecs: isTestMode ? 20 : 40,
