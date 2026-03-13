@@ -39,7 +39,7 @@ export default defineConfig({
     sourcemap: process.env.NODE_ENV !== 'production',
 
     // Advanced chunk splitting for better caching and loading
-    rollupOptions: {
+    rolldownOptions: {
       output: {
         manualChunks: getManualChunks,
       },
