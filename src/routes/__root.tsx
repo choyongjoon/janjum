@@ -10,13 +10,22 @@ import {
   Outlet,
   useRouteContext,
 } from '@tanstack/react-router';
-import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 import { createServerFn, Scripts } from '@tanstack/react-start';
 import { getWebRequest } from '@tanstack/react-start/server';
 import type { ConvexReactClient } from 'convex/react';
 import { ConvexProviderWithClerk } from 'convex/react-clerk';
 import { PostHogProvider } from 'posthog-js/react';
 import type * as React from 'react';
+import { lazy, Suspense } from 'react';
+
+const TanStackRouterDevtools = import.meta.env.DEV
+  ? lazy(() =>
+      import('@tanstack/react-router-devtools').then((res) => ({
+        default: res.TanStackRouterDevtools,
+      }))
+    )
+  : () => null;
+
 import { NewUserRedirect } from '~/components/auth/NewUserRedirect';
 import { DefaultCatchBoundary } from '~/components/DefaultCatchBoundary.js';
 import { Footer } from '~/components/Footer';
@@ -170,7 +179,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           <NewUserRedirect>{children}</NewUserRedirect>
         </main>
         <Footer />
-        <TanStackRouterDevtools position="bottom-right" />
+        <Suspense>
+          <TanStackRouterDevtools position="bottom-right" />
+        </Suspense>
         <Scripts />
       </body>
     </html>
