@@ -38,6 +38,7 @@ const CAFE_WEBSITES: Partial<Record<CafeKey, string>> = {
   mammoth: 'https://mmthcoffee.com',
   gongcha: 'https://www.gong-cha.co.kr',
   oozy: 'https://oozycoffee.com',
+  angelinus: 'https://www.lotteeatz.com/brand/angel',
 };
 
 function parseArgs(): ParsedArgs {
