@@ -1,14 +1,15 @@
-import { convexQuery, useConvexMutation } from '@convex-dev/react-query';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Id } from 'convex/_generated/dataModel';
-import { useState } from 'react';
-import { api } from '../../../convex/_generated/api';
-import { SignInModal } from '../auth/SignInModal';
-import { ReviewCard } from './ReviewCard';
-import { ReviewForm } from './ReviewForm';
+import { convexQuery, useConvexMutation } from "@convex-dev/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { Id } from "convex/_generated/dataModel";
+import { useState } from "react";
+import { showToast } from "~/utils/toast";
+import { api } from "../../../convex/_generated/api";
+import { SignInModal } from "../auth/SignInModal";
+import { ReviewCard } from "./ReviewCard";
+import { ReviewForm } from "./ReviewForm";
 
 interface ReviewSectionProps {
-  productId: Id<'products'>;
+  productId: Id<"products">;
 }
 
 export function ReviewSection({ productId }: ReviewSectionProps) {
@@ -17,6 +18,8 @@ export function ReviewSection({ productId }: ReviewSectionProps) {
   const [showForm, setShowForm] = useState(false);
   const [_editingReview, setEditingReview] = useState(false);
   const [showSignInModal, setShowSignInModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] =
+    useState<Id<"reviews"> | null>(null);
 
   // Get review statistics
   const { data: reviewStats } = useQuery(
@@ -32,7 +35,7 @@ export function ReviewSection({ productId }: ReviewSectionProps) {
   const { data: userReview } = useQuery({
     ...convexQuery(api.reviews.getUserReview, {
       productId,
-      userId: currentUser?._id || '',
+      userId: currentUser?._id || "",
     }),
     enabled: !!currentUser?._id,
   });
@@ -70,23 +73,27 @@ export function ReviewSection({ productId }: ReviewSectionProps) {
     setEditingReview(false);
   };
 
-  const handleDeleteReview = async (reviewId: Id<'reviews'>) => {
+  const handleDeleteReview = (reviewId: Id<"reviews">) => {
     if (!currentUser) {
-      alert('후기를 삭제하려면 로그인이 필요합니다.');
+      showToast("후기를 삭제하려면 로그인이 필요합니다.", "error");
       return;
     }
+    setShowDeleteConfirm(reviewId);
+  };
 
-    if (!confirm('정말로 이 후기를 삭제하시겠습니까?')) {
+  const confirmDeleteReview = async () => {
+    if (!(currentUser && showDeleteConfirm)) {
       return;
     }
-
     try {
       await deleteReviewMutation.mutateAsync({
-        reviewId,
+        reviewId: showDeleteConfirm,
         userId: currentUser._id,
       });
     } catch {
-      alert('후기 삭제에 실패했습니다. 다시 시도해주세요.');
+      showToast("후기 삭제에 실패했습니다. 다시 시도해주세요.", "error");
+    } finally {
+      setShowDeleteConfirm(null);
     }
   };
 
@@ -102,31 +109,31 @@ export function ReviewSection({ productId }: ReviewSectionProps) {
 
         {!showForm && (
           <div className="flex gap-2">
-            {currentUser ? (
-              hasUserReview ? (
-                <button
-                  className="btn btn-outline btn-sm"
-                  onClick={handleEditReview}
-                  type="button"
-                >
-                  내 후기 수정
-                </button>
-              ) : (
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={handleWriteReview}
-                  type="button"
-                >
-                  후기 작성
-                </button>
-              )
-            ) : (
+            {!currentUser && (
               <button
                 className="btn btn-primary btn-sm"
                 onClick={() => setShowSignInModal(true)}
                 type="button"
               >
                 소셜 계정으로 로그인
+              </button>
+            )}
+            {currentUser && hasUserReview && (
+              <button
+                className="btn btn-outline btn-sm"
+                onClick={handleEditReview}
+                type="button"
+              >
+                내 후기 수정
+              </button>
+            )}
+            {currentUser && !hasUserReview && (
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={handleWriteReview}
+                type="button"
+              >
+                후기 작성
               </button>
             )}
           </div>
@@ -193,6 +200,32 @@ export function ReviewSection({ productId }: ReviewSectionProps) {
             </div>
           </div>
         )
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">후기 삭제</h3>
+            <p className="py-4">정말로 이 후기를 삭제하시겠습니까?</p>
+            <div className="modal-action">
+              <button
+                className="btn"
+                onClick={() => setShowDeleteConfirm(null)}
+                type="button"
+              >
+                취소
+              </button>
+              <button
+                className="btn btn-error"
+                onClick={confirmDeleteReview}
+                type="button"
+              >
+                삭제
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Sign In Modal */}

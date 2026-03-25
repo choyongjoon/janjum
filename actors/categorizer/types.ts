@@ -1,12 +1,12 @@
 export type Category =
-  | '커피'
-  | '차'
-  | '블렌디드'
-  | '스무디'
-  | '주스'
-  | '에이드'
-  | '아이스크림'
-  | '그 외';
+  | "커피"
+  | "차"
+  | "블렌디드"
+  | "스무디"
+  | "주스"
+  | "에이드"
+  | "아이스크림"
+  | "그 외";
 
 export interface CategorizerInput {
   externalCategory?: string;
@@ -15,30 +15,29 @@ export interface CategorizerInput {
 
 export interface CategorizerResult {
   category: Category;
-  confidence: 'high' | 'medium' | 'low';
-  source: 'direct' | 'pattern' | 'fallback' | 'human';
+  confidence: "high" | "medium" | "low";
   matchedRule?: string;
+  source: "direct" | "pattern" | "fallback" | "human";
 }
 
 export interface CategorizationRule {
-  id: string;
-  type: 'direct' | 'pattern';
   condition: {
     externalCategory?: string;
     namePattern?: string;
     nameContains?: string[];
     nameEndsWith?: string[];
   };
-  targetCategory: Category;
-  confidence: 'high' | 'medium' | 'low';
-  createdBy: 'system' | 'human';
+  confidence: "high" | "medium" | "low";
   createdAt: number;
-  usageCount: number;
+  createdBy: "system" | "human";
+  id: string;
   priority?: number;
+  targetCategory: Category;
+  type: "direct" | "pattern";
+  usageCount: number;
 }
 
 export interface CategorizationRules {
-  version: string;
   lastUpdated: number;
   rules: CategorizationRule[];
   stats: {
@@ -46,44 +45,45 @@ export interface CategorizationRules {
     humanLearnings: number;
     averageConfidence: number;
   };
+  version: string;
 }
 
 export interface CategorizeOptions {
+  confidence?: "all" | "low" | "medium";
   dryRun?: boolean;
-  interactive?: boolean;
-  verbose?: boolean;
-  confidence?: 'all' | 'low' | 'medium';
-  limit?: number;
   force?: boolean;
+  interactive?: boolean;
+  limit?: number;
+  verbose?: boolean;
 }
 
 export interface CategorizeStats {
-  processed: number;
-  updated: number;
-  unchanged: number;
-  errors: number;
   confidenceBreakdown: {
     high: number;
     medium: number;
     low: number;
   };
+  errors: number;
+  processed: number;
   sourceBreakdown: {
     direct: number;
     pattern: number;
     fallback: number;
     human: number;
   };
+  unchanged: number;
+  updated: number;
 }
 
 export interface Product {
   _id: string;
-  name: string;
   category?: string; // Allow any string, not just Category enum
   externalCategory?: string;
+  name: string;
 }
 
 export interface ProductForCategorize {
-  name: string;
-  externalCategory: string;
   category?: string;
+  externalCategory: string;
+  name: string;
 }

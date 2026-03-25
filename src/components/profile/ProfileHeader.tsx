@@ -1,16 +1,16 @@
-import { SignOutButton } from '@clerk/tanstack-react-start';
-import { Link } from '@tanstack/react-router';
+import { SignOutButton } from "@clerk/tanstack-react-start";
+import { Link } from "@tanstack/react-router";
 
 interface User {
   _id: string;
-  name: string;
   handle: string;
   imageUrl?: string;
+  name: string;
 }
 
 interface ProfileHeaderProps {
-  user?: User | null;
   isCurrentUser?: boolean;
+  user?: User | null;
 }
 
 export function ProfileHeader({
@@ -29,15 +29,17 @@ export function ProfileHeader({
             <div className="avatar">
               <div className="h-16 w-16 rounded-full">
                 <img
-                  alt={user.name || '프로필'}
+                  alt={user.name || "프로필"}
                   className="h-full w-full object-cover"
+                  height={64}
                   src={user.imageUrl}
+                  width={64}
                 />
               </div>
             </div>
           )}
           <div className="flex-1">
-            <h1 className="font-bold text-2xl">{user.name || '사용자'}</h1>
+            <h1 className="font-bold text-2xl">{user.name || "사용자"}</h1>
             <p className="text-base-content/60 text-sm">@{user.handle}</p>
           </div>
           {isCurrentUser && (

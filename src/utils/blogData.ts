@@ -1,13 +1,13 @@
 // Import markdown blog posts
-import startPostMd from '~/data/blog-posts/start.md?raw';
+import startPostMd from "~/data/blog-posts/start.md?raw";
 
-type BlogPost = {
-  id: string;
-  title: string;
-  excerpt: string;
+interface BlogPost {
   content: string;
+  excerpt: string;
+  id: string;
   publishedAt: string;
-};
+  title: string;
+}
 
 // Regex for parsing frontmatter (moved to top level for performance)
 const FRONTMATTER_REGEX = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/;
@@ -17,15 +17,15 @@ const parseBlogPost = (markdown: string): BlogPost => {
   const match = markdown.match(FRONTMATTER_REGEX);
 
   if (!match) {
-    throw new Error('Invalid markdown format - missing frontmatter');
+    throw new Error("Invalid markdown format - missing frontmatter");
   }
 
   const [, frontmatter, content] = match;
   const data: Record<string, string> = {};
 
   // Parse YAML-like frontmatter using for...of instead of forEach
-  for (const line of frontmatter.split('\n')) {
-    const colonIndex = line.indexOf(':');
+  for (const line of frontmatter.split("\n")) {
+    const colonIndex = line.indexOf(":");
     if (colonIndex > 0) {
       const key = line.substring(0, colonIndex).trim();
       const value = line.substring(colonIndex + 1).trim();

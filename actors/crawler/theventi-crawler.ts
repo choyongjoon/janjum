@@ -1,25 +1,25 @@
-import { PlaywrightCrawler, type Request } from 'crawlee';
-import type { Page } from 'playwright';
-import { logger } from '../../shared/logger';
-import type { Nutritions } from '../../shared/nutritions';
-import { type Product, waitForLoad, writeProductsToJson } from './crawlerUtils';
+import { PlaywrightCrawler, type Request } from "crawlee";
+import type { Page } from "playwright";
+import { logger } from "../../shared/logger";
+import type { Nutritions } from "../../shared/nutritions";
+import { type Product, waitForLoad, writeProductsToJson } from "./crawlerUtils";
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
 // ================================================
 
 const SITE_CONFIG = {
-  baseUrl: 'https://www.theventi.co.kr',
-  menuBaseUrl: 'https://www.theventi.co.kr/new2022/menu/all.html',
-  detailBaseUrl: 'https://www.theventi.co.kr/new2022/menu/all-view.new.html',
+  baseUrl: "https://www.theventi.co.kr",
+  menuBaseUrl: "https://www.theventi.co.kr/new2022/menu/all.html",
+  detailBaseUrl: "https://www.theventi.co.kr/new2022/menu/all-view.new.html",
   menuCategories: {
     커피: 2,
     디카페인: 3,
-    '아이스 블렌디드': 4,
-    '주스/에이드': 5,
-    '버블티/티': 6,
+    "아이스 블렌디드": 4,
+    "주스/에이드": 5,
+    "버블티/티": 6,
     베버리지: 7,
-    '사이드메뉴/RTD': 8,
+    "사이드메뉴/RTD": 8,
   },
 } as const;
 
@@ -29,10 +29,10 @@ const SITE_CONFIG = {
 
 const SELECTORS = {
   productLink: 'a[href*="all-view.new.html"]',
-  detailName: 'p.tit',
-  detailImage: '.img_bx img',
-  detailDescription: '.txt.scroll-con-y',
-  nutritionTable: 'table.table',
+  detailName: "p.tit",
+  detailImage: ".img_bx img",
+  detailDescription: ".txt.scroll-con-y",
+  nutritionTable: "table.table",
 } as const;
 
 // ================================================
@@ -41,18 +41,18 @@ const SELECTORS = {
 
 const SERVING_SIZE_REGEX = /(\d+)\s*(ml|g)/i;
 const NUMERIC_REGEX = /[\d.]+/;
-const UID_PATTERN = 'uid=(\\d+)';
+const UID_PATTERN = "uid=(\\d+)";
 
 // ================================================
 // CRAWLER CONFIGURATION
 // ================================================
 
-const isTestMode = process.env.CRAWLER_TEST_MODE === 'true';
+const isTestMode = process.env.CRAWLER_TEST_MODE === "true";
 const maxProductsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS || '3', 10)
+  ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS || "3", 10)
   : Number.POSITIVE_INFINITY;
 const maxRequestsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || '10', 10)
+  ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || "10", 10)
   : 50;
 
 const CRAWLER_CONFIG = {
@@ -62,7 +62,7 @@ const CRAWLER_CONFIG = {
   requestHandlerTimeoutSecs: isTestMode ? 30 : 120,
   launchOptions: {
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
   },
 };
 
@@ -88,7 +88,7 @@ async function extractProductLinksFromListing(
   await page
     .waitForSelector(SELECTORS.productLink, { timeout: 15_000 })
     .catch(() => {
-      logger.warn('Timed out waiting for product links, proceeding anyway');
+      logger.warn("Timed out waiting for product links, proceeding anyway");
     });
 
   return page.evaluate(
@@ -98,14 +98,14 @@ async function extractProductLinksFromListing(
       const uniqueProducts = new Map<string, { uid: string; name: string }>();
 
       for (const link of links) {
-        const href = link.getAttribute('href');
+        const href = link.getAttribute("href");
         const match = href?.match(uidRegex);
         if (match) {
           const uid = match[1];
           if (!uniqueProducts.has(uid)) {
             uniqueProducts.set(uid, {
               uid,
-              name: link.textContent?.trim() || '',
+              name: link.textContent?.trim() || "",
             });
           }
         }
@@ -129,11 +129,11 @@ function extractNutritionTableData(
     const headers: string[] = [];
     const values: string[] = [];
 
-    for (const th of table.querySelectorAll('thead th')) {
-      headers.push(th.textContent?.trim() || '');
+    for (const th of table.querySelectorAll("thead th")) {
+      headers.push(th.textContent?.trim() || "");
     }
-    for (const td of table.querySelectorAll('tbody td')) {
-      values.push(td.textContent?.trim() || '');
+    for (const td of table.querySelectorAll("tbody td")) {
+      values.push(td.textContent?.trim() || "");
     }
 
     if (headers.length > 3 && values.length > 0) {
@@ -160,25 +160,25 @@ async function extractNutritionFromDetailPage(
 }
 
 type NutritionFieldKey =
-  | 'calories'
-  | 'sugar'
-  | 'protein'
-  | 'saturatedFat'
-  | 'natrium'
-  | 'caffeine';
+  | "calories"
+  | "sugar"
+  | "protein"
+  | "saturatedFat"
+  | "natrium"
+  | "caffeine";
 
 const NUTRITION_FIELD_MAP: Array<{
   keyword: string;
   field: NutritionFieldKey;
   unit: string;
 }> = [
-  { keyword: '열량', field: 'calories', unit: 'kcal' },
-  { keyword: 'kcal', field: 'calories', unit: 'kcal' },
-  { keyword: '당류', field: 'sugar', unit: 'g' },
-  { keyword: '단백질', field: 'protein', unit: 'g' },
-  { keyword: '포화지방', field: 'saturatedFat', unit: 'g' },
-  { keyword: '나트륨', field: 'natrium', unit: 'mg' },
-  { keyword: '카페인', field: 'caffeine', unit: 'mg' },
+  { keyword: "열량", field: "calories", unit: "kcal" },
+  { keyword: "kcal", field: "calories", unit: "kcal" },
+  { keyword: "당류", field: "sugar", unit: "g" },
+  { keyword: "단백질", field: "protein", unit: "g" },
+  { keyword: "포화지방", field: "saturatedFat", unit: "g" },
+  { keyword: "나트륨", field: "natrium", unit: "mg" },
+  { keyword: "카페인", field: "caffeine", unit: "mg" },
 ];
 
 function applyServingSize(nutrition: Nutritions, value: string): boolean {
@@ -200,11 +200,11 @@ function mapNutritionData(
 
   for (const [index, header] of headers.entries()) {
     const value = values[index];
-    if (!value || value === '-') {
+    if (!value || value === "-") {
       continue;
     }
 
-    if (header.includes('제공량')) {
+    if (header.includes("제공량")) {
       hasData = applyServingSize(nutrition, value) || hasData;
       continue;
     }
@@ -235,13 +235,13 @@ async function extractProductDetailFromPage(page: Page): Promise<{
     .evaluate((selector: string) => {
       const tit = document.querySelector(selector);
       if (!tit) {
-        return '';
+        return "";
       }
-      const spans = [...tit.querySelectorAll('span:not(.tag)')];
+      const spans = [...tit.querySelectorAll("span:not(.tag)")];
       const lastSpan = spans.at(-1);
-      return lastSpan?.textContent?.trim() || tit.textContent?.trim() || '';
+      return lastSpan?.textContent?.trim() || tit.textContent?.trim() || "";
     }, SELECTORS.detailName)
-    .catch(() => '');
+    .catch(() => "");
 
   if (!name) {
     return null;
@@ -250,23 +250,23 @@ async function extractProductDetailFromPage(page: Page): Promise<{
   const imageUrl = await page
     .locator(SELECTORS.detailImage)
     .first()
-    .getAttribute('src', { timeout: 3000 })
+    .getAttribute("src", { timeout: 3000 })
     .then((src) => {
       if (!src) {
-        return '';
+        return "";
       }
-      return src.startsWith('http')
+      return src.startsWith("http")
         ? src
-        : `${SITE_CONFIG.baseUrl}${src.startsWith('/') ? '' : '/'}${src}`;
+        : `${SITE_CONFIG.baseUrl}${src.startsWith("/") ? "" : "/"}${src}`;
     })
-    .catch(() => '');
+    .catch(() => "");
 
   const description = await page
     .locator(SELECTORS.detailDescription)
     .first()
     .textContent({ timeout: 3000 })
     .then((text) => {
-      const cleaned = text?.trim().replace(/\s+/g, ' ') || null;
+      const cleaned = text?.trim().replace(/\s+/g, " ") || null;
       return cleaned && cleaned.length > 5 ? cleaned : null;
     })
     .catch(() => null);
@@ -356,7 +356,7 @@ async function handleDetailPage(
 
   await crawlerInstance.pushData(product);
   logger.info(
-    `Extracted: ${detail.name} (uid=${uid})${detail.nutritions ? ' with nutrition' : ''}`
+    `Extracted: ${detail.name} (uid=${uid})${detail.nutritions ? " with nutrition" : ""}`
   );
 }
 
@@ -403,16 +403,16 @@ export const runTheventiCrawler = async () => {
   try {
     await crawler.run(urlsToProcess);
     const dataset = await crawler.getData();
-    await writeProductsToJson(dataset.items as Product[], 'theventi');
+    await writeProductsToJson(dataset.items as Product[], "theventi");
   } catch (error) {
-    logger.error('TheVenti crawler failed:', error);
+    logger.error("TheVenti crawler failed:", error);
     throw error;
   }
 };
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   runTheventiCrawler().catch((error) => {
-    logger.error('Crawler execution failed:', error);
+    logger.error("Crawler execution failed:", error);
     process.exit(1);
   });
 }

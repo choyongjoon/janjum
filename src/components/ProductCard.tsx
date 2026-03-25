@@ -1,16 +1,16 @@
-import { convexQuery } from '@convex-dev/react-query';
-import { useQuery } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 
-import { api } from '../../convex/_generated/api';
-import type { Doc } from '../../convex/_generated/dataModel';
-import { RatingSummary } from '../components/RatingSummary';
+import { api } from "../../convex/_generated/api";
+import type { Doc } from "../../convex/_generated/dataModel";
+import { RatingSummary } from "../components/RatingSummary";
 
 export function ProductCard({
   product,
   priority = false,
 }: {
-  product: Doc<'products'> & {
+  product: Doc<"products"> & {
     cafeName?: string;
     imageUrl?: string;
   };
@@ -49,7 +49,7 @@ export function ProductCard({
           alt={product.name}
           className="aspect-square w-full object-cover"
           height={300}
-          loading={priority ? 'eager' : 'lazy'}
+          loading={priority ? "eager" : "lazy"}
           src={product.imageUrl || product.externalImageUrl}
           width={300}
         />
@@ -63,7 +63,7 @@ export function ProductCard({
         )}
         <div className="flex items-start justify-between gap-2">
           <h3
-            className={`card-title break-keep ${isActive ? '' : 'text-base-content/50'}`}
+            className={`card-title break-keep ${isActive ? "" : "text-base-content/50"}`}
           >
             {product.name}
           </h3>

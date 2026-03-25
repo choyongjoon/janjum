@@ -1,14 +1,14 @@
-import type { SVGProps } from 'react';
+import type { SVGProps } from "react";
 
 interface SearchIconProps extends SVGProps<SVGSVGElement> {
-  size?: 'sm' | 'md' | 'lg';
+  size?: "sm" | "md" | "lg";
 }
 
-export function SearchIcon({ size = 'md', ...props }: SearchIconProps) {
+export function SearchIcon({ size = "md", ...props }: SearchIconProps) {
   const sizeClasses = {
-    sm: 'h-4 w-4',
-    md: 'h-5 w-5',
-    lg: 'h-6 w-6',
+    sm: "h-4 w-4",
+    md: "h-5 w-5",
+    lg: "h-6 w-6",
   };
 
   return (

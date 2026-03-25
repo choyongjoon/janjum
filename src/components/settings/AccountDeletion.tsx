@@ -1,8 +1,8 @@
-import { useAuth } from '@clerk/tanstack-react-start';
-import { useRouter } from '@tanstack/react-router';
-import { useState } from 'react';
-import { usePostHogEvents } from '~/hooks/usePostHogEvents';
-import { DeleteAccountDialog } from './DeleteAccountDialog';
+import { useAuth } from "@clerk/tanstack-react-start";
+import { useRouter } from "@tanstack/react-router";
+import { useState } from "react";
+import { usePostHogEvents } from "~/hooks/usePostHogEvents";
+import { DeleteAccountDialog } from "./DeleteAccountDialog";
 
 export function AccountDeletion() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -12,12 +12,12 @@ export function AccountDeletion() {
 
   const handleDeleteAccount = async () => {
     // Track deletion confirmation
-    trackAccountDeletion('confirmed');
+    trackAccountDeletion("confirmed");
 
     // Sign out the user from Clerk first
     await signOut();
     // Navigate to home page
-    router.navigate({ to: '/' });
+    router.navigate({ to: "/" });
     setShowDeleteDialog(false);
   };
 
@@ -32,7 +32,7 @@ export function AccountDeletion() {
           <button
             className="btn btn-error btn-outline btn-sm"
             onClick={() => {
-              trackAccountDeletion('initiated');
+              trackAccountDeletion("initiated");
               setShowDeleteDialog(true);
             }}
             type="button"
@@ -46,7 +46,7 @@ export function AccountDeletion() {
       <DeleteAccountDialog
         isOpen={showDeleteDialog}
         onClose={() => {
-          trackAccountDeletion('cancelled');
+          trackAccountDeletion("cancelled");
           setShowDeleteDialog(false);
         }}
         onConfirm={handleDeleteAccount}

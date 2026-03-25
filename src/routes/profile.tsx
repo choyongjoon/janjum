@@ -1,13 +1,13 @@
-import { convexQuery } from '@convex-dev/react-query';
-import { useQuery } from '@tanstack/react-query';
-import { createFileRoute } from '@tanstack/react-router';
-import { AuthWrapper } from '~/components/auth/AuthWrapper';
-import { ProfileHeader } from '~/components/profile/ProfileHeader';
-import { ProfileReviews } from '~/components/profile/ProfileReviews';
-import { ProfileStats } from '~/components/profile/ProfileStats';
-import { api } from '../../convex/_generated/api';
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
+import { AuthWrapper } from "~/components/auth/AuthWrapper";
+import { ProfileHeader } from "~/components/profile/ProfileHeader";
+import { ProfileReviews } from "~/components/profile/ProfileReviews";
+import { ProfileStats } from "~/components/profile/ProfileStats";
+import { api } from "../../convex/_generated/api";
 
-export const Route = createFileRoute('/profile')({
+export const Route = createFileRoute("/profile")({
   component: AuthenticatedProfilePage,
 });
 
@@ -29,7 +29,7 @@ function ProfilePage() {
     error: reviewsError,
   } = useQuery({
     ...convexQuery(api.reviews.getUserReviews, {
-      userId: currentUser?._id || '',
+      userId: currentUser?._id || "",
     }),
     enabled: !!currentUser?._id,
   });
@@ -37,7 +37,7 @@ function ProfilePage() {
   // Get user's rating statistics
   const { data: userStats, isLoading: statsLoading } = useQuery({
     ...convexQuery(api.reviews.getUserStats, {
-      userId: currentUser?._id || '',
+      userId: currentUser?._id || "",
     }),
     enabled: !!currentUser?._id,
   });

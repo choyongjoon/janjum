@@ -1,21 +1,21 @@
 #!/usr/bin/env tsx
 
-import { execSync } from 'node:child_process';
-import fs from 'node:fs';
-import path from 'node:path';
-import { logger } from 'shared/logger';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { ProductForCategorize } from './types';
+import { execSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { logger } from "../../shared/logger";
+import type { ProductForCategorize } from "./types";
 
-describe('Categorizer', () => {
-  const testDir = path.join(process.cwd(), 'test-temp');
-  const testJsonPath = path.join(testDir, 'products-커피.json');
+describe("Categorizer", () => {
+  const testDir = path.join(process.cwd(), "test-temp");
+  const testJsonPath = path.join(testDir, "products-커피.json");
 
   beforeAll(() => {
     fs.mkdirSync(testDir, { recursive: true });
     // copy all files from test to test-temp
     fs.cpSync(
-      path.join(process.cwd(), 'actors', 'categorizer', 'test'),
+      path.join(process.cwd(), "actors", "categorizer", "test"),
       testDir,
       { recursive: true }
     );
@@ -31,16 +31,16 @@ describe('Categorizer', () => {
     }
   });
 
-  describe('', () => {
+  describe("", () => {
     const categories = [
-      '커피',
-      '차',
-      '블렌디드',
-      '스무디',
-      '주스',
-      '에이드',
-      '아이스크림',
-      '그 외',
+      "커피",
+      "차",
+      "블렌디드",
+      "스무디",
+      "주스",
+      "에이드",
+      "아이스크림",
+      "그 외",
     ];
 
     for (const category of categories) {
@@ -59,13 +59,13 @@ describe('Categorizer', () => {
           `pnpm exec tsx actors/categorizer/categorize.ts --file "${filePath}" --verbose`,
           {
             cwd: process.cwd(),
-            stdio: 'pipe',
+            stdio: "pipe",
           }
         );
 
         // Read the updated file
         const updatedProducts: ProductForCategorize[] = JSON.parse(
-          fs.readFileSync(filePath, 'utf-8')
+          fs.readFileSync(filePath, "utf-8")
         );
 
         // For other categories, expect exact match

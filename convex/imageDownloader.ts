@@ -1,30 +1,30 @@
-import { v } from 'convex/values';
-import { api } from './_generated/api';
-import type { Doc, Id } from './_generated/dataModel';
-import { type ActionCtx, action } from './_generated/server';
+import { v } from "convex/values";
+import { api } from "./_generated/api";
+import type { Doc, Id } from "./_generated/dataModel";
+import { type ActionCtx, action } from "./_generated/server";
 
-type DownloadResult = {
-  success: boolean;
-  storageId?: Id<'_storage'>;
-  message?: string;
+interface DownloadResult {
   error?: string;
-};
+  message?: string;
+  storageId?: Id<"_storage">;
+  success: boolean;
+}
 
 export const downloadAndStoreImageAction = action({
   args: {
     imageUrl: v.string(),
-    productId: v.id('products'),
+    productId: v.id("products"),
     uploadSecret: v.optional(v.string()),
   },
   handler: async (
     ctx: ActionCtx,
     { imageUrl, productId, uploadSecret }
   ): Promise<DownloadResult> => {
-    let storageId: Id<'_storage'> | null = null;
+    let storageId: Id<"_storage"> | null = null;
 
     try {
       // Verify the product still exists before downloading
-      const product: Doc<'products'> | null = await ctx.runQuery(
+      const product: Doc<"products"> | null = await ctx.runQuery(
         api.products.getById,
         { productId }
       );
@@ -37,7 +37,7 @@ export const downloadAndStoreImageAction = action({
         return {
           success: true,
           storageId: product.imageStorageId,
-          message: 'Product already has an image',
+          message: "Product already has an image",
         };
       }
 
@@ -55,9 +55,9 @@ export const downloadAndStoreImageAction = action({
       const uploadUrl = await ctx.storage.generateUploadUrl();
 
       const uploadResponse = await fetch(uploadUrl, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': response.headers.get('content-type') || 'image/jpeg',
+          "Content-Type": response.headers.get("content-type") || "image/jpeg",
         },
         body: imageBlob,
       });
@@ -67,7 +67,7 @@ export const downloadAndStoreImageAction = action({
       }
 
       const { storageId: newStorageId } = await uploadResponse.json();
-      storageId = newStorageId as Id<'_storage'>;
+      storageId = newStorageId as Id<"_storage">;
 
       // Update the product with the storage ID
       await ctx.runMutation(api.products.updateImage, {

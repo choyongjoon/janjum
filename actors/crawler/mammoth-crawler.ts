@@ -1,23 +1,23 @@
-import { PlaywrightCrawler } from 'crawlee';
-import type { Page } from 'playwright';
-import { logger } from '../../shared/logger';
-import type { Nutritions } from '../../shared/nutritions';
-import { type Product, waitForLoad, writeProductsToJson } from './crawlerUtils';
-import { extractNutritionFromText } from './nutritionUtils';
+import { PlaywrightCrawler } from "crawlee";
+import type { Page } from "playwright";
+import { logger } from "../../shared/logger";
+import type { Nutritions } from "../../shared/nutritions";
+import { type Product, waitForLoad, writeProductsToJson } from "./crawlerUtils";
+import { extractNutritionFromText } from "./nutritionUtils";
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
 // ================================================
 
 const SITE_CONFIG = {
-  baseUrl: 'https://mmthcoffee.com',
-  startUrl: 'https://mmthcoffee.com/sub/menu/list_coffee.php', // Use the coffee-specific URL
+  baseUrl: "https://mmthcoffee.com",
+  startUrl: "https://mmthcoffee.com/sub/menu/list_coffee.php", // Use the coffee-specific URL
   menuListUrls: [
-    'https://mmthcoffee.com/sub/menu/list_coffee.php',
-    'https://mmthcoffee.com/sub/menu/list_sub.php?menuType=F', // Food/Dessert
+    "https://mmthcoffee.com/sub/menu/list_coffee.php",
+    "https://mmthcoffee.com/sub/menu/list_sub.php?menuType=F", // Food/Dessert
   ],
   productUrlTemplate:
-    'https://mmthcoffee.com/sub/menu/list_coffee_view.php?menuSeq=',
+    "https://mmthcoffee.com/sub/menu/list_coffee_view.php?menuSeq=",
 } as const;
 
 // ================================================
@@ -30,19 +30,19 @@ const SELECTORS = {
 
   // Product data extraction
   productData: {
-    koreanName: 'strong',
-    image: 'img',
-    link: '', // The entire anchor element
+    koreanName: "strong",
+    image: "img",
+    link: "", // The entire anchor element
   },
 
   // Product detail page selectors
   productDetails: {
-    name: '.product-title, h1, .detail-name',
-    description: '.product-description, .detail-desc',
-    category: '.product-category, .detail-category',
-    image: '.product-image img, .detail-image img',
-    price: '.price, .product-price',
-    nutritionTable: '.i_table',
+    name: ".product-title, h1, .detail-name",
+    description: ".product-description, .detail-desc",
+    category: ".product-category, .detail-category",
+    image: ".product-image img, .detail-image img",
+    price: ".price, .product-price",
+    nutritionTable: ".i_table",
   },
 } as const;
 
@@ -51,12 +51,12 @@ const SELECTORS = {
 // ================================================
 
 // Test mode configuration
-const isTestMode = process.env.CRAWLER_TEST_MODE === 'true';
+const isTestMode = process.env.CRAWLER_TEST_MODE === "true";
 const maxProductsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS || '3', 10)
+  ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS || "3", 10)
   : Number.POSITIVE_INFINITY;
 const maxRequestsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || '10', 10)
+  ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || "10", 10)
   : 150;
 
 const CRAWLER_CONFIG = {
@@ -66,7 +66,7 @@ const CRAWLER_CONFIG = {
   requestHandlerTimeoutSecs: isTestMode ? 20 : 30,
   launchOptions: {
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
   },
 };
 
@@ -104,42 +104,42 @@ function extractMammothNutritionFromText(text: string): Nutritions | null {
       const ozValue = Number.parseFloat(servingSizeMatch[1]);
       // Convert oz to ml (1 oz = 29.5735 ml)
       nutrition.servingSize = Math.round(ozValue * 29.5735);
-      nutrition.servingSizeUnit = 'ml';
+      nutrition.servingSizeUnit = "ml";
     }
 
     // Extract calories: 칼로리 (Kcal) 30.2
     const caloriesMatch = text.match(MAMMOTH_NUTRITION_PATTERNS.calories);
     if (caloriesMatch) {
       nutrition.calories = Number.parseFloat(caloriesMatch[1]);
-      nutrition.caloriesUnit = 'kcal';
+      nutrition.caloriesUnit = "kcal";
     }
 
     // Extract protein: 단백질 (g) 1.9
     const proteinMatch = text.match(MAMMOTH_NUTRITION_PATTERNS.protein);
     if (proteinMatch) {
       nutrition.protein = Number.parseFloat(proteinMatch[1]);
-      nutrition.proteinUnit = 'g';
+      nutrition.proteinUnit = "g";
     }
 
     // Extract sugar: 당류 (g) 73.5
     const sugarMatch = text.match(MAMMOTH_NUTRITION_PATTERNS.sugar);
     if (sugarMatch) {
       nutrition.sugar = Number.parseFloat(sugarMatch[1]);
-      nutrition.sugarUnit = 'g';
+      nutrition.sugarUnit = "g";
     }
 
     // Extract sodium: 나트륨 (mg) 2.0
     const sodiumMatch = text.match(MAMMOTH_NUTRITION_PATTERNS.sodium);
     if (sodiumMatch) {
       nutrition.natrium = Number.parseFloat(sodiumMatch[1]);
-      nutrition.natriumUnit = 'mg';
+      nutrition.natriumUnit = "mg";
     }
 
     // Extract caffeine: 카페인 (mg) 486.5
     const caffeineMatch = text.match(MAMMOTH_NUTRITION_PATTERNS.caffeine);
     if (caffeineMatch) {
       nutrition.caffeine = Number.parseFloat(caffeineMatch[1]);
-      nutrition.caffeineUnit = 'mg';
+      nutrition.caffeineUnit = "mg";
     }
 
     // Return null if no nutrition data was found
@@ -147,14 +147,13 @@ function extractMammothNutritionFromText(text: string): Nutritions | null {
     return hasData ? nutrition : null;
   } catch (error) {
     logger.debug(
-      'Error parsing Mammoth nutrition text:',
+      "Error parsing Mammoth nutrition text:",
       error as Record<string, unknown>
     );
     return null;
   }
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: optimize later
 async function extractNutritionData(page: Page): Promise<Nutritions | null> {
   try {
     const nutritionTableElement = page.locator(
@@ -163,14 +162,14 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
     const nutritionTableCount = await nutritionTableElement.count();
 
     if (nutritionTableCount > 0) {
-      logger.debug('Found .i_table selector, extracting nutrition data');
+      logger.debug("Found .i_table selector, extracting nutrition data");
 
       // Try extracting from individual table cells for Mammoth's specific format
-      const tableCells = await nutritionTableElement.locator('td, th').all();
+      const tableCells = await nutritionTableElement.locator("td, th").all();
 
-      let combinedText = '';
+      let combinedText = "";
       for (const tableCell of tableCells) {
-        const cellText = await tableCell.textContent().catch(() => '');
+        const cellText = await tableCell.textContent().catch(() => "");
         if (cellText?.trim()) {
           combinedText += `${cellText} `;
         }
@@ -182,7 +181,7 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
         );
         const nutrition = extractMammothNutritionFromText(combinedText);
         if (nutrition) {
-          logger.debug('Successfully extracted nutrition data from .i_table');
+          logger.debug("Successfully extracted nutrition data from .i_table");
           return nutrition;
         }
       }
@@ -190,23 +189,23 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
       // Fallback to standard extraction
       const allTableText = await nutritionTableElement
         .textContent()
-        .catch(() => '');
+        .catch(() => "");
       if (allTableText) {
         const nutrition = extractNutritionFromText(allTableText);
         if (nutrition) {
           logger.debug(
-            'Successfully extracted nutrition data from full table text'
+            "Successfully extracted nutrition data from full table text"
           );
           return nutrition;
         }
       }
     } else {
-      logger.debug('No .i_table selector found on page');
+      logger.debug("No .i_table selector found on page");
     }
     return null;
   } catch (error) {
     logger.debug(
-      'Failed to extract nutrition data from Mammoth product:',
+      "Failed to extract nutrition data from Mammoth product:",
       error as Record<string, unknown>
     );
     return null;
@@ -243,34 +242,33 @@ async function handleProductPage(
 
     const product: Product = {
       name: basicInfo.name,
-      nameEn: basicInfo.nameEn || '',
-      description: '',
-      externalCategory: 'Coffee',
+      nameEn: basicInfo.nameEn || "",
+      description: "",
+      externalCategory: "Coffee",
       externalId: basicInfo.menuSeq,
-      externalImageUrl: basicInfo.imageUrl || '',
+      externalImageUrl: basicInfo.imageUrl || "",
       externalUrl: `${SITE_CONFIG.productUrlTemplate}${basicInfo.menuSeq}`,
       price: null,
-      category: 'Coffee',
+      category: "Coffee",
       nutritions,
     };
 
     await crawlerInstance.pushData(product);
 
-    const nutritionInfo = nutritions ? ' with nutrition data' : '';
+    const nutritionInfo = nutritions ? " with nutrition data" : "";
     logger.info(
-      `✅ Extracted: ${product.name}${product.nameEn ? ` (${product.nameEn})` : ''}${nutritionInfo}`
+      `✅ Extracted: ${product.name}${product.nameEn ? ` (${product.nameEn})` : ""}${nutritionInfo}`
     );
   } catch (error) {
     logger.warn(`Failed to process product ${basicInfo.name}: ${error}`);
   }
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: optimize later
 async function handleMenuListPage(
   page: Page,
   crawlerInstance: PlaywrightCrawler
 ) {
-  logger.info('Processing Mammoth Coffee menu list page');
+  logger.info("Processing Mammoth Coffee menu list page");
 
   await waitForLoad(page);
   // Debug screenshot removed for performance
@@ -291,8 +289,8 @@ async function handleMenuListPage(
     for (const link of productLinks) {
       try {
         // Extract href and menuSeq
-        const href = await link.getAttribute('href').catch(() => '');
-        const menuSeq = extractMenuSeqFromHref(href || '');
+        const href = await link.getAttribute("href").catch(() => "");
+        const menuSeq = extractMenuSeqFromHref(href || "");
 
         if (!menuSeq) {
           continue;
@@ -300,28 +298,28 @@ async function handleMenuListPage(
 
         // Extract Korean name from strong tag
         const koreanName = await link
-          .locator('strong')
+          .locator("strong")
           .textContent()
-          .catch(() => '');
+          .catch(() => "");
 
         // Extract full text and get English name by removing Korean name
-        const fullText = await link.textContent().catch(() => '');
-        const englishName = fullText?.replace(koreanName || '', '').trim();
+        const fullText = await link.textContent().catch(() => "");
+        const englishName = fullText?.replace(koreanName || "", "").trim();
 
         // Extract image
         const imageSrc = await link
-          .locator('img')
-          .getAttribute('src')
-          .catch(() => '');
+          .locator("img")
+          .getAttribute("src")
+          .catch(() => "");
 
         if (koreanName) {
           productUrls.push({
             name: koreanName,
-            nameEn: englishName || '',
+            nameEn: englishName || "",
             menuSeq,
             imageUrl: imageSrc
               ? new URL(imageSrc, SITE_CONFIG.baseUrl).href
-              : '',
+              : "",
           });
         }
       } catch (error) {
@@ -346,7 +344,7 @@ async function handleMenuListPage(
         {
           url: `${SITE_CONFIG.productUrlTemplate}${basicInfo.menuSeq}`,
           userData: { basicInfo },
-          label: 'PRODUCT',
+          label: "PRODUCT",
         },
       ]);
     }
@@ -369,7 +367,7 @@ export const createMammothCrawler = () =>
       launchOptions: CRAWLER_CONFIG.launchOptions,
     },
     async requestHandler({ page, request, crawler: crawlerInstance }) {
-      if (request.label === 'PRODUCT') {
+      if (request.label === "PRODUCT") {
         await handleProductPage(
           page,
           request as unknown as {
@@ -403,9 +401,9 @@ export const runMammothCrawler = async () => {
 
     await crawler.run(startUrls);
     const dataset = await crawler.getData();
-    await writeProductsToJson(dataset.items as Product[], 'mammoth');
+    await writeProductsToJson(dataset.items as Product[], "mammoth");
   } catch (error) {
-    logger.error('Mammoth Coffee crawler failed:', error);
+    logger.error("Mammoth Coffee crawler failed:", error);
     throw error;
   }
 };
@@ -413,7 +411,7 @@ export const runMammothCrawler = async () => {
 // Only run if this file is executed directly (not imported)
 if (import.meta.url === `file://${process.argv[1]}`) {
   runMammothCrawler().catch((error) => {
-    logger.error('Crawler execution failed:', error);
+    logger.error("Crawler execution failed:", error);
     process.exit(1);
   });
 }

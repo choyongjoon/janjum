@@ -1,23 +1,23 @@
-import { Link } from '@tanstack/react-router';
+import { Link } from "@tanstack/react-router";
 import {
   type Review,
   ReviewInUserPage,
-} from '~/components/reviews/ReviewInUserPage';
+} from "~/components/reviews/ReviewInUserPage";
 
 interface ProfileReviewsProps {
-  userReviews: Review[] | undefined;
-  isLoading: boolean;
   error: Error | null;
   isCurrentUser?: boolean;
+  isLoading: boolean;
+  userReviews: Review[] | undefined;
 }
 
 const EMPTY_REVIEWS: Review[] = [];
 
 interface ProfileReviewsContentProps {
-  userReviews: Review[];
-  isLoading: boolean;
   error: Error | null;
   isCurrentUser: boolean;
+  isLoading: boolean;
+  userReviews: Review[];
 }
 
 function ProfileReviewsContent({
@@ -59,8 +59,8 @@ function ProfileReviewsContent({
     <div className="py-8 text-center">
       <p className="mb-4 text-base-content/60">
         {isCurrentUser
-          ? '아직 작성한 후기가 없습니다.'
-          : '작성된 후기가 없습니다.'}
+          ? "아직 작성한 후기가 없습니다."
+          : "작성된 후기가 없습니다."}
       </p>
       {isCurrentUser && (
         <Link className="btn btn-primary" to="/search">
@@ -81,7 +81,7 @@ export function ProfileReviews({
     <div className="card bg-base-100 shadow-md">
       <div className="card-body">
         <h2 className="card-title mb-4">
-          {isCurrentUser ? '내 후기' : '후기'}
+          {isCurrentUser ? "내 후기" : "후기"}
         </h2>
         <ProfileReviewsContent
           error={error}

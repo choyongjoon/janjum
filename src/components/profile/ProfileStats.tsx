@@ -1,15 +1,15 @@
-import type { RatingDistribution } from 'convex/reviews';
-import { UserRatingHistogram } from '~/components/reviews/UserRatingHistogram';
+import type { RatingDistribution } from "convex/reviews";
+import { UserRatingHistogram } from "~/components/reviews/UserRatingHistogram";
 
 interface UserStats {
   averageRating: number;
-  totalReviews: number;
   ratingDistribution: RatingDistribution;
+  totalReviews: number;
 }
 
 interface ProfileStatsProps {
-  userStats: UserStats | undefined;
   isLoading: boolean;
+  userStats: UserStats | undefined;
 }
 
 export function ProfileStats({ userStats, isLoading }: ProfileStatsProps) {

@@ -1,4 +1,4 @@
-import { dailyStandardNutritions, type Nutritions } from 'shared/nutritions';
+import { dailyStandardNutritions, type Nutritions } from "shared/nutritions";
 
 const NutrationRow = ({
   label,
@@ -11,12 +11,12 @@ const NutrationRow = ({
   percent?: number | undefined;
   isLeftPadded?: boolean;
 }) => {
-  const trAdditionalClass = isLeftPadded ? 'ml-3' : '';
+  const trAdditionalClass = isLeftPadded ? "ml-3" : "";
 
   return (
     <tr
       className={`flex border-collapse items-center justify-between border-black border-t-2 border-b-0 px-1.5 py-0.5 ${trAdditionalClass}`}
-      style={{ height: '34px' }}
+      style={{ height: "34px" }}
     >
       <span className="font-medium text-xl leading-none">
         {label}
@@ -44,31 +44,31 @@ const calculatePercent = (
   return Math.round((value / total) * 100);
 };
 
-export type NutritionItem = {
+export interface NutritionItem {
+  dependency?: "carbohydrates" | "fat";
   key:
-    | 'natrium'
-    | 'carbohydrates'
-    | 'sugar'
-    | 'protein'
-    | 'fat'
-    | 'transFat'
-    | 'saturatedFat'
-    | 'cholesterol'
-    | 'caffeine';
+    | "natrium"
+    | "carbohydrates"
+    | "sugar"
+    | "protein"
+    | "fat"
+    | "transFat"
+    | "saturatedFat"
+    | "cholesterol"
+    | "caffeine";
   name: string;
-  dependency?: 'carbohydrates' | 'fat';
-};
+}
 
 export const nutritionItems: NutritionItem[] = [
-  { key: 'natrium', name: '나트륨' },
-  { key: 'carbohydrates', name: '탄수화물' },
-  { key: 'sugar', name: '당류', dependency: 'carbohydrates' },
-  { key: 'fat', name: '지방' },
-  { key: 'transFat', name: '트랜스지방', dependency: 'fat' },
-  { key: 'saturatedFat', name: '포화지방', dependency: 'fat' },
-  { key: 'cholesterol', name: '콜레스테롤' },
-  { key: 'protein', name: '단백질' },
-  { key: 'caffeine', name: '카페인' },
+  { key: "natrium", name: "나트륨" },
+  { key: "carbohydrates", name: "탄수화물" },
+  { key: "sugar", name: "당류", dependency: "carbohydrates" },
+  { key: "fat", name: "지방" },
+  { key: "transFat", name: "트랜스지방", dependency: "fat" },
+  { key: "saturatedFat", name: "포화지방", dependency: "fat" },
+  { key: "cholesterol", name: "콜레스테롤" },
+  { key: "protein", name: "단백질" },
+  { key: "caffeine", name: "카페인" },
 ];
 
 export const NutritionTable = ({ nutritions }: { nutritions: Nutritions }) => {

@@ -1,17 +1,17 @@
-import { PlaywrightCrawler, type Request } from 'crawlee';
-import type { Locator, Page } from 'playwright';
-import { logger } from '../../shared/logger';
-import type { Nutritions } from '../../shared/nutritions';
-import { type Product, waitForLoad, writeProductsToJson } from './crawlerUtils';
+import { PlaywrightCrawler, type Request } from "crawlee";
+import type { Locator, Page } from "playwright";
+import { logger } from "../../shared/logger";
+import type { Nutritions } from "../../shared/nutritions";
+import { type Product, waitForLoad, writeProductsToJson } from "./crawlerUtils";
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
 // ================================================
 
 const SITE_CONFIG = {
-  baseUrl: 'https://composecoffee.com',
-  startUrl: 'https://composecoffee.com/menu',
-  categoryUrlTemplate: 'https://composecoffee.com/menu/category/',
+  baseUrl: "https://composecoffee.com",
+  startUrl: "https://composecoffee.com/menu",
+  categoryUrlTemplate: "https://composecoffee.com/menu/category/",
 } as const;
 
 // ================================================
@@ -23,11 +23,11 @@ const SELECTORS = {
   categoryLinks: '.dropdown-menu a[href*="/menu/category/"]',
 
   // Category page selectors
-  productContainers: '.itemBox',
+  productContainers: ".itemBox",
   productData: {
-    id: '> div[id]',
-    name: 'h3.undertitle',
-    image: '.rthumbnailimg',
+    id: "> div[id]",
+    name: "h3.undertitle",
+    image: ".rthumbnailimg",
   },
 
   // Pagination selectors
@@ -60,17 +60,17 @@ const COMPOSE_NUTRITION_PATTERNS = {
 // ================================================
 
 // Test mode configuration
-const isTestMode = process.env.CRAWLER_TEST_MODE === 'true';
+const isTestMode = process.env.CRAWLER_TEST_MODE === "true";
 const maxProductsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS || '3', 10)
+  ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS || "3", 10)
   : Number.POSITIVE_INFINITY;
 const maxRequestsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || '10', 10)
+  ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || "10", 10)
   : 100;
 
 const CRAWLER_CONFIG = {
   maxConcurrency: Number.parseInt(
-    process.env.CRAWLER_MAX_CONCURRENCY || '3',
+    process.env.CRAWLER_MAX_CONCURRENCY || "3",
     10
   ),
   maxRequestsPerCrawl: isTestMode ? maxRequestsInTestMode : 100,
@@ -78,7 +78,7 @@ const CRAWLER_CONFIG = {
   requestHandlerTimeoutSecs: isTestMode ? 30 : 60,
   launchOptions: {
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
   },
 };
 
@@ -100,9 +100,9 @@ function extractComposeNutrition(nutritionText: string): Nutritions | null {
       let unit = servingSizeMatch[2].toLowerCase();
 
       // Convert oz to ml if needed
-      if (unit === 'oz') {
+      if (unit === "oz") {
         servingSize *= 29.5735; // 1 oz = 29.5735 ml
-        unit = 'ml';
+        unit = "ml";
       }
 
       nutrition.servingSize = servingSize;
@@ -115,14 +115,14 @@ function extractComposeNutrition(nutritionText: string): Nutritions | null {
     );
     if (caloriesMatch) {
       nutrition.calories = Number.parseFloat(caloriesMatch[1]);
-      nutrition.caloriesUnit = 'kcal';
+      nutrition.caloriesUnit = "kcal";
     }
 
     // Extract sodium
     const sodiumMatch = nutritionText.match(COMPOSE_NUTRITION_PATTERNS.sodium);
     if (sodiumMatch) {
       nutrition.natrium = Number.parseFloat(sodiumMatch[1]);
-      nutrition.natriumUnit = 'mg';
+      nutrition.natriumUnit = "mg";
     }
 
     // Extract carbohydrates
@@ -131,21 +131,21 @@ function extractComposeNutrition(nutritionText: string): Nutritions | null {
     );
     if (carbohydratesMatch) {
       nutrition.carbohydrates = Number.parseFloat(carbohydratesMatch[1]);
-      nutrition.carbohydratesUnit = 'g';
+      nutrition.carbohydratesUnit = "g";
     }
 
     // Extract sugar
     const sugarMatch = nutritionText.match(COMPOSE_NUTRITION_PATTERNS.sugar);
     if (sugarMatch) {
       nutrition.sugar = Number.parseFloat(sugarMatch[1]);
-      nutrition.sugarUnit = 'g';
+      nutrition.sugarUnit = "g";
     }
 
     // Extract fat
     const fatMatch = nutritionText.match(COMPOSE_NUTRITION_PATTERNS.fat);
     if (fatMatch) {
       nutrition.fat = Number.parseFloat(fatMatch[1]);
-      nutrition.fatUnit = 'g';
+      nutrition.fatUnit = "g";
     }
 
     // Extract saturated fat
@@ -154,7 +154,7 @@ function extractComposeNutrition(nutritionText: string): Nutritions | null {
     );
     if (saturatedFatMatch) {
       nutrition.saturatedFat = Number.parseFloat(saturatedFatMatch[1]);
-      nutrition.saturatedFatUnit = 'g';
+      nutrition.saturatedFatUnit = "g";
     }
 
     // Extract protein
@@ -163,7 +163,7 @@ function extractComposeNutrition(nutritionText: string): Nutritions | null {
     );
     if (proteinMatch) {
       nutrition.protein = Number.parseFloat(proteinMatch[1]);
-      nutrition.proteinUnit = 'g';
+      nutrition.proteinUnit = "g";
     }
 
     // Return nutrition data if we found any values
@@ -179,27 +179,27 @@ async function extractProductData(container: Locator) {
     const [productId, name, imageUrl, nutritionInfo] = await Promise.all([
       container
         .locator(SELECTORS.productData.id)
-        .getAttribute('id')
-        .then((id) => id || ''),
+        .getAttribute("id")
+        .then((id) => id || ""),
       container
         .locator(SELECTORS.productData.name)
         .textContent()
-        .then((text) => text?.trim() || ''),
+        .then((text) => text?.trim() || ""),
       container
         .locator(SELECTORS.productData.image)
-        .getAttribute('src')
+        .getAttribute("src")
         .then((src) => {
-          let url = src || '';
-          if (url.startsWith('/')) {
+          let url = src || "";
+          if (url.startsWith("/")) {
             url = `${SITE_CONFIG.baseUrl}${url}`;
           }
           return url;
         }),
       container
-        .locator('ul.info.g-0')
+        .locator("ul.info.g-0")
         .textContent()
-        .then((text) => text?.trim() || '')
-        .catch(() => ''),
+        .then((text) => text?.trim() || "")
+        .catch(() => ""),
     ]);
 
     if (name && name.length > 0) {
@@ -258,7 +258,7 @@ async function extractPageProducts(page: Page) {
 
   if (paginationCount > 0) {
     const hrefPromises = Array.from({ length: paginationCount }, (_, i) =>
-      paginationElements.nth(i).getAttribute('href')
+      paginationElements.nth(i).getAttribute("href")
     );
     const hrefs = await Promise.all(hrefPromises);
 
@@ -276,7 +276,7 @@ async function extractPageProducts(page: Page) {
   // Get current page from URL
   const url = page.url();
   const urlParams = new URLSearchParams(new URL(url).search);
-  const currentPage = urlParams.get('page') || '1';
+  const currentPage = urlParams.get("page") || "1";
 
   return {
     products,
@@ -295,15 +295,15 @@ async function extractCategoryData(page: Page) {
     const linkPromises = Array.from({ length: linkCount }, async (_, i) => {
       const link = categoryLinks.nth(i);
       const [href, text] = await Promise.all([
-        link.getAttribute('href'),
-        link.textContent().then((t) => t?.trim() || ''),
+        link.getAttribute("href"),
+        link.textContent().then((t) => t?.trim() || ""),
       ]);
 
       if (href && text) {
         const match = href.match(PATTERNS.categoryId);
         if (match) {
           return {
-            url: href.startsWith('/') ? `${SITE_CONFIG.baseUrl}${href}` : href,
+            url: href.startsWith("/") ? `${SITE_CONFIG.baseUrl}${href}` : href,
             name: text,
             id: match[1],
           };
@@ -331,7 +331,7 @@ async function handleMainMenuPage(
   page: Page,
   crawlerInstance: PlaywrightCrawler
 ) {
-  logger.info('Processing main menu page to discover categories');
+  logger.info("Processing main menu page to discover categories");
 
   await waitForLoad(page);
   // Debug screenshot removed for performance
@@ -373,7 +373,7 @@ async function handleCategoryPage(
   );
 
   // Take a screenshot for debugging (only for first category)
-  if (categoryId === '207002' && currentPage === 1) {
+  if (categoryId === "207002" && currentPage === 1) {
     // Debug screenshot removed for performance
     // await takeDebugScreenshot(page, `compose-category-${categoryId}`);
   }
@@ -394,7 +394,7 @@ async function handleCategoryPage(
       description: productData.description,
       price: productData.price,
       externalImageUrl: productData.imageUrl,
-      category: 'Drinks' as const,
+      category: "Drinks" as const,
       externalCategory: categoryName,
       externalId: `compose_${categoryId}_${productData.name}`,
       externalUrl: url,
@@ -428,7 +428,7 @@ async function handleCategoryPage(
         };
       }> = [];
       for (let pageNum = 2; pageNum <= pageData.maxPage; pageNum++) {
-        const nextPageUrl = `${url.split('?')[0]}?page=${pageNum}`;
+        const nextPageUrl = `${url.split("?")[0]}?page=${pageNum}`;
         paginationRequests.push({
           url: nextPageUrl,
           userData: {
@@ -462,7 +462,7 @@ export const createComposeCrawler = () =>
       const url = request.url;
 
       // Handle main menu page - discover categories
-      if (url.includes('/menu') && !url.includes('category')) {
+      if (url.includes("/menu") && !url.includes("category")) {
         await handleMainMenuPage(page, crawlerInstance);
         return;
       }
@@ -484,9 +484,9 @@ export const runComposeCrawler = async () => {
   try {
     await crawler.run([SITE_CONFIG.startUrl]);
     const dataset = await crawler.getData();
-    await writeProductsToJson(dataset.items as Product[], 'compose');
+    await writeProductsToJson(dataset.items as Product[], "compose");
   } catch (error) {
-    logger.error('Compose crawler failed:', error);
+    logger.error("Compose crawler failed:", error);
     throw error;
   }
 };
@@ -494,7 +494,7 @@ export const runComposeCrawler = async () => {
 // Only run if this file is executed directly (not imported)
 if (import.meta.url === `file://${process.argv[1]}`) {
   runComposeCrawler().catch((error) => {
-    logger.error('Crawler execution failed:', error);
+    logger.error("Crawler execution failed:", error);
     process.exit(1);
   });
 }

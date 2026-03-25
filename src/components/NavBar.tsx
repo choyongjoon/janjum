@@ -1,18 +1,20 @@
-import { Link, useLocation } from '@tanstack/react-router';
-import { Authenticated, Unauthenticated } from 'convex/react';
-import { useState } from 'react';
-import { SignInModal } from './auth/SignInModal';
-import { BookmarkIcon, SearchIcon, UserIcon } from './icons';
+import { Link, useLocation } from "@tanstack/react-router";
+import { Authenticated, Unauthenticated } from "convex/react";
+import { useState } from "react";
+import { SignInModal } from "./auth/SignInModal";
+import { BookmarkIcon } from "./icons/BookmarkIcon";
+import { SearchIcon } from "./icons/SearchIcon";
+import { UserIcon } from "./icons/UserIcon";
 
 export function NavBar() {
   const [showSignIn, setShowSignIn] = useState(false);
 
-  const isBlog = useLocation().pathname.startsWith('/blog');
+  const isBlog = useLocation().pathname.startsWith("/blog");
 
   return (
     <div
       className="navbar bg-primary text-primary-content shadow-sm"
-      data-theme={isBlog ? 'wireframe' : ''}
+      data-theme={isBlog ? "wireframe" : ""}
     >
       <div className="navbar-start">
         {/* <div className="dropdown">

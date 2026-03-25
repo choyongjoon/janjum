@@ -1,5 +1,5 @@
-import { logger } from '../../shared/logger';
-import type { Nutritions } from '../../shared/nutritions';
+import { logger } from "../../shared/logger";
+import type { Nutritions } from "../../shared/nutritions";
 
 // ================================================
 // SHARED NUTRITION PATTERNS
@@ -33,7 +33,7 @@ export function parseNutritionValue(
 export function parseNutritionValueFromText(
   text: string | null
 ): number | null {
-  if (!text || text.trim() === '' || text.trim() === '-') {
+  if (!text || text.trim() === "" || text.trim() === "-") {
     return null;
   }
   const parsed = Number.parseFloat(text.trim());
@@ -45,25 +45,25 @@ export function parseNutritionValueFromText(
 // ================================================
 
 export interface NutritionMatches {
-  servingSize: RegExpMatchArray | null;
-  calories: RegExpMatchArray | null;
-  protein: RegExpMatchArray | null;
-  fat: RegExpMatchArray | null;
-  carbohydrates: RegExpMatchArray | null;
-  sugar: RegExpMatchArray | null;
-  sodium: RegExpMatchArray | null;
   caffeine: RegExpMatchArray | null;
+  calories: RegExpMatchArray | null;
+  carbohydrates: RegExpMatchArray | null;
+  fat: RegExpMatchArray | null;
+  protein: RegExpMatchArray | null;
+  servingSize: RegExpMatchArray | null;
+  sodium: RegExpMatchArray | null;
+  sugar: RegExpMatchArray | null;
 }
 
 export interface NutritionValues {
-  servingSize: number | null;
-  calories: number | null;
-  protein: number | null;
-  fat: number | null;
-  carbohydrates: number | null;
-  sugar: number | null;
-  sodium: number | null;
   caffeine: number | null;
+  calories: number | null;
+  carbohydrates: number | null;
+  fat: number | null;
+  protein: number | null;
+  servingSize: number | null;
+  sodium: number | null;
+  sugar: number | null;
 }
 
 export function parseNutritionMatches(nutritionText: string): NutritionMatches {
@@ -106,7 +106,7 @@ export function getServingSizeUnit(
     return null;
   }
   const unitText = matches.servingSize?.[2]?.toLowerCase();
-  return unitText?.includes('ml') ? 'ml' : 'g';
+  return unitText?.includes("ml") ? "ml" : "g";
 }
 
 // ================================================
@@ -124,16 +124,16 @@ export function hasAnyNutritionData(values: NutritionValues): boolean {
 
 export function hasNutritionKeywords(text: string): boolean {
   return (
-    text.includes('칼로리') ||
-    text.includes('kcal') ||
-    text.includes('단백질') ||
-    text.includes('지방') ||
-    text.includes('탄수화물') ||
-    text.includes('당류') ||
-    text.includes('나트륨') ||
-    text.includes('카페인') ||
-    text.includes('영양') ||
-    text.includes('성분')
+    text.includes("칼로리") ||
+    text.includes("kcal") ||
+    text.includes("단백질") ||
+    text.includes("지방") ||
+    text.includes("탄수화물") ||
+    text.includes("당류") ||
+    text.includes("나트륨") ||
+    text.includes("카페인") ||
+    text.includes("영양") ||
+    text.includes("성분")
   );
 }
 
@@ -141,7 +141,6 @@ export function hasNutritionKeywords(text: string): boolean {
 // NUTRITION OBJECT CREATION
 // ================================================
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: refactor later
 export function createNutritionObject(
   values: NutritionValues,
   matches: NutritionMatches
@@ -151,25 +150,25 @@ export function createNutritionObject(
     servingSizeUnit:
       getServingSizeUnit(matches, values.servingSize !== null) ?? undefined,
     calories: values.calories ?? undefined,
-    caloriesUnit: values.calories !== null ? 'kcal' : undefined,
+    caloriesUnit: values.calories === null ? undefined : "kcal",
     carbohydrates: values.carbohydrates ?? undefined,
-    carbohydratesUnit: values.carbohydrates !== null ? 'g' : undefined,
+    carbohydratesUnit: values.carbohydrates === null ? undefined : "g",
     sugar: values.sugar ?? undefined,
-    sugarUnit: values.sugar !== null ? 'g' : undefined,
+    sugarUnit: values.sugar === null ? undefined : "g",
     protein: values.protein ?? undefined,
-    proteinUnit: values.protein !== null ? 'g' : undefined,
+    proteinUnit: values.protein === null ? undefined : "g",
     fat: values.fat ?? undefined,
-    fatUnit: values.fat !== null ? 'g' : undefined,
+    fatUnit: values.fat === null ? undefined : "g",
     transFat: undefined,
     transFatUnit: undefined,
     saturatedFat: undefined,
     saturatedFatUnit: undefined,
     natrium: values.sodium ?? undefined,
-    natriumUnit: values.sodium !== null ? 'mg' : undefined,
+    natriumUnit: values.sodium === null ? undefined : "mg",
     cholesterol: undefined,
     cholesterolUnit: undefined,
     caffeine: values.caffeine ?? undefined,
-    caffeineUnit: values.caffeine !== null ? 'mg' : undefined,
+    caffeineUnit: values.caffeine === null ? undefined : "mg",
   };
 }
 
@@ -189,7 +188,7 @@ export function extractNutritionFromText(
     }
   } catch (error) {
     logger.debug(
-      'Failed to extract nutrition data from text:',
+      "Failed to extract nutrition data from text:",
       error as Record<string, unknown>
     );
   }

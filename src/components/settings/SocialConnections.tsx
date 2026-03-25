@@ -1,31 +1,31 @@
-import { useUser } from '@clerk/tanstack-react-start';
-import { useState } from 'react';
+import { useUser } from "@clerk/tanstack-react-start";
+import { useState } from "react";
 import {
   type SocialProvider,
   type SocialProviderConfig,
   socialProviders,
-} from '~/config/socialProviders';
-import { usePostHogEvents } from '~/hooks/usePostHogEvents';
+} from "~/config/socialProviders";
+import { usePostHogEvents } from "~/hooks/usePostHogEvents";
 
 interface ConnectedAccount {
-  provider: string;
+  destroy: () => Promise<void>;
   emailAddress?: string;
+  provider: string;
   username?: string;
   verification: { status: string | null } | null;
-  destroy: () => Promise<void>;
 }
 
 interface ProviderCardProps {
-  provider: SocialProviderConfig;
   connectedAccount: ConnectedAccount | null;
-  isProviderLoading: boolean;
-  isLastAccount: boolean;
-  onConnect: (provider: SocialProviderConfig) => void;
-  onDisconnect: (account: ConnectedAccount) => void;
   getVerificationStatus: (account: ConnectedAccount) => {
     text: string;
     className: string;
   };
+  isLastAccount: boolean;
+  isProviderLoading: boolean;
+  onConnect: (provider: SocialProviderConfig) => void;
+  onDisconnect: (account: ConnectedAccount) => void;
+  provider: SocialProviderConfig;
 }
 
 function ProviderCard({
@@ -62,7 +62,7 @@ function ProviderCard({
           <div
             className="tooltip"
             data-tip={
-              isLastAccount ? '마지막 로그인 방법은 해제할 수 없습니다' : ''
+              isLastAccount ? "마지막 로그인 방법은 해제할 수 없습니다" : ""
             }
           >
             <button
@@ -74,7 +74,7 @@ function ProviderCard({
               {isProviderLoading ? (
                 <span className="loading loading-spinner loading-xs" />
               ) : (
-                '연결 해제'
+                "연결 해제"
               )}
             </button>
           </div>
@@ -88,7 +88,7 @@ function ProviderCard({
             {isProviderLoading ? (
               <span className="loading loading-spinner loading-xs" />
             ) : (
-              '연결'
+              "연결"
             )}
           </button>
         )}
@@ -113,9 +113,9 @@ export function SocialConnections() {
     const account = user.externalAccounts.find((externalAccount) => {
       // Map provider keys to their Clerk identifiers
       const providerMap: Record<SocialProvider, string> = {
-        google: 'google',
-        kakao: 'custom_kakao',
-        naver: 'custom_naver',
+        google: "google",
+        kakao: "custom_kakao",
+        naver: "custom_naver",
       };
 
       return externalAccount.provider === providerMap[providerKey];
@@ -147,7 +147,7 @@ export function SocialConnections() {
           externalAccount.verification.externalVerificationRedirectURL.toString();
       }
     } catch {
-      setError('연결에 실패했습니다. 다시 시도해주세요.');
+      setError("연결에 실패했습니다. 다시 시도해주세요.");
 
       // Track failed connection attempt
       trackSSOConnect(provider.name, false);
@@ -167,7 +167,7 @@ export function SocialConnections() {
       // Track successful disconnection
       trackSSODisconnect(account.provider, true);
     } catch {
-      setError('연결 해제에 실패했습니다. 다시 시도해주세요.');
+      setError("연결 해제에 실패했습니다. 다시 시도해주세요.");
 
       // Track failed disconnection
       trackSSODisconnect(account.provider, false);
@@ -179,12 +179,12 @@ export function SocialConnections() {
   const getVerificationStatus = (account: ConnectedAccount) => {
     const status = account.verification?.status;
     switch (status) {
-      case 'verified':
-        return { text: '연결됨', className: 'badge-success' };
-      case 'unverified':
-        return { text: '미인증', className: 'badge-warning' };
+      case "verified":
+        return { text: "연결됨", className: "badge-success" };
+      case "unverified":
+        return { text: "미인증", className: "badge-warning" };
       default:
-        return { text: '확인 중', className: 'badge-info' };
+        return { text: "확인 중", className: "badge-info" };
     }
   };
 

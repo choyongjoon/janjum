@@ -2,17 +2,17 @@ import {
   convexQuery,
   useConvexAction,
   useConvexMutation,
-} from '@convex-dev/react-query';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { useRouter } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
-import { usePostHogEvents } from '~/hooks/usePostHogEvents';
-import { api } from '../../convex/_generated/api';
-import type { Id } from '../../convex/_generated/dataModel';
+} from "@convex-dev/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useRouter } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { usePostHogEvents } from "~/hooks/usePostHogEvents";
+import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 
 interface FormData {
-  name: string;
   handle: string;
+  name: string;
 }
 
 export function useSettingsForm() {
@@ -30,14 +30,14 @@ export function useSettingsForm() {
 
   // Form state
   const [formData, setFormData] = useState<FormData>({
-    name: '',
-    handle: '',
+    name: "",
+    handle: "",
   });
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [previewUrl, setPreviewUrl] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
 
   // Initialize form data when user data loads
   useEffect(() => {
@@ -45,14 +45,14 @@ export function useSettingsForm() {
       if (currentUser) {
         // Existing user - populate form with their data
         setFormData({
-          name: currentUser.name || '',
-          handle: currentUser.handle || '',
+          name: currentUser.name || "",
+          handle: currentUser.handle || "",
         });
       } else {
         // New user - start with empty form
         setFormData({
-          name: '',
-          handle: '',
+          name: "",
+          handle: "",
         });
       }
     }
@@ -81,43 +81,43 @@ export function useSettingsForm() {
     }
   };
 
-  const uploadImage = async (): Promise<Id<'_storage'> | undefined> => {
+  const uploadImage = async (): Promise<Id<"_storage"> | undefined> => {
     if (!selectedImage) {
       return currentUser?.imageStorageId;
     }
 
     const uploadUrl = await generateUploadUrlMutation.mutateAsync({});
     const result = await fetch(uploadUrl as string, {
-      method: 'POST',
-      headers: { 'Content-Type': selectedImage.type },
+      method: "POST",
+      headers: { "Content-Type": selectedImage.type },
       body: selectedImage,
     });
 
     if (!result.ok) {
-      throw new Error('이미지 업로드에 실패했습니다.');
+      throw new Error("이미지 업로드에 실패했습니다.");
     }
 
     const { storageId } = await result.json();
     return storageId;
   };
 
-  const getUpdatedFields = (imageStorageId?: Id<'_storage'>): string[] => {
+  const getUpdatedFields = (imageStorageId?: Id<"_storage">): string[] => {
     const updatedFields: string[] = [];
     if (currentUser?.name !== formData.name) {
-      updatedFields.push('name');
+      updatedFields.push("name");
     }
     if (currentUser?.handle !== formData.handle) {
-      updatedFields.push('handle');
+      updatedFields.push("handle");
     }
     if (imageStorageId) {
-      updatedFields.push('image');
+      updatedFields.push("image");
     }
     return updatedFields;
   };
 
   const trackSuccessfulUpdate = (
     updatedFields: string[],
-    imageStorageId?: Id<'_storage'>
+    imageStorageId?: Id<"_storage">
   ) => {
     trackProfileUpdate(updatedFields);
     if (imageStorageId && selectedImage) {
@@ -128,12 +128,12 @@ export function useSettingsForm() {
   const trackFailedUpdate = (error: unknown) => {
     if (selectedImage) {
       const errorType =
-        error instanceof Error ? error.message : 'unknown_error';
+        error instanceof Error ? error.message : "unknown_error";
       trackImageUpload(false, errorType);
     }
   };
 
-  const updateProfile = async (imageStorageId?: Id<'_storage'>) => {
+  const updateProfile = async (imageStorageId?: Id<"_storage">) => {
     const updatedFields = getUpdatedFields(imageStorageId);
 
     try {
@@ -152,8 +152,8 @@ export function useSettingsForm() {
 
   const handlePostUpdate = () => {
     setSelectedImage(null);
-    setPreviewUrl('');
-    setSuccessMessage('프로필이 성공적으로 업데이트되었습니다!');
+    setPreviewUrl("");
+    setSuccessMessage("프로필이 성공적으로 업데이트되었습니다!");
 
     // For new users (currentUser is null) or users who haven't completed setup, redirect to home
     // For existing users who have completed setup, redirect to profile
@@ -161,7 +161,7 @@ export function useSettingsForm() {
 
     setTimeout(() => {
       router.navigate({
-        to: isNewUser || isInitialSetup ? '/' : '/profile',
+        to: isNewUser || isInitialSetup ? "/" : "/profile",
       });
     }, 2000);
   };
@@ -173,13 +173,13 @@ export function useSettingsForm() {
     const hasEmptyHandle = !formData.handle.trim();
 
     if (hasEmptyName || hasEmptyHandle) {
-      setErrorMessage('이름과 핸들을 모두 입력해주세요.');
+      setErrorMessage("이름과 핸들을 모두 입력해주세요.");
       return;
     }
 
     setIsSubmitting(true);
-    setErrorMessage('');
-    setSuccessMessage('');
+    setErrorMessage("");
+    setSuccessMessage("");
 
     try {
       const imageStorageId = await uploadImage();
@@ -190,7 +190,7 @@ export function useSettingsForm() {
       const message =
         error instanceof Error
           ? error.message
-          : '프로필 업데이트 중 오류가 발생했습니다.';
+          : "프로필 업데이트 중 오류가 발생했습니다.";
       setErrorMessage(message);
     } finally {
       setIsSubmitting(false);

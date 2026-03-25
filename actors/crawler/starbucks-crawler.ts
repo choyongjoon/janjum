@@ -1,19 +1,19 @@
-import { PlaywrightCrawler, type Request } from 'crawlee';
-import type { Page } from 'playwright';
-import { logger } from '../../shared/logger';
-import type { Nutritions } from '../../shared/nutritions';
-import { type Product, waitForLoad, writeProductsToJson } from './crawlerUtils';
-import { parseNutritionValueFromText } from './nutritionUtils';
+import { PlaywrightCrawler, type Request } from "crawlee";
+import type { Page } from "playwright";
+import { logger } from "../../shared/logger";
+import type { Nutritions } from "../../shared/nutritions";
+import { type Product, waitForLoad, writeProductsToJson } from "./crawlerUtils";
+import { parseNutritionValueFromText } from "./nutritionUtils";
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
 // ================================================
 
 const SITE_CONFIG = {
-  baseUrl: 'https://www.starbucks.co.kr',
-  startUrl: 'https://www.starbucks.co.kr/menu/drink_list.do',
+  baseUrl: "https://www.starbucks.co.kr",
+  startUrl: "https://www.starbucks.co.kr/menu/drink_list.do",
   productUrlTemplate:
-    'https://www.starbucks.co.kr/menu/drink_view.do?product_cd=',
+    "https://www.starbucks.co.kr/menu/drink_view.do?product_cd=",
 } as const;
 
 // ================================================
@@ -31,21 +31,21 @@ const STARBUCKS_REGEX_PATTERNS = {
 const SELECTORS = {
   // Product listing page selectors
   productLinks: [
-    'a.goDrinkView',
+    "a.goDrinkView",
     'a[href*="drink_view.do"]',
     'a[href*="product_cd"]',
-    '.product-item a',
-    '.drink-item a',
+    ".product-item a",
+    ".drink-item a",
     'a[onclick*="goDrinkView"]',
   ],
 
   // Product detail page selectors
   productDetails: {
-    name: '.myAssignZone > h4',
-    nameEn: '.myAssignZone > h4 > span',
-    description: '.myAssignZone p.t1',
-    category: '.cate',
-    image: '.elevatezoom-gallery > img:first-child',
+    name: ".myAssignZone > h4",
+    nameEn: ".myAssignZone > h4 > span",
+    description: ".myAssignZone p.t1",
+    category: ".cate",
+    image: ".elevatezoom-gallery > img:first-child",
   },
 } as const;
 
@@ -62,12 +62,12 @@ const PATTERNS = {
 // ================================================
 
 // Test mode configuration
-const isTestMode = process.env.CRAWLER_TEST_MODE === 'true';
+const isTestMode = process.env.CRAWLER_TEST_MODE === "true";
 const maxProductsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS || '3', 10)
+  ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS || "3", 10)
   : Number.POSITIVE_INFINITY;
 const maxRequestsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || '10', 10)
+  ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || "10", 10)
   : 200;
 
 const CRAWLER_CONFIG = {
@@ -78,15 +78,15 @@ const CRAWLER_CONFIG = {
   launchOptions: {
     headless: true,
     args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-web-security',
-      '--disable-features=VizDisplayCompositor',
-      '--disable-background-timer-throttling',
-      '--disable-backgrounding-occluded-windows',
-      '--disable-renderer-backgrounding',
-      '--no-zygote',
-      '--single-process',
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-web-security",
+      "--disable-features=VizDisplayCompositor",
+      "--disable-background-timer-throttling",
+      "--disable-backgrounding-occluded-windows",
+      "--disable-renderer-backgrounding",
+      "--no-zygote",
+      "--single-process",
     ],
   },
 };
@@ -96,14 +96,14 @@ const CRAWLER_CONFIG = {
 // ================================================
 
 async function checkNutritionInfoExists(page: Page): Promise<boolean> {
-  return (await page.locator('#product_info01').count()) > 0;
+  return (await page.locator("#product_info01").count()) > 0;
 }
 
 async function _waitForNutritionContent(page: Page): Promise<void> {
   await page
     .waitForFunction(
       () => {
-        const servingElement = document.querySelector('#product_info01');
+        const servingElement = document.querySelector("#product_info01");
         return (
           servingElement?.textContent &&
           servingElement.textContent.trim().length > 0
@@ -112,12 +112,12 @@ async function _waitForNutritionContent(page: Page): Promise<void> {
       { timeout: 5000 }
     )
     .catch(() => {
-      logger.warn('Serving size not populated within timeout');
+      logger.warn("Serving size not populated within timeout");
     });
 }
 
 async function extractServingSize(page: Page): Promise<number | undefined> {
-  const servingText = await page.locator('#product_info01').textContent();
+  const servingText = await page.locator("#product_info01").textContent();
   logger.info(`Serving size text: ${servingText}`);
 
   const servingMatch = servingText?.match(STARBUCKS_REGEX_PATTERNS.servingSize);
@@ -129,14 +129,14 @@ async function checkNutritionValuesPopulated(
 ): Promise<{ caloriesText: string; proteinText: string }> {
   const caloriesText =
     (await page
-      .locator('.product_info_content li.kcal dd')
+      .locator(".product_info_content li.kcal dd")
       .textContent()
-      .catch(() => '')) || '';
+      .catch(() => "")) || "";
   const proteinText =
     (await page
-      .locator('.product_info_content li.protein dd')
+      .locator(".product_info_content li.protein dd")
       .textContent()
-      .catch(() => '')) || '';
+      .catch(() => "")) || "";
 
   logger.info(
     `Calories text: '${caloriesText}', Protein text: '${proteinText}'`
@@ -150,9 +150,9 @@ function hasValidNutritionValues(
   proteinText: string
 ): boolean {
   const isCaloriesEmpty =
-    !caloriesText || caloriesText.trim() === '' || caloriesText.trim() === '-';
+    !caloriesText || caloriesText.trim() === "" || caloriesText.trim() === "-";
   const isProteinEmpty =
-    !proteinText || proteinText.trim() === '' || proteinText.trim() === '-';
+    !proteinText || proteinText.trim() === "" || proteinText.trim() === "-";
   return !(isCaloriesEmpty && isProteinEmpty);
 }
 
@@ -162,7 +162,7 @@ function createMinimalNutrition(
   if (servingSize) {
     return {
       servingSize,
-      servingSizeUnit: 'ml',
+      servingSizeUnit: "ml",
     };
   }
   return null;
@@ -171,55 +171,55 @@ function createMinimalNutrition(
 function extractAllNutritionValues(page: Page): Promise<string[]> {
   return Promise.all([
     page
-      .locator('.product_info_content li.kcal dd')
+      .locator(".product_info_content li.kcal dd")
       .textContent()
-      .catch(() => '')
-      .then((text) => text || ''),
+      .catch(() => "")
+      .then((text) => text || ""),
     page
-      .locator('.product_info_content li.protein dd')
+      .locator(".product_info_content li.protein dd")
       .textContent()
-      .catch(() => '')
-      .then((text) => text || ''),
+      .catch(() => "")
+      .then((text) => text || ""),
     page
-      .locator('.product_info_content li.fat dd')
+      .locator(".product_info_content li.fat dd")
       .textContent()
-      .catch(() => '')
-      .then((text) => text || ''),
+      .catch(() => "")
+      .then((text) => text || ""),
     page
-      .locator('.product_info_content li.sat_FAT dd')
+      .locator(".product_info_content li.sat_FAT dd")
       .textContent()
-      .catch(() => '')
-      .then((text) => text || ''),
+      .catch(() => "")
+      .then((text) => text || ""),
     page
-      .locator('.product_info_content li.trans_FAT dd')
+      .locator(".product_info_content li.trans_FAT dd")
       .textContent()
-      .catch(() => '')
-      .then((text) => text || ''),
+      .catch(() => "")
+      .then((text) => text || ""),
     page
-      .locator('.product_info_content li.cholesterol dd')
+      .locator(".product_info_content li.cholesterol dd")
       .textContent()
-      .catch(() => '')
-      .then((text) => text || ''),
+      .catch(() => "")
+      .then((text) => text || ""),
     page
-      .locator('.product_info_content li.sodium dd')
+      .locator(".product_info_content li.sodium dd")
       .textContent()
-      .catch(() => '')
-      .then((text) => text || ''),
+      .catch(() => "")
+      .then((text) => text || ""),
     page
-      .locator('.product_info_content li.sugars dd')
+      .locator(".product_info_content li.sugars dd")
       .textContent()
-      .catch(() => '')
-      .then((text) => text || ''),
+      .catch(() => "")
+      .then((text) => text || ""),
     page
-      .locator('.product_info_content li.chabo dd')
+      .locator(".product_info_content li.chabo dd")
       .textContent()
-      .catch(() => '')
-      .then((text) => text || ''), // carbohydrates
+      .catch(() => "")
+      .then((text) => text || ""), // carbohydrates
     page
-      .locator('.product_info_content li.caffeine dd')
+      .locator(".product_info_content li.caffeine dd")
       .textContent()
-      .catch(() => '')
-      .then((text) => text || ''),
+      .catch(() => "")
+      .then((text) => text || ""),
   ]);
 }
 
@@ -243,41 +243,41 @@ function createNutritionObject(
 
   return {
     servingSize,
-    servingSizeUnit: servingSize !== null ? 'ml' : undefined,
+    servingSizeUnit: servingSize === null ? undefined : "ml",
     calories: parseNutritionValueFromText(calories) ?? undefined,
     caloriesUnit:
-      parseNutritionValueFromText(calories) !== null ? 'kcal' : undefined,
+      parseNutritionValueFromText(calories) === null ? undefined : "kcal",
     carbohydrates: parseNutritionValueFromText(carbohydrates) ?? undefined,
     carbohydratesUnit:
-      parseNutritionValueFromText(carbohydrates) !== null ? 'g' : undefined,
+      parseNutritionValueFromText(carbohydrates) === null ? undefined : "g",
     sugar: parseNutritionValueFromText(sugar) ?? undefined,
-    sugarUnit: parseNutritionValueFromText(sugar) !== null ? 'g' : undefined,
+    sugarUnit: parseNutritionValueFromText(sugar) === null ? undefined : "g",
     protein: parseNutritionValueFromText(protein) ?? undefined,
     proteinUnit:
-      parseNutritionValueFromText(protein) !== null ? 'g' : undefined,
+      parseNutritionValueFromText(protein) === null ? undefined : "g",
     fat: parseNutritionValueFromText(fat) ?? undefined,
-    fatUnit: parseNutritionValueFromText(fat) !== null ? 'g' : undefined,
+    fatUnit: parseNutritionValueFromText(fat) === null ? undefined : "g",
     transFat: parseNutritionValueFromText(transFat) ?? undefined,
     transFatUnit:
-      parseNutritionValueFromText(transFat) !== null ? 'g' : undefined,
+      parseNutritionValueFromText(transFat) === null ? undefined : "g",
     saturatedFat: parseNutritionValueFromText(saturatedFat) ?? undefined,
     saturatedFatUnit:
-      parseNutritionValueFromText(saturatedFat) !== null ? 'g' : undefined,
+      parseNutritionValueFromText(saturatedFat) === null ? undefined : "g",
     natrium: parseNutritionValueFromText(sodium) ?? undefined,
     natriumUnit:
-      parseNutritionValueFromText(sodium) !== null ? 'mg' : undefined,
+      parseNutritionValueFromText(sodium) === null ? undefined : "mg",
     cholesterol: parseNutritionValueFromText(cholesterol) ?? undefined,
     cholesterolUnit:
-      parseNutritionValueFromText(cholesterol) !== null ? 'mg' : undefined,
+      parseNutritionValueFromText(cholesterol) === null ? undefined : "mg",
     caffeine: parseNutritionValueFromText(caffeine) ?? undefined,
     caffeineUnit:
-      parseNutritionValueFromText(caffeine) !== null ? 'mg' : undefined,
+      parseNutritionValueFromText(caffeine) === null ? undefined : "mg",
   };
 }
 
 function hasAnyNutritionData(nutritions: Nutritions): boolean {
   return Object.entries(nutritions).some(
-    ([key, value]) => !key.endsWith('Unit') && value !== null
+    ([key, value]) => !key.endsWith("Unit") && value !== null
   );
 }
 
@@ -294,7 +294,7 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
     const hasNutritionInfo = await checkNutritionInfoExists(page);
 
     if (!hasNutritionInfo) {
-      logger.warn('No nutrition info section found on page');
+      logger.warn("No nutrition info section found on page");
       return null;
     }
 
@@ -325,7 +325,7 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
     // Only return nutrition data if at least one nutrition field has a value
     return hasAnyNutritionData(nutritions) ? nutritions : null;
   } catch (error) {
-    logger.error('Error extracting nutrition data:', error);
+    logger.error("Error extracting nutrition data:", error);
     return null;
   }
 }
@@ -344,29 +344,29 @@ async function extractProductData(page: Page): Promise<Product> {
     page
       .locator(SELECTORS.productDetails.name)
       .textContent()
-      .then((text) => text?.trim() || ''),
+      .then((text) => text?.trim() || ""),
     page
       .locator(SELECTORS.productDetails.nameEn)
       .textContent()
-      .then((text) => text?.trim() || ''),
+      .then((text) => text?.trim() || ""),
     page
       .locator(SELECTORS.productDetails.description)
       .first()
       .textContent()
-      .then((text) => text?.trim() || ''),
+      .then((text) => text?.trim() || ""),
     page
       .locator(SELECTORS.productDetails.category)
       .textContent()
-      .then((text) => text?.trim() || ''),
+      .then((text) => text?.trim() || ""),
     page
       .locator(SELECTORS.productDetails.image)
       .first()
-      .getAttribute('src')
-      .catch(() => '')
-      .then((src) => src || ''),
+      .getAttribute("src")
+      .catch(() => "")
+      .then((src) => src || ""),
     Promise.resolve(page.url()).then((url) => {
       const urlParams = new URLSearchParams(new URL(url).search);
-      return urlParams.get('product_cd') || '';
+      return urlParams.get("product_cd") || "";
     }),
     Promise.resolve(page.url()),
   ]);
@@ -374,7 +374,7 @@ async function extractProductData(page: Page): Promise<Product> {
   // Clean Korean name by removing English part
   let cleanName = name;
   if (nameEn && name.includes(nameEn)) {
-    cleanName = name.replace(nameEn, '').trim();
+    cleanName = name.replace(nameEn, "").trim();
   }
 
   // Extract nutrition data
@@ -389,7 +389,7 @@ async function extractProductData(page: Page): Promise<Product> {
     externalImageUrl,
     externalUrl,
     price: null,
-    category: 'Drinks',
+    category: "Drinks",
     nutritions,
   };
 }
@@ -402,7 +402,7 @@ function extractProductIdFromLink(
   const extractedIds: string[] = [];
 
   // Try to extract product ID from href
-  if (href?.includes('drink_view.do')) {
+  if (href?.includes("drink_view.do")) {
     const match = href.match(PATTERNS.productCode);
     if (match) {
       extractedIds.push(match[1]);
@@ -410,7 +410,7 @@ function extractProductIdFromLink(
   }
 
   // Try to extract product ID from onclick
-  if (onclick?.includes('product_cd')) {
+  if (onclick?.includes("product_cd")) {
     const match = onclick.match(PATTERNS.productCode);
     if (match) {
       extractedIds.push(match[1]);
@@ -430,7 +430,7 @@ function extractProductIdFromLink(
 
 async function extractProductIds(page: Page) {
   let links: ReturnType<typeof page.locator> | null = null;
-  let usedSelector = '';
+  let usedSelector = "";
 
   // Try each selector until we find one that works
   const selectorPromises = SELECTORS.productLinks.map(async (selector) => {
@@ -463,9 +463,9 @@ async function extractProductIds(page: Page) {
           return { ids: [] };
         }
         const [href, onclick, innerHTML] = await Promise.all([
-          link.getAttribute('href').then((h) => h || ''),
-          link.getAttribute('onclick').then((o) => o || ''),
-          link.innerHTML().then((h) => h || ''),
+          link.getAttribute("href").then((h) => h || ""),
+          link.getAttribute("onclick").then((o) => o || ""),
+          link.innerHTML().then((h) => h || ""),
         ]);
 
         const extractedIds = extractProductIdFromLink(href, onclick, innerHTML);
@@ -494,7 +494,7 @@ async function handleMainMenuPage(
   page: Page,
   crawlerInstance: PlaywrightCrawler
 ) {
-  logger.info('Processing drink list page');
+  logger.info("Processing drink list page");
 
   await waitForLoad(page);
   // Skip debug screenshot for performance
@@ -550,7 +550,7 @@ async function handleProductPage(
       const finalProduct: Product = {
         ...product,
         price: null,
-        category: 'Drinks',
+        category: "Drinks",
       };
 
       await crawlerInstance.pushData(finalProduct);
@@ -580,7 +580,7 @@ export const createStarbucksCrawler = () =>
     async requestHandler({ page, request, crawler: crawlerInstance }) {
       const url = request.url;
 
-      if (url.includes('drink_list.do')) {
+      if (url.includes("drink_list.do")) {
         await handleMainMenuPage(page, crawlerInstance);
       } else if (request.userData?.isProductPage) {
         await handleProductPage(page, request, crawlerInstance);
@@ -598,9 +598,9 @@ export const runStarbucksCrawler = async () => {
   try {
     await crawler.run([SITE_CONFIG.startUrl]);
     const dataset = await crawler.getData();
-    await writeProductsToJson(dataset.items as Product[], 'starbucks');
+    await writeProductsToJson(dataset.items as Product[], "starbucks");
   } catch (error) {
-    logger.error('Starbucks crawler failed:', error);
+    logger.error("Starbucks crawler failed:", error);
     throw error;
   }
 };
@@ -608,7 +608,7 @@ export const runStarbucksCrawler = async () => {
 // Only run if this file is executed directly (not imported)
 if (import.meta.url === `file://${process.argv[1]}`) {
   runStarbucksCrawler().catch((error) => {
-    logger.error('Crawler execution failed:', error);
+    logger.error("Crawler execution failed:", error);
     process.exit(1);
   });
 }

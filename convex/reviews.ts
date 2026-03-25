@@ -1,19 +1,19 @@
-import { v } from 'convex/values';
-import { api } from './_generated/api';
-import type { Id } from './_generated/dataModel';
-import { mutation, query } from './_generated/server';
+import { v } from "convex/values";
+import { api } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
+import { mutation, query } from "./_generated/server";
 
 /**
  * Rating scale mapping for Korean labels
  */
 export const RATING_TEXTS = {
-  1: '최악',
-  2: '별로',
-  3: '보통',
-  3.5: '좋음',
-  4: '추천',
-  4.5: '강력 추천',
-  5: '최고',
+  1: "최악",
+  2: "별로",
+  3: "보통",
+  3.5: "좋음",
+  4: "추천",
+  4.5: "강력 추천",
+  5: "최고",
 } as const;
 
 export type RatingDistribution = {
@@ -25,15 +25,15 @@ export type RatingDistribution = {
  */
 export const getByProduct = query({
   args: {
-    productId: v.id('products'),
+    productId: v.id("products"),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, { productId, limit = 50 }) => {
     const reviews = await ctx.db
-      .query('reviews')
-      .withIndex('by_product', (q) => q.eq('productId', productId))
-      .filter((q) => q.neq(q.field('isVisible'), false)) // Show visible reviews
-      .order('desc')
+      .query("reviews")
+      .withIndex("by_product", (q) => q.eq("productId", productId))
+      .filter((q) => q.neq(q.field("isVisible"), false)) // Show visible reviews
+      .order("desc")
       .take(limit);
 
     // Add image URLs for review photos
@@ -43,7 +43,7 @@ export const getByProduct = query({
         if (review.imageStorageIds) {
           imageUrls = await Promise.all(
             review.imageStorageIds.map(async (storageId) => {
-              return (await ctx.storage.getUrl(storageId)) || '';
+              return (await ctx.storage.getUrl(storageId)) || "";
             })
           );
         }
@@ -52,7 +52,7 @@ export const getByProduct = query({
           ...review,
           imageUrls,
           ratingText:
-            RATING_TEXTS[review.rating as keyof typeof RATING_TEXTS] || '',
+            RATING_TEXTS[review.rating as keyof typeof RATING_TEXTS] || "",
         };
       })
     );
@@ -65,12 +65,12 @@ export const getByProduct = query({
  * Get review statistics for a product
  */
 export const getProductStats = query({
-  args: { productId: v.id('products') },
+  args: { productId: v.id("products") },
   handler: async (ctx, { productId }) => {
     const reviews = await ctx.db
-      .query('reviews')
-      .withIndex('by_product', (q) => q.eq('productId', productId))
-      .filter((q) => q.neq(q.field('isVisible'), false))
+      .query("reviews")
+      .withIndex("by_product", (q) => q.eq("productId", productId))
+      .filter((q) => q.neq(q.field("isVisible"), false))
       .collect();
 
     if (reviews.length === 0) {
@@ -114,14 +114,14 @@ export const getProductStats = query({
  */
 export const getUserReview = query({
   args: {
-    productId: v.id('products'),
+    productId: v.id("products"),
     userId: v.string(),
   },
   handler: async (ctx, { productId, userId }) => {
     const review = await ctx.db
-      .query('reviews')
-      .withIndex('by_product', (q) => q.eq('productId', productId))
-      .filter((q) => q.eq(q.field('userId'), userId))
+      .query("reviews")
+      .withIndex("by_product", (q) => q.eq("productId", productId))
+      .filter((q) => q.eq(q.field("userId"), userId))
       .first();
 
     if (!review) {
@@ -133,7 +133,7 @@ export const getUserReview = query({
     if (review.imageStorageIds) {
       imageUrls = await Promise.all(
         review.imageStorageIds.map(async (storageId) => {
-          return (await ctx.storage.getUrl(storageId)) || '';
+          return (await ctx.storage.getUrl(storageId)) || "";
         })
       );
     }
@@ -142,7 +142,7 @@ export const getUserReview = query({
       ...review,
       imageUrls,
       ratingText:
-        RATING_TEXTS[review.rating as keyof typeof RATING_TEXTS] || '',
+        RATING_TEXTS[review.rating as keyof typeof RATING_TEXTS] || "",
     };
   },
 });
@@ -152,11 +152,11 @@ export const getUserReview = query({
  */
 export const upsertReview = mutation({
   args: {
-    productId: v.id('products'),
+    productId: v.id("products"),
     userId: v.string(),
     rating: v.number(),
     text: v.optional(v.string()),
-    imageStorageIds: v.optional(v.array(v.id('_storage'))),
+    imageStorageIds: v.optional(v.array(v.id("_storage"))),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -165,23 +165,23 @@ export const upsertReview = mutation({
     const validRatings = [1, 2, 3, 3.5, 4, 4.5, 5];
     if (!validRatings.includes(args.rating)) {
       throw new Error(
-        'Invalid rating. Must be one of: 1, 2, 3, 3.5, 4, 4.5, 5'
+        "Invalid rating. Must be one of: 1, 2, 3, 3.5, 4, 4.5, 5"
       );
     }
 
     // Validate image count (max 2)
     if (args.imageStorageIds && args.imageStorageIds.length > 2) {
-      throw new Error('Maximum 2 images allowed per review');
+      throw new Error("Maximum 2 images allowed per review");
     }
 
     // Check if user already has a review for this product
     const existingReview = await ctx.db
-      .query('reviews')
-      .withIndex('by_product', (q) => q.eq('productId', args.productId))
-      .filter((q) => q.eq(q.field('userId'), args.userId))
+      .query("reviews")
+      .withIndex("by_product", (q) => q.eq("productId", args.productId))
+      .filter((q) => q.eq(q.field("userId"), args.userId))
       .first();
 
-    let reviewId: Id<'reviews'>;
+    let reviewId: Id<"reviews">;
 
     if (existingReview) {
       // Update existing review
@@ -195,7 +195,7 @@ export const upsertReview = mutation({
       reviewId = existingReview._id;
     } else {
       // Create new review
-      reviewId = await ctx.db.insert('reviews', {
+      reviewId = await ctx.db.insert("reviews", {
         productId: args.productId,
         userId: args.userId,
         rating: args.rating,
@@ -212,7 +212,7 @@ export const upsertReview = mutation({
       productId: args.productId,
     });
 
-    return { reviewId, action: existingReview ? 'updated' : 'created' };
+    return { reviewId, action: existingReview ? "updated" : "created" };
   },
 });
 
@@ -221,18 +221,18 @@ export const upsertReview = mutation({
  */
 export const deleteReview = mutation({
   args: {
-    reviewId: v.id('reviews'),
+    reviewId: v.id("reviews"),
     userId: v.string(), // For authorization
   },
   handler: async (ctx, { reviewId, userId }) => {
     const review = await ctx.db.get(reviewId);
 
     if (!review) {
-      throw new Error('Review not found');
+      throw new Error("Review not found");
     }
 
     if (review.userId !== userId) {
-      throw new Error('Unauthorized: Can only delete your own reviews');
+      throw new Error("Unauthorized: Can only delete your own reviews");
     }
 
     await ctx.db.delete(reviewId);
@@ -250,12 +250,12 @@ export const deleteReview = mutation({
  * Update product rating aggregation statistics
  */
 export const updateProductStats = mutation({
-  args: { productId: v.id('products') },
+  args: { productId: v.id("products") },
   handler: async (ctx, { productId }) => {
     const reviews = await ctx.db
-      .query('reviews')
-      .withIndex('by_product', (q) => q.eq('productId', productId))
-      .filter((q) => q.neq(q.field('isVisible'), false))
+      .query("reviews")
+      .withIndex("by_product", (q) => q.eq("productId", productId))
+      .filter((q) => q.neq(q.field("isVisible"), false))
       .collect();
 
     const totalReviews = reviews.length;
@@ -298,10 +298,10 @@ export const getUserReviews = query({
   },
   handler: async (ctx, { userId, limit = 50 }) => {
     const reviews = await ctx.db
-      .query('reviews')
-      .withIndex('by_user', (q) => q.eq('userId', userId))
-      .filter((q) => q.neq(q.field('isVisible'), false))
-      .order('desc')
+      .query("reviews")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .filter((q) => q.neq(q.field("isVisible"), false))
+      .order("desc")
       .take(limit);
 
     // Get product information for each review
@@ -313,7 +313,7 @@ export const getUserReviews = query({
         if (review.imageStorageIds) {
           imageUrls = await Promise.all(
             review.imageStorageIds.map(async (storageId) => {
-              return (await ctx.storage.getUrl(storageId)) || '';
+              return (await ctx.storage.getUrl(storageId)) || "";
             })
           );
         }
@@ -323,7 +323,7 @@ export const getUserReviews = query({
           product,
           imageUrls,
           ratingText:
-            RATING_TEXTS[review.rating as keyof typeof RATING_TEXTS] || '',
+            RATING_TEXTS[review.rating as keyof typeof RATING_TEXTS] || "",
         };
       })
     );
@@ -339,9 +339,9 @@ export const getUserStats = query({
   args: { userId: v.string() },
   handler: async (ctx, { userId }) => {
     const reviews = await ctx.db
-      .query('reviews')
-      .withIndex('by_user', (q) => q.eq('userId', userId))
-      .filter((q) => q.neq(q.field('isVisible'), false))
+      .query("reviews")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .filter((q) => q.neq(q.field("isVisible"), false))
       .collect();
 
     if (reviews.length === 0) {
@@ -387,10 +387,10 @@ export const getRecentReviews = query({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, { limit = 10 }) => {
     const reviews = await ctx.db
-      .query('reviews')
-      .withIndex('by_created_at')
-      .filter((q) => q.neq(q.field('isVisible'), false))
-      .order('desc')
+      .query("reviews")
+      .withIndex("by_created_at")
+      .filter((q) => q.neq(q.field("isVisible"), false))
+      .order("desc")
       .take(limit);
 
     // Get product information for each review
@@ -402,7 +402,7 @@ export const getRecentReviews = query({
         if (review.imageStorageIds) {
           imageUrls = await Promise.all(
             review.imageStorageIds.map(async (storageId) => {
-              return (await ctx.storage.getUrl(storageId)) || '';
+              return (await ctx.storage.getUrl(storageId)) || "";
             })
           );
         }
@@ -412,7 +412,7 @@ export const getRecentReviews = query({
           product,
           imageUrls,
           ratingText:
-            RATING_TEXTS[review.rating as keyof typeof RATING_TEXTS] || '',
+            RATING_TEXTS[review.rating as keyof typeof RATING_TEXTS] || "",
         };
       })
     );
@@ -425,7 +425,7 @@ export const getRecentReviews = query({
  * Get individual review by ID with product context
  */
 export const getById = query({
-  args: { reviewId: v.id('reviews') },
+  args: { reviewId: v.id("reviews") },
   handler: async (ctx, { reviewId }) => {
     const review = await ctx.db.get(reviewId);
 
@@ -444,8 +444,8 @@ export const getById = query({
 
     // Get user information
     const user = await ctx.db
-      .query('users')
-      .withIndex('by_id', (q) => q.eq('_id', review.userId as Id<'users'>))
+      .query("users")
+      .withIndex("by_id", (q) => q.eq("_id", review.userId as Id<"users">))
       .unique();
 
     // Add image URLs
@@ -453,7 +453,7 @@ export const getById = query({
     if (review.imageStorageIds) {
       imageUrls = await Promise.all(
         review.imageStorageIds.map(async (storageId) => {
-          return (await ctx.storage.getUrl(storageId)) || '';
+          return (await ctx.storage.getUrl(storageId)) || "";
         })
       );
     }
@@ -465,7 +465,7 @@ export const getById = query({
       user,
       imageUrls,
       ratingText:
-        RATING_TEXTS[review.rating as keyof typeof RATING_TEXTS] || '',
+        RATING_TEXTS[review.rating as keyof typeof RATING_TEXTS] || "",
     };
   },
 });
@@ -474,8 +474,8 @@ export const getAllWithImages = query({
   args: {},
   handler: async (ctx) => {
     const reviews = await ctx.db
-      .query('reviews')
-      .filter((q) => q.neq(q.field('imageStorageIds'), undefined))
+      .query("reviews")
+      .filter((q) => q.neq(q.field("imageStorageIds"), undefined))
       .collect();
 
     // Sort by _creationTime (latest first) to prioritize recent uploads
@@ -485,15 +485,15 @@ export const getAllWithImages = query({
 
 export const updateImages = mutation({
   args: {
-    reviewId: v.id('reviews'),
-    imageStorageIds: v.array(v.id('_storage')),
+    reviewId: v.id("reviews"),
+    imageStorageIds: v.array(v.id("_storage")),
     uploadSecret: v.optional(v.string()),
   },
   handler: async (ctx, { reviewId, imageStorageIds, uploadSecret }) => {
     // Verify upload secret for protected operations
     const expectedSecret = process.env.CONVEX_UPLOAD_SECRET;
     if (expectedSecret && uploadSecret !== expectedSecret) {
-      throw new Error('Unauthorized: Invalid upload secret');
+      throw new Error("Unauthorized: Invalid upload secret");
     }
 
     const now = Date.now();

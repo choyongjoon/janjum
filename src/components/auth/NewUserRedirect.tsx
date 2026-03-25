@@ -1,8 +1,8 @@
-import { convexQuery, useConvexAuth } from '@convex-dev/react-query';
-import { useQuery } from '@tanstack/react-query';
-import { useRouter } from '@tanstack/react-router';
-import { useEffect } from 'react';
-import { api } from '../../../convex/_generated/api';
+import { convexQuery, useConvexAuth } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { api } from "../../../convex/_generated/api";
 
 interface NewUserRedirectProps {
   children: React.ReactNode;
@@ -24,9 +24,9 @@ export function NewUserRedirect({ children }: NewUserRedirectProps) {
       !userLoading &&
       currentUser &&
       currentUser.hasCompletedSetup === false &&
-      router.state.location.pathname !== '/settings'
+      router.state.location.pathname !== "/settings"
     ) {
-      router.navigate({ to: '/settings' });
+      router.navigate({ to: "/settings" });
     }
   }, [userLoading, currentUser, router]);
 

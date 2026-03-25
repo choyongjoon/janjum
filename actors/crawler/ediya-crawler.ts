@@ -1,17 +1,17 @@
-import { PlaywrightCrawler, type Request } from 'crawlee';
-import type { Locator, Page } from 'playwright';
-import { logger } from '../../shared/logger';
-import type { Nutritions } from '../../shared/nutritions';
-import { type Product, waitForLoad, writeProductsToJson } from './crawlerUtils';
+import { PlaywrightCrawler, type Request } from "crawlee";
+import type { Locator, Page } from "playwright";
+import { logger } from "../../shared/logger";
+import type { Nutritions } from "../../shared/nutritions";
+import { type Product, waitForLoad, writeProductsToJson } from "./crawlerUtils";
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
 // ================================================
 
 const SITE_CONFIG = {
-  baseUrl: 'https://ediya.com',
-  startUrl: 'https://ediya.com/contents/drink.html',
-  categoryUrlTemplate: 'https://ediya.com/contents/drink.html?chked_val=',
+  baseUrl: "https://ediya.com",
+  startUrl: "https://ediya.com/contents/drink.html",
+  categoryUrlTemplate: "https://ediya.com/contents/drink.html?chked_val=",
 } as const;
 
 // ================================================
@@ -28,17 +28,17 @@ const SELECTORS = {
   categoryCheckboxes: 'input[name="chkList"]',
 
   // Product listing selectors
-  productContainers: '#menu_ul > li',
+  productContainers: "#menu_ul > li",
 
   // Pagination selectors
   loadMoreButton: ['a:has-text("더보기")'],
 
   // Product data selectors
   productData: {
-    name: '.menu_tt > a > span',
-    nameEn: 'div.detail_con > h2 > span',
-    description: '.detail_txt',
-    image: '> a > img',
+    name: ".menu_tt > a > span",
+    nameEn: "div.detail_con > h2 > span",
+    description: ".detail_txt",
+    image: "> a > img",
   },
 } as const;
 
@@ -47,12 +47,12 @@ const SELECTORS = {
 // ================================================
 
 // Test mode configuration
-const isTestMode = process.env.CRAWLER_TEST_MODE === 'true';
+const isTestMode = process.env.CRAWLER_TEST_MODE === "true";
 const maxProductsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS || '3', 10)
+  ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS || "3", 10)
   : Number.POSITIVE_INFINITY;
 const maxRequestsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || '10', 10)
+  ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || "10", 10)
   : 50;
 
 const CRAWLER_CONFIG = {
@@ -62,7 +62,7 @@ const CRAWLER_CONFIG = {
   requestHandlerTimeoutSecs: isTestMode ? 30 : 120, // Increased timeout for pagination
   launchOptions: {
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'] as string[],
+    args: ["--no-sandbox", "--disable-setuid-sandbox"] as string[],
   },
 };
 
@@ -71,8 +71,8 @@ const CRAWLER_CONFIG = {
 // ================================================
 
 async function clickLoadMoreButton(page: Page): Promise<boolean> {
-  let loadMoreButton: import('playwright').Locator | null = null;
-  let usedSelector = '';
+  let loadMoreButton: import("playwright").Locator | null = null;
+  let usedSelector = "";
 
   // Try to find the load more button using multiple selectors
   for (const selector of SELECTORS.loadMoreButton) {
@@ -97,7 +97,7 @@ async function clickLoadMoreButton(page: Page): Promise<boolean> {
   }
 
   if (!loadMoreButton) {
-    logger.debug('No load more button found');
+    logger.debug("No load more button found");
     return false;
   }
 
@@ -122,7 +122,7 @@ async function clickLoadMoreButton(page: Page): Promise<boolean> {
       );
       return true;
     }
-    logger.debug('No new products loaded after clicking load more button');
+    logger.debug("No new products loaded after clicking load more button");
     return false;
   } catch (error) {
     logger.debug(`⚠️ Failed to click load more button: ${error}`);
@@ -172,7 +172,7 @@ async function extractCategoryValues(
   page: Page
 ): Promise<Array<{ value: string; name: string }>> {
   try {
-    logger.info('📄 Extracting category checkboxes');
+    logger.info("📄 Extracting category checkboxes");
 
     await waitForLoad(page);
 
@@ -188,11 +188,11 @@ async function extractCategoryValues(
 
     for (const checkbox of checkboxes) {
       const [value, label] = await Promise.all([
-        checkbox.getAttribute('value'),
+        checkbox.getAttribute("value"),
         checkbox.evaluate((el) => {
           // Try to find associated label text
-          const parent = el.closest('label') || el.parentElement;
-          return parent?.textContent?.trim() || '';
+          const parent = el.closest("label") || el.parentElement;
+          return parent?.textContent?.trim() || "";
         }),
       ]);
 
@@ -214,7 +214,7 @@ async function extractNutritionData(
   container: Locator
 ): Promise<Nutritions | null> {
   try {
-    const nutritionElement = container.locator('.pro_comp');
+    const nutritionElement = container.locator(".pro_comp");
 
     if ((await nutritionElement.count()) === 0) {
       return null;
@@ -223,33 +223,33 @@ async function extractNutritionData(
     const nutrition: Nutritions = {};
 
     // Extract serving size from .pro_size element
-    const sizeElement = nutritionElement.locator('.pro_size');
+    const sizeElement = nutritionElement.locator(".pro_size");
     if ((await sizeElement.count()) > 0) {
       const sizeText = await sizeElement.textContent();
       if (sizeText) {
         const sizeMatch = sizeText.match(SERVING_SIZE_ML_REGEX);
         if (sizeMatch) {
           nutrition.servingSize = Number.parseFloat(sizeMatch[1]);
-          nutrition.servingSizeUnit = 'ml';
+          nutrition.servingSizeUnit = "ml";
         }
       }
     }
 
     // Extract nutrition data from .pro_nutri dl elements
     const nutritionItems = await nutritionElement
-      .locator('.pro_nutri dl')
+      .locator(".pro_nutri dl")
       .all();
 
     for (const item of nutritionItems) {
-      const dtElement = item.locator('dt');
-      const ddElement = item.locator('dd');
+      const dtElement = item.locator("dt");
+      const ddElement = item.locator("dd");
 
       if ((await dtElement.count()) === 0 || (await ddElement.count()) === 0) {
         continue;
       }
 
-      const label = (await dtElement.textContent())?.trim().toLowerCase() || '';
-      const valueText = (await ddElement.textContent())?.trim() || '';
+      const label = (await dtElement.textContent())?.trim().toLowerCase() || "";
+      const valueText = (await ddElement.textContent())?.trim() || "";
 
       // Extract numeric value from parentheses
       const valueMatch = valueText.match(NUTRITION_VALUE_REGEX);
@@ -262,31 +262,31 @@ async function extractNutritionData(
         continue;
       }
 
-      if (label.includes('칼로리')) {
+      if (label.includes("칼로리")) {
         nutrition.calories = numValue;
-        nutrition.caloriesUnit = 'kcal';
-      } else if (label.includes('당류')) {
+        nutrition.caloriesUnit = "kcal";
+      } else if (label.includes("당류")) {
         nutrition.sugar = numValue;
-        nutrition.sugarUnit = 'g';
-      } else if (label.includes('단백질')) {
+        nutrition.sugarUnit = "g";
+      } else if (label.includes("단백질")) {
         nutrition.protein = numValue;
-        nutrition.proteinUnit = 'g';
-      } else if (label.includes('포화지방')) {
+        nutrition.proteinUnit = "g";
+      } else if (label.includes("포화지방")) {
         nutrition.saturatedFat = numValue;
-        nutrition.saturatedFatUnit = 'g';
-      } else if (label.includes('나트륨')) {
+        nutrition.saturatedFatUnit = "g";
+      } else if (label.includes("나트륨")) {
         nutrition.natrium = numValue;
-        nutrition.natriumUnit = 'mg';
-      } else if (label.includes('카페인')) {
+        nutrition.natriumUnit = "mg";
+      } else if (label.includes("카페인")) {
         nutrition.caffeine = numValue;
-        nutrition.caffeineUnit = 'mg';
+        nutrition.caffeineUnit = "mg";
       }
     }
 
     return Object.keys(nutrition).length > 0 ? nutrition : null;
   } catch (error) {
     logger.debug(
-      'Failed to extract nutrition data from Ediya menu item:',
+      "Failed to extract nutrition data from Ediya menu item:",
       error as Record<string, unknown>
     );
     return null;
@@ -308,10 +308,10 @@ async function extractProductData(container: Locator): Promise<{
           .textContent()
           .then((text) => {
             if (!text) {
-              return '';
+              return "";
             }
             // Clean the name by removing whitespace and gift suffix
-            const cleaned = text.trim().replace(GIFT_SUFFIX_REGEX, '');
+            const cleaned = text.trim().replace(GIFT_SUFFIX_REGEX, "");
             return cleaned;
           }),
         container
@@ -326,23 +326,23 @@ async function extractProductData(container: Locator): Promise<{
           .catch(() => null),
         container
           .locator(SELECTORS.productData.image)
-          .getAttribute('src')
+          .getAttribute("src")
           .then((src) => {
             if (!src) {
-              return '';
+              return "";
             }
 
             // Handle relative paths properly
-            if (src.startsWith('/')) {
+            if (src.startsWith("/")) {
               return `${SITE_CONFIG.baseUrl}${src}`;
             }
-            if (src.startsWith('http')) {
+            if (src.startsWith("http")) {
               return src;
             }
             // Relative path without leading slash
             return `${SITE_CONFIG.baseUrl}/${src}`;
           })
-          .catch(() => ''),
+          .catch(() => ""),
         extractNutritionData(container),
       ]
     );
@@ -381,7 +381,7 @@ function createProduct(
     description: productData.description,
     price: null,
     externalImageUrl: productData.imageUrl,
-    category: 'Drinks',
+    category: "Drinks",
     externalCategory: categoryName,
     externalId,
     externalUrl: pageUrl,
@@ -474,7 +474,7 @@ async function extractProductsFromPage(
         ) {
           products.push(product);
           logger.info(
-            `✅ Extracted: ${product.name} (${product.externalCategory})${product.nutritions ? ' with nutrition data' : ''}`
+            `✅ Extracted: ${product.name} (${product.externalCategory})${product.nutritions ? " with nutrition data" : ""}`
           );
         }
       } catch (productError) {
@@ -502,7 +502,7 @@ async function handleMainMenuPage(
   page: Page,
   crawlerInstance: PlaywrightCrawler
 ) {
-  logger.info('Processing main menu page to discover categories');
+  logger.info("Processing main menu page to discover categories");
 
   await waitForLoad(page);
   // Debug screenshot removed for performance
@@ -511,7 +511,7 @@ async function handleMainMenuPage(
   const categories = await extractCategoryValues(page);
 
   if (categories.length === 0) {
-    logger.error('❌ No categories found');
+    logger.error("❌ No categories found");
     return;
   }
 
@@ -590,9 +590,9 @@ export const runEdiyaCrawler = async () => {
   try {
     await crawler.run([SITE_CONFIG.startUrl]);
     const dataset = await crawler.getData();
-    await writeProductsToJson(dataset.items as Product[], 'ediya');
+    await writeProductsToJson(dataset.items as Product[], "ediya");
   } catch (error) {
-    logger.error('Ediya crawler failed:', error);
+    logger.error("Ediya crawler failed:", error);
     throw error;
   }
 };
@@ -600,7 +600,7 @@ export const runEdiyaCrawler = async () => {
 // Only run if this file is executed directly (not imported)
 if (import.meta.url === `file://${process.argv[1]}`) {
   runEdiyaCrawler().catch((error) => {
-    logger.error('Crawler execution failed:', error);
+    logger.error("Crawler execution failed:", error);
     process.exit(1);
   });
 }

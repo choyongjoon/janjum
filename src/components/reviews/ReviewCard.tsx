@@ -1,19 +1,19 @@
-import { convexQuery } from '@convex-dev/react-query';
-import { useQuery } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
-import type { Id } from 'convex/_generated/dataModel';
-import { api } from '../../../convex/_generated/api';
-import { showToast } from '../../utils/toast';
-import { RatingText } from './RatingText';
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
+import type { Id } from "convex/_generated/dataModel";
+import { api } from "../../../convex/_generated/api";
+import { showToast } from "../../utils/toast";
+import { RatingText } from "./RatingText";
 
 function useUserProfile(userId: string) {
   const { data: fetchedUser } = useQuery({
-    ...convexQuery(api.users.getById, { userId: userId as Id<'users'> }),
+    ...convexQuery(api.users.getById, { userId: userId as Id<"users"> }),
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });
 
-  const displayName = fetchedUser?.name || '익명 사용자';
+  const displayName = fetchedUser?.name || "익명 사용자";
   const handle = fetchedUser?.handle;
   const imageUrl = fetchedUser?.imageUrl;
 
@@ -42,7 +42,9 @@ function ReviewImageModal({
         <img
           alt={`Review attachment ${index + 1}`}
           className="h-full w-full object-cover"
+          height={200}
           src={imageUrl}
+          width={200}
         />
       </button>
 
@@ -51,7 +53,9 @@ function ReviewImageModal({
           <img
             alt={`후기 사진 ${index + 1}`}
             className="h-auto w-full"
+            height={600}
             src={imageUrl}
+            width={600}
           />
         </div>
         <form className="modal-backdrop" method="dialog">
@@ -63,8 +67,11 @@ function ReviewImageModal({
 }
 
 interface ReviewCardProps {
+  currentUserId?: string;
+  onDelete?: () => void;
+  onEdit?: () => void;
   review: {
-    _id: Id<'reviews'>;
+    _id: Id<"reviews">;
     userId: string;
     rating: number;
     text?: string;
@@ -73,9 +80,6 @@ interface ReviewCardProps {
     createdAt: number;
     updatedAt: number;
   };
-  currentUserId?: string;
-  onEdit?: () => void;
-  onDelete?: () => void;
 }
 
 export function ReviewCard({
@@ -106,26 +110,32 @@ export function ReviewCard({
                   to="/user/$handle"
                 >
                   {imageUrl && (
+                    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: onError is a load event, not user interaction
                     <img
                       alt={displayName}
                       className="h-full w-full rounded-full object-cover"
+                      height={40}
                       onError={(e) => {
-                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.style.display = "none";
                       }}
                       src={imageUrl}
+                      width={40}
                     />
                   )}
                 </Link>
               ) : (
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
                   {imageUrl && (
+                    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: onError is a load event, not user interaction
                     <img
                       alt={displayName}
                       className="h-full w-full rounded-full object-cover"
+                      height={40}
                       onError={(e) => {
-                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.style.display = "none";
                       }}
                       src={imageUrl}
+                      width={40}
                     />
                   )}
                 </div>
@@ -169,10 +179,10 @@ export function ReviewCard({
                 navigator.clipboard
                   .writeText(reviewUrl)
                   .then(() => {
-                    showToast('후기 링크가 복사되었습니다!', 'success');
+                    showToast("후기 링크가 복사되었습니다!", "success");
                   })
                   .catch(() => {
-                    showToast('링크 복사에 실패했습니다.', 'error');
+                    showToast("링크 복사에 실패했습니다.", "error");
                   });
               }}
               title="후기 링크 복사"
@@ -245,7 +255,7 @@ export function ReviewCard({
         {/* Review Text with left margin matching profile image */}
         {review.text && (
           <div className="ml-[52px]">
-            {' '}
+            {" "}
             {/* 40px (h-10 w-10) + 12px (gap-3) = 52px */}
             <p className="text-base-content">{review.text}</p>
           </div>
@@ -274,9 +284,9 @@ export function ReviewCard({
             to="/review/$reviewId"
           >
             {wasEdited ? (
-              <>{updatedDate.toLocaleDateString('ko-KR')} (수정됨)</>
+              <>{updatedDate.toLocaleDateString("ko-KR")} (수정됨)</>
             ) : (
-              createdDate.toLocaleDateString('ko-KR')
+              createdDate.toLocaleDateString("ko-KR")
             )}
           </Link>
         </div>

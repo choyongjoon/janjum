@@ -1,10 +1,10 @@
-import { Link } from '@tanstack/react-router';
-import type { Doc } from 'convex/_generated/dataModel';
+import { Link } from "@tanstack/react-router";
+import type { Doc } from "convex/_generated/dataModel";
 
 export function CafeCard({
   cafe,
 }: {
-  cafe: Doc<'cafes'> & { imageUrl?: string };
+  cafe: Doc<"cafes"> & { imageUrl?: string };
 }) {
   return (
     <Link

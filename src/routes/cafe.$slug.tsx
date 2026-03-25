@@ -1,30 +1,30 @@
-import { convexQuery } from '@convex-dev/react-query';
-import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import type { Id } from 'convex/_generated/dataModel';
-import { useMemo, useState } from 'react';
-import { z } from 'zod';
-import CafeHeader from '~/components/cafe/CafeHeader';
-import { CategoryFilter } from '~/components/cafe/CategoryFilter';
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import type { Id } from "convex/_generated/dataModel";
+import { useMemo, useState } from "react";
+import { z } from "zod";
+import CafeHeader from "~/components/cafe/CafeHeader";
+import { CategoryFilter } from "~/components/cafe/CategoryFilter";
 import {
   type OrderOption,
   OrderSelector,
-} from '~/components/cafe/OrderSelector';
-import { ProductSearchInput } from '~/components/cafe/ProductSearchInput';
-import { api } from '../../convex/_generated/api';
-import { ProductCard } from '../components/ProductCard';
-import { getOrderedCategories } from '../utils/categories';
-import { seo } from '../utils/seo';
+} from "~/components/cafe/OrderSelector";
+import { ProductSearchInput } from "~/components/cafe/ProductSearchInput";
+import { api } from "../../convex/_generated/api";
+import { ProductCard } from "../components/ProductCard";
+import { getOrderedCategories } from "../utils/categories";
+import { seo } from "../utils/seo";
 
 const searchSchema = z.object({
   category: z.string().optional(),
   order: z
-    .enum(['latest', 'most-reviews', 'highest-rating'])
+    .enum(["latest", "most-reviews", "highest-rating"])
     .optional()
-    .default('latest'),
+    .default("latest"),
 });
 
-export const Route = createFileRoute('/cafe/$slug')({
+export const Route = createFileRoute("/cafe/$slug")({
   component: CafePage,
   validateSearch: searchSchema,
   loader: async (opts) => {
@@ -36,9 +36,9 @@ export const Route = createFileRoute('/cafe/$slug')({
   head: ({ loaderData }) => ({
     meta: [
       ...seo({
-        title: `${loaderData?.cafe?.name || '카페'} | 잔점`,
-        description: `${loaderData?.cafe?.name || '카페'} 음료 정보를 확인하세요.`,
-        image: '/android-chrome-512x512.png',
+        title: `${loaderData?.cafe?.name || "카페"} | 잔점`,
+        description: `${loaderData?.cafe?.name || "카페"} 음료 정보를 확인하세요.`,
+        image: "/android-chrome-512x512.png",
       }),
     ],
   }),
@@ -50,18 +50,18 @@ function CafePage() {
     convexQuery(api.cafes.getBySlug, { slug })
   );
 
-  const { category: selectedCategory, order: selectedOrder = 'latest' } =
+  const { category: selectedCategory, order: selectedOrder = "latest" } =
     Route.useSearch();
   const navigate = useNavigate();
 
   const { data: products, isLoading: productsLoading } = useQuery({
     ...convexQuery(api.products.getByCafe, {
-      cafeId: cafe?._id as Id<'cafes'>,
+      cafeId: cafe?._id as Id<"cafes">,
     }),
     enabled: !!cafe?._id,
   });
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
 
   const availableCategories = Array.from(
     new Set(products?.map((p) => p.category).filter(Boolean) || [])
@@ -88,11 +88,11 @@ function CafePage() {
     }
     const sorted = [...filteredProducts];
     switch (selectedOrder) {
-      case 'most-reviews':
+      case "most-reviews":
         return sorted.sort(
           (a, b) => (b.totalReviews ?? 0) - (a.totalReviews ?? 0)
         );
-      case 'highest-rating':
+      case "highest-rating":
         return sorted.sort(
           (a, b) => (b.averageRating ?? 0) - (a.averageRating ?? 0)
         );
@@ -107,11 +107,11 @@ function CafePage() {
     }
 
     navigate({
-      to: '/cafe/$slug',
+      to: "/cafe/$slug",
       params: { slug: cafe.slug },
       search: (prev) => ({
         ...prev,
-        category: newCategory === '전체' ? undefined : newCategory,
+        category: newCategory === "전체" ? undefined : newCategory,
       }),
       replace: true,
     });
@@ -123,11 +123,11 @@ function CafePage() {
     }
 
     navigate({
-      to: '/cafe/$slug',
+      to: "/cafe/$slug",
       params: { slug: cafe.slug },
       search: (prev) => ({
         ...prev,
-        order: newOrder === 'latest' ? undefined : newOrder,
+        order: newOrder === "latest" ? undefined : newOrder,
       }),
       replace: true,
     });
@@ -189,7 +189,7 @@ function CafePage() {
             <p className="text-base-content/70">
               {searchQuery.trim()
                 ? `"${searchQuery.trim()}"에 대한 검색 결과가 없습니다.`
-                : '상품이 없습니다.'}
+                : "상품이 없습니다."}
             </p>
           </div>
         )}

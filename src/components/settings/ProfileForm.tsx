@@ -1,18 +1,18 @@
-import { Link } from '@tanstack/react-router';
+import { Link } from "@tanstack/react-router";
 
 interface FormData {
-  name: string;
   handle: string;
+  name: string;
 }
 
 interface ProfileFormProps {
+  children: React.ReactNode; // For ProfileImageUpload component
   formData: FormData;
-  isSubmitting: boolean;
-  userLoading: boolean;
   isInitialSetup: boolean;
+  isSubmitting: boolean;
   onInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onSubmit: (e: React.FormEvent) => void;
-  children: React.ReactNode; // For ProfileImageUpload component
+  userLoading: boolean;
 }
 
 export function ProfileForm({
@@ -85,9 +85,9 @@ export function ProfileForm({
                   );
                 }
                 if (isInitialSetup) {
-                  return '프로필 설정 완료';
+                  return "프로필 설정 완료";
                 }
-                return '변경사항 저장';
+                return "변경사항 저장";
               })()}
             </button>
           </div>

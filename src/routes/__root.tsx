@@ -1,41 +1,41 @@
 /// <reference types="vite/client" />
 
-import { ClerkProvider, useAuth } from '@clerk/tanstack-react-start';
-import { getAuth } from '@clerk/tanstack-react-start/server';
-import type { ConvexQueryClient } from '@convex-dev/react-query';
-import type { QueryClient } from '@tanstack/react-query';
+import { ClerkProvider, useAuth } from "@clerk/tanstack-react-start";
+import { getAuth } from "@clerk/tanstack-react-start/server";
+import type { ConvexQueryClient } from "@convex-dev/react-query";
+import type { QueryClient } from "@tanstack/react-query";
 import {
   createRootRouteWithContext,
   HeadContent,
   Outlet,
   useRouteContext,
-} from '@tanstack/react-router';
-import { createServerFn, Scripts } from '@tanstack/react-start';
-import { getWebRequest } from '@tanstack/react-start/server';
-import type { ConvexReactClient } from 'convex/react';
-import { ConvexProviderWithClerk } from 'convex/react-clerk';
-import { PostHogProvider } from 'posthog-js/react';
-import type * as React from 'react';
-import { lazy, Suspense } from 'react';
+} from "@tanstack/react-router";
+import { createServerFn, Scripts } from "@tanstack/react-start";
+import { getWebRequest } from "@tanstack/react-start/server";
+import type { ConvexReactClient } from "convex/react";
+import { ConvexProviderWithClerk } from "convex/react-clerk";
+import { PostHogProvider } from "posthog-js/react";
+import type * as React from "react";
+import { lazy, Suspense } from "react";
 
 const TanStackRouterDevtools = import.meta.env.DEV
   ? lazy(() =>
-      import('@tanstack/react-router-devtools').then((res) => ({
+      import("@tanstack/react-router-devtools").then((res) => ({
         default: res.TanStackRouterDevtools,
       }))
     )
   : () => null;
 
-import { NewUserRedirect } from '~/components/auth/NewUserRedirect';
-import { DefaultCatchBoundary } from '~/components/DefaultCatchBoundary.js';
-import { Footer } from '~/components/Footer';
-import { NavBar } from '~/components/NavBar';
-import { NotFound } from '~/components/NotFound.js';
-import { usePostHogIdentify } from '~/hooks/usePostHogIdentify';
-import appCss from '~/styles/app.css?url';
-import { seo } from '~/utils/seo';
+import { NewUserRedirect } from "~/components/auth/NewUserRedirect";
+import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary.js";
+import { Footer } from "~/components/Footer";
+import { NavBar } from "~/components/NavBar";
+import { NotFound } from "~/components/NotFound.js";
+import { usePostHogIdentify } from "~/hooks/usePostHogIdentify";
+import appCss from "~/styles/app.css?url";
+import { seo } from "~/utils/seo";
 
-const fetchClerkAuth = createServerFn({ method: 'GET' }).handler(async () => {
+const fetchClerkAuth = createServerFn({ method: "GET" }).handler(async () => {
   try {
     const auth = await getAuth(getWebRequest());
 
@@ -47,7 +47,7 @@ const fetchClerkAuth = createServerFn({ method: 'GET' }).handler(async () => {
       };
     }
 
-    const token = await auth.getToken({ template: 'convex' });
+    const token = await auth.getToken({ template: "convex" });
 
     return {
       userId: auth.userId,
@@ -70,45 +70,45 @@ export const Route = createRootRouteWithContext<{
   head: () => ({
     meta: [
       {
-        charSet: 'utf-8',
+        charSet: "utf-8",
       },
       {
-        name: 'viewport',
-        content: 'width=device-width, initial-scale=1',
+        name: "viewport",
+        content: "width=device-width, initial-scale=1",
       },
       ...seo({
-        title: '잔점 | 카페 음료 모든 것을 한곳에!',
-        description: '카페 음료 모든 것을 한곳에!',
+        title: "잔점 | 카페 음료 모든 것을 한곳에!",
+        description: "카페 음료 모든 것을 한곳에!",
       }),
     ],
     links: [
-      { rel: 'stylesheet', href: appCss },
+      { rel: "stylesheet", href: appCss },
       // Preconnect to Google Fonts for faster loading
-      { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
       {
-        rel: 'preconnect',
-        href: 'https://fonts.gstatic.com',
-        crossOrigin: 'anonymous',
+        rel: "preconnect",
+        href: "https://fonts.gstatic.com",
+        crossOrigin: "anonymous",
       },
       {
-        rel: 'apple-touch-icon',
-        sizes: '180x180',
-        href: '/apple-touch-icon.png',
+        rel: "apple-touch-icon",
+        sizes: "180x180",
+        href: "/apple-touch-icon.png",
       },
       {
-        rel: 'icon',
-        type: 'image/png',
-        sizes: '32x32',
-        href: '/favicon-32x32.png',
+        rel: "icon",
+        type: "image/png",
+        sizes: "32x32",
+        href: "/favicon-32x32.png",
       },
       {
-        rel: 'icon',
-        type: 'image/png',
-        sizes: '16x16',
-        href: '/favicon-16x16.png',
+        rel: "icon",
+        type: "image/png",
+        sizes: "16x16",
+        href: "/favicon-16x16.png",
       },
-      { rel: 'manifest', href: '/site.webmanifest', color: '#fffff' },
-      { rel: 'icon', href: '/favicon.ico' },
+      { rel: "manifest", href: "/site.webmanifest", color: "#fffff" },
+      { rel: "icon", href: "/favicon.ico" },
     ],
   }),
   beforeLoad: async (ctx) => {
@@ -138,9 +138,9 @@ function RootComponent() {
       apiKey={import.meta.env.VITE_PUBLIC_POSTHOG_KEY}
       options={{
         api_host: import.meta.env.VITE_PUBLIC_POSTHOG_HOST,
-        defaults: '2025-05-24',
+        defaults: "2025-05-24",
         capture_exceptions: true,
-        debug: import.meta.env.MODE === 'development',
+        debug: import.meta.env.MODE === "development",
       }}
     >
       <ClerkProvider>

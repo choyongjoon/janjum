@@ -1,24 +1,24 @@
-import { convexQuery } from '@convex-dev/react-query';
-import { useSuspenseQuery } from '@tanstack/react-query';
-import { createFileRoute, Link, redirect } from '@tanstack/react-router';
-import type { Id } from 'convex/_generated/dataModel';
-import { api } from '../../convex/_generated/api';
-import { ReviewCard } from '../components/reviews/ReviewCard';
-import { seo } from '../utils/seo';
+import { convexQuery } from "@convex-dev/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import type { Id } from "convex/_generated/dataModel";
+import { api } from "../../convex/_generated/api";
+import { ReviewCard } from "../components/reviews/ReviewCard";
+import { seo } from "../utils/seo";
 
-export const Route = createFileRoute('/review/$reviewId')({
+export const Route = createFileRoute("/review/$reviewId")({
   component: ReviewPage,
   loader: async (opts) => {
     const review = await opts.context.queryClient.ensureQueryData(
       convexQuery(api.reviews.getById, {
-        reviewId: opts.params.reviewId as Id<'reviews'>,
+        reviewId: opts.params.reviewId as Id<"reviews">,
       })
     );
 
     // If review not found, redirect to home
     if (!review) {
       throw redirect({
-        to: '/',
+        to: "/",
       });
     }
 
@@ -27,13 +27,13 @@ export const Route = createFileRoute('/review/$reviewId')({
   head: ({ loaderData }) => ({
     meta: [
       ...seo({
-        title: `${loaderData?.user?.name || '익명 사용자'}님의 후기 | 잔점`,
+        title: `${loaderData?.user?.name || "익명 사용자"}님의 후기 | 잔점`,
         description:
           loaderData?.text ||
-          `${loaderData?.product?.name || '상품'}에 대한 후기입니다.`,
+          `${loaderData?.product?.name || "상품"}에 대한 후기입니다.`,
         image:
           loaderData?.product?.externalImageUrl ||
-          '/android-chrome-512x512.png',
+          "/android-chrome-512x512.png",
       }),
     ],
   }),
@@ -44,7 +44,7 @@ function ReviewPage() {
 
   const { data: review } = useSuspenseQuery(
     convexQuery(api.reviews.getById, {
-      reviewId: reviewId as Id<'reviews'>,
+      reviewId: reviewId as Id<"reviews">,
     })
   );
 
@@ -72,7 +72,9 @@ function ReviewPage() {
               <img
                 alt={review.product.name}
                 className="aspect-square w-full rounded-lg object-cover shadow-md"
+                height={128}
                 src={review.product.externalImageUrl}
+                width={128}
               />
             </div>
 

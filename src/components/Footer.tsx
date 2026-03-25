@@ -1,12 +1,12 @@
-import { Link, useLocation } from '@tanstack/react-router';
+import { Link, useLocation } from "@tanstack/react-router";
 
 export function Footer() {
-  const isBlog = useLocation().pathname.startsWith('/blog');
+  const isBlog = useLocation().pathname.startsWith("/blog");
 
   return (
     <footer
       className="mt-auto bg-base-200"
-      data-theme={isBlog ? 'wireframe' : ''}
+      data-theme={isBlog ? "wireframe" : ""}
     >
       <div className="container mx-auto px-4 py-8">
         <div className="flex flex-col items-center space-y-6">

@@ -1,14 +1,14 @@
 const orderOptions = [
-  { value: 'latest', label: '최신순' },
-  { value: 'most-reviews', label: '후기 많은순' },
-  { value: 'highest-rating', label: '높은 평점순' },
+  { value: "latest", label: "최신순" },
+  { value: "most-reviews", label: "후기 많은순" },
+  { value: "highest-rating", label: "높은 평점순" },
 ] as const;
 
-export type OrderOption = (typeof orderOptions)[number]['value'];
+export type OrderOption = (typeof orderOptions)[number]["value"];
 
 interface OrderSelectorProps {
-  value: OrderOption;
   onChange: (value: OrderOption) => void;
+  value: OrderOption;
 }
 
 export function OrderSelector({ value, onChange }: OrderSelectorProps) {

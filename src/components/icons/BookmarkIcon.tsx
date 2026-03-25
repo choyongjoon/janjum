@@ -1,14 +1,14 @@
-import type { SVGProps } from 'react';
+import type { SVGProps } from "react";
 
 interface UserIconProps extends SVGProps<SVGSVGElement> {
-  size?: 'sm' | 'md' | 'lg';
+  size?: "sm" | "md" | "lg";
 }
 
-export function BookmarkIcon({ size = 'md', ...props }: UserIconProps) {
+export function BookmarkIcon({ size = "md", ...props }: UserIconProps) {
   const sizeClasses = {
-    sm: 'h-4 w-4',
-    md: 'h-6 w-6',
-    lg: 'h-8 w-8',
+    sm: "h-4 w-4",
+    md: "h-6 w-6",
+    lg: "h-8 w-8",
   };
 
   return (

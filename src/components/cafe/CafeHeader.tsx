@@ -1,10 +1,10 @@
-import type { Doc } from 'convex/_generated/dataModel';
+import type { Doc } from "convex/_generated/dataModel";
 
 function CafeHeader({
   cafe,
   numProducts,
 }: {
-  cafe: Doc<'cafes'> & { imageUrl?: string };
+  cafe: Doc<"cafes"> & { imageUrl?: string };
   numProducts: number | undefined;
 }) {
   return (
@@ -15,16 +15,18 @@ function CafeHeader({
             <img
               alt={cafe.name}
               className="aspect-square w-full object-cover"
+              height={80}
               loading="lazy"
               src={cafe.imageUrl}
+              width={80}
             />
           </div>
           <div>
             <h1 className="font-bold text-4xl">{cafe?.name}</h1>
             <p className="mt-2 text-lg opacity-90">
-              {numProducts !== undefined
-                ? `${numProducts}개의 상품`
-                : '로딩 중...'}
+              {numProducts === undefined
+                ? "로딩 중..."
+                : `${numProducts}개의 상품`}
             </p>
           </div>
         </div>

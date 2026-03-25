@@ -1,10 +1,10 @@
-import { useSignIn } from '@clerk/tanstack-react-start';
-import { useEffect, useState } from 'react';
+import { useSignIn } from "@clerk/tanstack-react-start";
+import { useEffect, useState } from "react";
 import {
   type SocialProviderConfig,
   socialProviders,
-} from '~/config/socialProviders';
-import { usePostHogEvents } from '~/hooks/usePostHogEvents';
+} from "~/config/socialProviders";
+import { usePostHogEvents } from "~/hooks/usePostHogEvents";
 
 interface SignInModalProps {
   isOpen: boolean;
@@ -19,13 +19,13 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
   // Handle Escape key to close modal
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen && onClose) {
-        trackSignIn('cancelled');
+      if (e.key === "Escape" && isOpen && onClose) {
+        trackSignIn("cancelled");
         onClose();
       }
     };
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
   }, [isOpen, onClose, trackSignIn]);
 
   const handleOAuthSignIn = async (provider: SocialProviderConfig) => {
@@ -43,7 +43,7 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
 
       await signIn.authenticateWithRedirect({
         strategy: provider.clerkStrategy,
-        redirectUrl: '/oauth-callback',
+        redirectUrl: "/oauth-callback",
         redirectUrlComplete: window.location.pathname,
       });
     } catch (_error) {
@@ -53,7 +53,7 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
   };
 
   return (
-    <div className={`modal ${isOpen ? 'modal-open' : ''}`}>
+    <div className={`modal ${isOpen ? "modal-open" : ""}`}>
       <div className="modal-box max-w-md">
         {isLoaded ? (
           <>
@@ -95,7 +95,7 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
                   className="btn btn-ghost"
                   onClick={() => {
                     // Track that user cancelled sign-in
-                    trackSignIn('cancelled');
+                    trackSignIn("cancelled");
                     onClose();
                   }}
                   type="button"

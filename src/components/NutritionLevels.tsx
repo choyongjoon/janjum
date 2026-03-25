@@ -1,5 +1,5 @@
-import type { Nutritions } from '~/../../shared/nutritions';
-import { getNutritionLevelMap } from '~/utils/nutritionLevel';
+import type { Nutritions } from "~/../../shared/nutritions";
+import { getNutritionLevelMap } from "~/utils/nutritionLevel";
 
 export interface NutritionLevelsProps {
   nutritions?: Nutritions | null;
@@ -8,13 +8,13 @@ export interface NutritionLevelsProps {
 // Convert nutrition level to progress percentage
 function levelTextToProgressValue(levelText: string): number {
   switch (levelText) {
-    case '거의 없음':
+    case "거의 없음":
       return 5;
-    case '적음':
+    case "적음":
       return 35;
-    case '보통':
+    case "보통":
       return 65;
-    case '많음':
+    case "많음":
       return 95;
     default:
       return 0;
@@ -30,24 +30,24 @@ export function NutritionLevels({ nutritions }: NutritionLevelsProps) {
 
   const nutritionItems = [
     {
-      key: 'calories',
-      label: '칼로리',
+      key: "calories",
+      label: "칼로리",
       level: nutritionLevelMap.calories,
     },
     {
-      key: 'carbohydrates',
-      label: '탄수화물',
+      key: "carbohydrates",
+      label: "탄수화물",
       level: nutritionLevelMap.carbohydrates,
     },
-    { key: 'sugar', label: '당류', level: nutritionLevelMap.sugar },
+    { key: "sugar", label: "당류", level: nutritionLevelMap.sugar },
     {
-      key: 'saturatedFat',
-      label: '포화지방',
+      key: "saturatedFat",
+      label: "포화지방",
       level: nutritionLevelMap.saturatedFat,
     },
     {
-      key: 'caffeine',
-      label: '카페인',
+      key: "caffeine",
+      label: "카페인",
       level: nutritionLevelMap.caffeine,
     },
   ];

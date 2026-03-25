@@ -1,5 +1,5 @@
-import { customAlphabet } from 'nanoid';
-import { mutation } from './_generated/server';
+import { customAlphabet } from "nanoid";
+import { mutation } from "./_generated/server";
 
 /**
  * Generate a URL-friendly short ID using nanoid
@@ -10,7 +10,7 @@ import { mutation } from './_generated/server';
  * - 8 characters provide ~208 billion unique combinations
  */
 const NANOID_ALPHABET =
-  '23456789ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz';
+  "23456789ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz";
 const NANOID_LENGTH = 8;
 
 // Create nanoid generator with custom alphabet

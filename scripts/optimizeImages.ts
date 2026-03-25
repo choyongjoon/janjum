@@ -1,36 +1,36 @@
 #!/usr/bin/env tsx
 
-import { ConvexHttpClient } from 'convex/browser';
-import sharp from 'sharp';
-import { api } from '../convex/_generated/api';
-import type { Id } from '../convex/_generated/dataModel';
-import { logger } from '../shared/logger';
+import { ConvexHttpClient } from "convex/browser";
+import sharp from "sharp";
+import { api } from "../convex/_generated/api";
+import type { Id } from "../convex/_generated/dataModel";
+import { logger } from "../shared/logger";
 
 const CONVEX_URL = process.env.VITE_CONVEX_URL;
 const UPLOAD_SECRET = process.env.CONVEX_UPLOAD_SECRET;
 
 if (!CONVEX_URL) {
-  logger.error('CONVEX_URL environment variable is required');
+  logger.error("CONVEX_URL environment variable is required");
   process.exit(1);
 }
 
 if (!UPLOAD_SECRET) {
-  logger.error('CONVEX_UPLOAD_SECRET environment variable is required');
+  logger.error("CONVEX_UPLOAD_SECRET environment variable is required");
   process.exit(1);
 }
 
 const convex = new ConvexHttpClient(CONVEX_URL);
 
 interface ImageOptimizationStats {
-  processed: number;
-  optimized: number;
   failed: number;
-  totalSizeBefore: number;
+  optimized: number;
+  processed: number;
   totalSizeAfter: number;
+  totalSizeBefore: number;
 }
 
 class ImageOptimizer {
-  private stats: ImageOptimizationStats = {
+  private readonly stats: ImageOptimizationStats = {
     processed: 0,
     optimized: 0,
     failed: 0,
@@ -56,7 +56,7 @@ class ImageOptimizer {
       view.set(optimizedBuffer);
       return arrayBuffer;
     } catch (error) {
-      logger.error('Error optimizing image:', error);
+      logger.error("Error optimizing image:", error);
       throw error;
     }
   }
@@ -78,7 +78,7 @@ class ImageOptimizer {
    * Check if stored image needs optimization by checking its metadata
    */
   async checkIfStorageNeedsOptimization(
-    storageId: Id<'_storage'>
+    storageId: Id<"_storage">
   ): Promise<boolean> {
     try {
       const metadata = await convex.query(api.http.getStorageMetadata, {
@@ -92,7 +92,7 @@ class ImageOptimizer {
 
       // Check if the stored file is already WebP
       const contentType = metadata.contentType;
-      const isWebP = contentType === 'image/webp';
+      const isWebP = contentType === "image/webp";
 
       logger.debug(
         `Storage ${storageId} metadata: ${contentType}, isWebP: ${isWebP}`
@@ -107,7 +107,7 @@ class ImageOptimizer {
 
   async uploadOptimizedImage(
     imageBuffer: ArrayBuffer
-  ): Promise<Id<'_storage'>> {
+  ): Promise<Id<"_storage">> {
     try {
       // Generate upload URL
       const uploadUrl = await convex.mutation(api.http.generateUploadUrl, {
@@ -116,11 +116,11 @@ class ImageOptimizer {
 
       // Upload the optimized image
       const response = await fetch(uploadUrl, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'image/webp',
+          "Content-Type": "image/webp",
         },
-        body: new Blob([imageBuffer], { type: 'image/webp' }),
+        body: new Blob([imageBuffer], { type: "image/webp" }),
       });
 
       if (!response.ok) {
@@ -130,16 +130,16 @@ class ImageOptimizer {
       }
 
       const { storageId } = await response.json();
-      return storageId as Id<'_storage'>;
+      return storageId as Id<"_storage">;
     } catch (error) {
-      logger.error('Error uploading optimized image:', error);
+      logger.error("Error uploading optimized image:", error);
       throw error;
     }
   }
 
   async processStoredImage(
-    storageId: Id<'_storage'>
-  ): Promise<Id<'_storage'> | null> {
+    storageId: Id<"_storage">
+  ): Promise<Id<"_storage"> | null> {
     try {
       // First check metadata without downloading to see if already WebP
       const needsOptimization =
@@ -163,7 +163,7 @@ class ImageOptimizer {
 
       // Double-check format after download (fallback safety check)
       const imageFormat = await sharp(originalImageBuffer).metadata();
-      if (imageFormat.format === 'webp') {
+      if (imageFormat.format === "webp") {
         logger.info(
           `Image ${storageId} is already in WebP format (detected after download)`
         );
@@ -199,7 +199,7 @@ class ImageOptimizer {
   }
 
   async optimizeProductImages(): Promise<void> {
-    logger.info('Starting product image optimization...');
+    logger.info("Starting product image optimization...");
 
     try {
       // Get all products with images
@@ -236,13 +236,13 @@ class ImageOptimizer {
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
     } catch (error) {
-      logger.error('Error optimizing product images:', error);
+      logger.error("Error optimizing product images:", error);
       throw error;
     }
   }
 
   async optimizeCafeImages(): Promise<void> {
-    logger.info('Starting cafe image optimization...');
+    logger.info("Starting cafe image optimization...");
 
     try {
       // Get all cafes with images
@@ -277,13 +277,13 @@ class ImageOptimizer {
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
     } catch (error) {
-      logger.error('Error optimizing cafe images:', error);
+      logger.error("Error optimizing cafe images:", error);
       throw error;
     }
   }
 
   async optimizeUserImages(): Promise<void> {
-    logger.info('Starting user image optimization...');
+    logger.info("Starting user image optimization...");
 
     try {
       // Get all users with images
@@ -318,13 +318,13 @@ class ImageOptimizer {
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
     } catch (error) {
-      logger.error('Error optimizing user images:', error);
+      logger.error("Error optimizing user images:", error);
       throw error;
     }
   }
 
   async optimizeReviewImages(): Promise<void> {
-    logger.info('Starting review image optimization...');
+    logger.info("Starting review image optimization...");
 
     try {
       // Get all reviews with images
@@ -342,7 +342,7 @@ class ImageOptimizer {
           `Processing review images (${this.stats.processed}/${reviews.length})`
         );
 
-        const optimizedImageIds: Id<'_storage'>[] = [];
+        const optimizedImageIds: Id<"_storage">[] = [];
 
         for (const imageStorageId of review.imageStorageIds) {
           const newStorageId = await this.processStoredImage(imageStorageId);
@@ -356,19 +356,19 @@ class ImageOptimizer {
           uploadSecret: UPLOAD_SECRET,
         });
 
-        logger.info('Updated review with optimized images');
+        logger.info("Updated review with optimized images");
 
         // Add a small delay to avoid overwhelming the API
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
     } catch (error) {
-      logger.error('Error optimizing review images:', error);
+      logger.error("Error optimizing review images:", error);
       throw error;
     }
   }
 
   printStats(): void {
-    logger.info('=== Image Optimization Complete ===');
+    logger.info("=== Image Optimization Complete ===");
     logger.info(`Total images processed: ${this.stats.processed}`);
     logger.info(`Successfully optimized: ${this.stats.optimized}`);
     logger.info(`Failed to optimize: ${this.stats.failed}`);
@@ -397,7 +397,7 @@ async function main(): Promise<void> {
   const optimizer = new ImageOptimizer();
 
   try {
-    logger.info('Starting image optimization process...');
+    logger.info("Starting image optimization process...");
 
     // Process all image types
     await optimizer.optimizeProductImages();
@@ -407,15 +407,15 @@ async function main(): Promise<void> {
 
     optimizer.printStats();
   } catch (error) {
-    logger.error('Image optimization failed:', error);
+    logger.error("Image optimization failed:", error);
     process.exit(1);
   }
 }
 
 // Run the script
-if (process.argv[1]?.endsWith('optimizeImages.ts')) {
+if (process.argv[1]?.endsWith("optimizeImages.ts")) {
   main().catch((error) => {
-    logger.error('Unhandled error:', error);
+    logger.error("Unhandled error:", error);
     process.exit(1);
   });
 }

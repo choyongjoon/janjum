@@ -1,9 +1,9 @@
-import { convexQuery } from '@convex-dev/react-query';
-import { useQuery } from '@tanstack/react-query';
-import { usePostHog } from 'posthog-js/react';
-import { useEffect, useRef } from 'react';
-import { api } from '../../convex/_generated/api';
-import { usePostHogEvents } from './usePostHogEvents';
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { usePostHog } from "posthog-js/react";
+import { useEffect, useRef } from "react";
+import { api } from "../../convex/_generated/api";
+import { usePostHogEvents } from "./usePostHogEvents";
 
 /**
  * Custom hook to identify users in PostHog using Clerk authentication data and Convex user data
@@ -53,7 +53,7 @@ export function usePostHogIdentify() {
 
       // Track sign-up for new users who haven't completed setup
       if (isNewUser && currentUser.hasCompletedSetup === false) {
-        trackSignUp('oauth');
+        trackSignUp("oauth");
       }
 
       // Update the ref to track the current user

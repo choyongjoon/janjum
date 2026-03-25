@@ -1,5 +1,5 @@
-import { usePostHog } from 'posthog-js/react';
-import { useCallback } from 'react';
+import { usePostHog } from "posthog-js/react";
+import { useCallback } from "react";
 
 /**
  * Custom hook for tracking key user events in PostHog
@@ -11,10 +11,10 @@ export function usePostHogEvents() {
   // SSO Connection Events
   const trackSSOConnect = useCallback(
     (provider: string, success: boolean) => {
-      posthog?.capture('sso_connection_attempt', {
+      posthog?.capture("sso_connection_attempt", {
         provider,
         success,
-        source: 'settings_page',
+        source: "settings_page",
       });
     },
     [posthog]
@@ -22,10 +22,10 @@ export function usePostHogEvents() {
 
   const trackSSODisconnect = useCallback(
     (provider: string, success: boolean) => {
-      posthog?.capture('sso_disconnection_attempt', {
+      posthog?.capture("sso_disconnection_attempt", {
         provider,
         success,
-        source: 'settings_page',
+        source: "settings_page",
       });
     },
     [posthog]
@@ -34,7 +34,7 @@ export function usePostHogEvents() {
   // Auth Events
   const trackSignUp = useCallback(
     (method: string) => {
-      posthog?.capture('user_signed_up', {
+      posthog?.capture("user_signed_up", {
         method,
         timestamp: new Date().toISOString(),
       });
@@ -44,7 +44,7 @@ export function usePostHogEvents() {
 
   const trackSignIn = useCallback(
     (method: string) => {
-      posthog?.capture('user_signed_in', {
+      posthog?.capture("user_signed_in", {
         method,
         timestamp: new Date().toISOString(),
       });
@@ -55,9 +55,9 @@ export function usePostHogEvents() {
   // Profile Events
   const trackProfileUpdate = useCallback(
     (fields: string[]) => {
-      posthog?.capture('profile_updated', {
+      posthog?.capture("profile_updated", {
         fields_changed: fields,
-        source: 'settings_page',
+        source: "settings_page",
       });
     },
     [posthog]
@@ -65,10 +65,10 @@ export function usePostHogEvents() {
 
   const trackImageUpload = useCallback(
     (success: boolean, errorType?: string) => {
-      posthog?.capture('profile_image_upload', {
+      posthog?.capture("profile_image_upload", {
         success,
         error_type: errorType,
-        source: 'settings_page',
+        source: "settings_page",
       });
     },
     [posthog]
@@ -77,7 +77,7 @@ export function usePostHogEvents() {
   // Content Interaction Events
   const trackReviewSubmit = useCallback(
     (productId: string, rating: number) => {
-      posthog?.capture('review_submitted', {
+      posthog?.capture("review_submitted", {
         product_id: productId,
         rating,
       });
@@ -87,7 +87,7 @@ export function usePostHogEvents() {
 
   const trackSearch = useCallback(
     (query: string, results_count?: number) => {
-      posthog?.capture('search_performed', {
+      posthog?.capture("search_performed", {
         query,
         results_count,
       });
@@ -97,8 +97,8 @@ export function usePostHogEvents() {
 
   // Settings Events
   const trackAccountDeletion = useCallback(
-    (step: 'initiated' | 'confirmed' | 'cancelled') => {
-      posthog?.capture('account_deletion_flow', {
+    (step: "initiated" | "confirmed" | "cancelled") => {
+      posthog?.capture("account_deletion_flow", {
         step,
         timestamp: new Date().toISOString(),
       });

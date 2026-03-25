@@ -1,4 +1,4 @@
-import { useUser } from '@clerk/tanstack-react-start';
+import { useUser } from "@clerk/tanstack-react-start";
 
 export function AccountInfo() {
   const { user } = useUser();
@@ -17,8 +17,8 @@ export function AccountInfo() {
             <span className="font-medium">가입일</span>
             <span className="text-base-content/70">
               {user.createdAt
-                ? new Date(user.createdAt).toLocaleDateString('ko-KR')
-                : '알 수 없음'}
+                ? new Date(user.createdAt).toLocaleDateString("ko-KR")
+                : "알 수 없음"}
             </span>
           </div>
         </div>

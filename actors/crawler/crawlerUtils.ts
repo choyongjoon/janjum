@@ -1,20 +1,20 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import type { Page } from 'playwright';
-import { logger } from 'shared/logger';
-import type { Nutritions } from 'shared/nutritions';
+import fs from "node:fs";
+import path from "node:path";
+import type { Page } from "playwright";
+import { logger } from "shared/logger";
+import type { Nutritions } from "shared/nutritions";
 
 export interface Product {
-  name: string;
-  nameEn: string | null;
-  description: string | null;
-  price: number | null;
-  externalImageUrl: string;
   category: string | null;
+  description: string | null;
   externalCategory: string;
   externalId: string;
+  externalImageUrl: string;
   externalUrl: string;
+  name: string;
+  nameEn: string | null;
   nutritions?: Nutritions | null;
+  price: number | null;
 }
 
 export const waitFor = async (ms: number) => {
@@ -23,7 +23,7 @@ export const waitFor = async (ms: number) => {
 
 export const waitForLoad = async (page: Page, timeout = 15_000) => {
   try {
-    await page.waitForLoadState('domcontentloaded', { timeout });
+    await page.waitForLoadState("domcontentloaded", { timeout });
     // Skip additional wait - content should be available after domcontentloaded
   } catch {
     logger.warn(`⚠️ Page load timeout after ${timeout}ms, continuing anyway...`);
@@ -35,9 +35,9 @@ export const takeDebugScreenshot = async (page: Page, key: string) => {
   // Take a screenshot for debugging
   const screenshotPath = path.join(
     process.cwd(),
-    'actors',
-    'crawler',
-    'crawler-outputs',
+    "actors",
+    "crawler",
+    "crawler-outputs",
     `${key}-debug-screenshot.png`
   );
   await page.screenshot({ path: screenshotPath, fullPage: true });
@@ -51,15 +51,15 @@ export const writeProductsToJson = async (products: Product[], key: string) => {
 
   const outputDir = path.join(
     process.cwd(),
-    'actors',
-    'crawler',
-    'crawler-outputs'
+    "actors",
+    "crawler",
+    "crawler-outputs"
   );
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
   }
 
-  const timestamp = new Date().toISOString().split('T')[0];
+  const timestamp = new Date().toISOString().split("T")[0];
   const filename = `${key}-products-${timestamp}.json`;
   const filepath = path.join(outputDir, filename);
 
@@ -74,6 +74,6 @@ export const writeProductsToJson = async (products: Product[], key: string) => {
   });
 
   logger.info(`Saved ${products.length} products to ${filename}`);
-  logger.info('=== CRAWL SUMMARY ===');
+  logger.info("=== CRAWL SUMMARY ===");
   logger.info(`Total products extracted: ${products.length}`);
 };

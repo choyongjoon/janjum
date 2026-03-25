@@ -1,22 +1,22 @@
-import { convexQuery } from '@convex-dev/react-query';
-import { useSuspenseQuery } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
-import { api } from 'convex/_generated/api';
-import type { Doc, Id } from 'convex/_generated/dataModel';
-import { showToast } from '../../utils/toast';
+import { convexQuery } from "@convex-dev/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
+import { api } from "convex/_generated/api";
+import type { Doc, Id } from "convex/_generated/dataModel";
+import { showToast } from "../../utils/toast";
 
-import { RatingText } from './RatingText';
+import { RatingText } from "./RatingText";
 
-export interface Review extends Doc<'reviews'> {
-  product: Doc<'products'> | null;
-  ratingText: string | undefined;
+export interface Review extends Doc<"reviews"> {
   imageUrls: string[] | undefined;
+  product: Doc<"products"> | null;
+  ratingText: string | undefined;
 }
 
 export function ReviewInUserPage({ review }: { review: Review }) {
   const { data: cafe } = useSuspenseQuery(
     convexQuery(api.cafes.getById, {
-      cafeId: review.product?.cafeId as Id<'cafes'>,
+      cafeId: review.product?.cafeId as Id<"cafes">,
     })
   );
 
@@ -27,7 +27,7 @@ export function ReviewInUserPage({ review }: { review: Review }) {
     >
       <Link
         className="link link-neutral"
-        params={{ slug: cafe?.slug || '' }}
+        params={{ slug: cafe?.slug || "" }}
         to="/cafe/$slug"
       >
         {cafe?.name}
@@ -50,7 +50,7 @@ export function ReviewInUserPage({ review }: { review: Review }) {
         <div className="mb-2 flex items-center justify-between">
           <RatingText
             rating={review.rating}
-            ratingText={review.ratingText || ''}
+            ratingText={review.ratingText || ""}
           />
           <button
             className="btn btn-ghost btn-circle btn-xs"
@@ -59,10 +59,10 @@ export function ReviewInUserPage({ review }: { review: Review }) {
               navigator.clipboard
                 .writeText(reviewUrl)
                 .then(() => {
-                  showToast('후기 링크가 복사되었습니다!', 'success');
+                  showToast("후기 링크가 복사되었습니다!", "success");
                 })
                 .catch(() => {
-                  showToast('링크 복사에 실패했습니다.', 'error');
+                  showToast("링크 복사에 실패했습니다.", "error");
                 });
             }}
             title="후기 링크 복사"
@@ -97,7 +97,9 @@ export function ReviewInUserPage({ review }: { review: Review }) {
                 <img
                   alt={`후기 이미지 ${index + 1}`}
                   className="h-full w-full object-cover"
+                  height={200}
                   src={imageUrl}
+                  width={200}
                 />
               </div>
             ))}
@@ -110,8 +112,8 @@ export function ReviewInUserPage({ review }: { review: Review }) {
             params={{ reviewId: review._id }}
             to="/review/$reviewId"
           >
-            {new Date(review.createdAt).toLocaleDateString('ko-KR')}
-            {review.updatedAt !== review.createdAt && ' (수정됨)'}
+            {new Date(review.createdAt).toLocaleDateString("ko-KR")}
+            {review.updatedAt !== review.createdAt && " (수정됨)"}
           </Link>
         </div>
       </div>

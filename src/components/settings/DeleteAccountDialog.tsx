@@ -1,7 +1,7 @@
-import { useConvexMutation } from '@convex-dev/react-query';
-import { useMutation } from '@tanstack/react-query';
-import { useState } from 'react';
-import { api } from '../../../convex/_generated/api';
+import { useConvexMutation } from "@convex-dev/react-query";
+import { useMutation } from "@tanstack/react-query";
+import { useState } from "react";
+import { api } from "../../../convex/_generated/api";
 
 interface DeleteAccountDialogProps {
   isOpen: boolean;
@@ -14,7 +14,7 @@ export function DeleteAccountDialog({
   onClose,
   onConfirm,
 }: DeleteAccountDialogProps) {
-  const [confirmText, setConfirmText] = useState('');
+  const [confirmText, setConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
 
   const deleteAccountMutation = useMutation({
@@ -23,13 +23,12 @@ export function DeleteAccountDialog({
       onConfirm();
     },
     onError: (error) => {
-      // biome-ignore lint/suspicious/noConsole: Frontend error logging
-      console.error('Failed to delete account:', error);
+      console.error("Failed to delete account:", error);
     },
   });
 
   const handleDelete = async () => {
-    if (confirmText !== '회원탈퇴') {
+    if (confirmText !== "회원탈퇴") {
       return;
     }
 
@@ -37,14 +36,13 @@ export function DeleteAccountDialog({
     try {
       await deleteAccountMutation.mutateAsync({});
     } catch (error) {
-      // biome-ignore lint/suspicious/noConsole: Frontend error logging
-      console.error('Delete account error:', error);
+      console.error("Delete account error:", error);
     } finally {
       setIsDeleting(false);
     }
   };
 
-  const canDelete = confirmText === '회원탈퇴' && !isDeleting;
+  const canDelete = confirmText === "회원탈퇴" && !isDeleting;
 
   if (!isOpen) {
     return null;
@@ -109,7 +107,7 @@ export function DeleteAccountDialog({
             취소
           </button>
           <button
-            className={`btn btn-error ${canDelete ? '' : 'btn-disabled'}`}
+            className={`btn btn-error ${canDelete ? "" : "btn-disabled"}`}
             disabled={!canDelete}
             onClick={handleDelete}
             type="button"
@@ -120,7 +118,7 @@ export function DeleteAccountDialog({
                 삭제 중...
               </>
             ) : (
-              '계정 삭제'
+              "계정 삭제"
             )}
           </button>
         </div>

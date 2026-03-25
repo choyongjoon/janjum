@@ -1,18 +1,16 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute } from "@tanstack/react-router";
 
-import { AuthWrapper } from '~/components/auth/AuthWrapper';
-import {
-  AccountDeletion,
-  AccountInfo,
-  AlertMessages,
-  ProfileForm,
-  ProfileImageUpload,
-  SettingsHeader,
-  SocialConnections,
-} from '~/components/settings';
-import { useSettingsForm } from '~/hooks/useSettingsForm';
+import { AuthWrapper } from "~/components/auth/AuthWrapper";
+import { AccountDeletion } from "~/components/settings/AccountDeletion";
+import { AccountInfo } from "~/components/settings/AccountInfo";
+import { AlertMessages } from "~/components/settings/AlertMessages";
+import { ProfileForm } from "~/components/settings/ProfileForm";
+import { ProfileImageUpload } from "~/components/settings/ProfileImageUpload";
+import { SettingsHeader } from "~/components/settings/SettingsHeader";
+import { SocialConnections } from "~/components/settings/SocialConnections";
+import { useSettingsForm } from "~/hooks/useSettingsForm";
 
-export const Route = createFileRoute('/settings')({
+export const Route = createFileRoute("/settings")({
   component: AuthenticatedSettingsPage,
 });
 

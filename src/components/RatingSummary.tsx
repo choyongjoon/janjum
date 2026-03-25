@@ -1,5 +1,5 @@
-import type { RatingDistribution } from 'convex/reviews';
-import { RatingHistogram } from './reviews/RatingHistogram';
+import type { RatingDistribution } from "convex/reviews";
+import { RatingHistogram } from "./reviews/RatingHistogram";
 
 export function RatingSummary({
   reviewStats,
@@ -18,7 +18,7 @@ export function RatingSummary({
     <div className={`flex items-center gap-3 ${className}`}>
       <RatingHistogram ratingDistribution={reviewStats.ratingDistribution} />
       <span className="font-medium text-primary">
-        {noReview ? '?' : reviewStats.averageRating.toFixed(1)}
+        {noReview ? "?" : reviewStats.averageRating.toFixed(1)}
       </span>
       <span className="text-base-content/60 text-sm">
         ({reviewStats.totalReviews})

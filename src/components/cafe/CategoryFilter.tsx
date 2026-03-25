@@ -1,8 +1,8 @@
 interface CategoryFilterProps {
   categories: string[];
-  selectedCategory: string | undefined;
   isLoading: boolean;
   onCategoryChange: (category: string) => void;
+  selectedCategory: string | undefined;
 }
 
 export function CategoryFilter({
@@ -15,8 +15,8 @@ export function CategoryFilter({
     <div className="mb-8">
       <div className="flex flex-wrap gap-2">
         <button
-          className={`btn btn-sm ${selectedCategory === undefined ? 'btn-primary' : 'btn-outline'}`}
-          onClick={() => onCategoryChange('전체')}
+          className={`btn btn-sm ${selectedCategory === undefined ? "btn-primary" : "btn-outline"}`}
+          onClick={() => onCategoryChange("전체")}
           type="button"
         >
           전체
@@ -33,7 +33,7 @@ export function CategoryFilter({
             ))
           : categories.map((category) => (
               <button
-                className={`btn btn-sm ${selectedCategory === category ? 'btn-primary' : 'btn-outline'}`}
+                className={`btn btn-sm ${selectedCategory === category ? "btn-primary" : "btn-outline"}`}
                 key={category}
                 onClick={() => onCategoryChange(category)}
                 type="button"

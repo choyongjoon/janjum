@@ -10,7 +10,7 @@
     wireframe;
 }
 
-@plugin 'daisyui/theme' {
+@plugin "daisyui/theme" {
   name: "autumn";
   default: true;
   --radius-selector: 0.25rem;
@@ -18,7 +18,7 @@
   --radius-box: 0.25rem;
 }
 
-@plugin 'daisyui/theme' {
+@plugin "daisyui/theme" {
   name: "business";
   prefersdark: true;
   --radius-selector: 0.25rem;

@@ -1,10 +1,10 @@
-import { v } from 'convex/values';
-import { mutation, query } from './_generated/server';
+import { v } from "convex/values";
+import { mutation, query } from "./_generated/server";
 
 export const list = query({
   args: {},
   handler: async (ctx) => {
-    const cafes = await ctx.db.query('cafes').collect();
+    const cafes = await ctx.db.query("cafes").collect();
     const cafesWithImageUrl = await Promise.all(
       cafes.map(async (cafe) => ({
         ...cafe,
@@ -13,7 +13,7 @@ export const list = query({
           : undefined,
       }))
     );
-    return cafesWithImageUrl.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+    return cafesWithImageUrl.sort((a, b) => a.name.localeCompare(b.name, "ko"));
   },
 });
 
@@ -21,8 +21,8 @@ export const getBySlug = query({
   args: { slug: v.string() },
   handler: async (ctx, { slug }) => {
     const cafe = await ctx.db
-      .query('cafes')
-      .withIndex('by_slug', (q) => q.eq('slug', slug))
+      .query("cafes")
+      .withIndex("by_slug", (q) => q.eq("slug", slug))
       .first();
 
     if (!cafe) {
@@ -39,7 +39,7 @@ export const getBySlug = query({
 });
 
 export const getById = query({
-  args: { cafeId: v.id('cafes') },
+  args: { cafeId: v.id("cafes") },
   handler: async (ctx, { cafeId }) => {
     return await ctx.db.get(cafeId);
   },
@@ -49,8 +49,8 @@ export const getAllWithImages = query({
   args: {},
   handler: async (ctx) => {
     const cafes = await ctx.db
-      .query('cafes')
-      .filter((q) => q.neq(q.field('imageStorageId'), undefined))
+      .query("cafes")
+      .filter((q) => q.neq(q.field("imageStorageId"), undefined))
       .collect();
 
     // Sort by _creationTime (latest first) to prioritize recent uploads
@@ -62,26 +62,26 @@ export const create = mutation({
   args: {
     name: v.string(),
     slug: v.string(),
-    imageStorageId: v.optional(v.id('_storage')),
+    imageStorageId: v.optional(v.id("_storage")),
     rank: v.optional(v.number()),
     uploadSecret: v.optional(v.string()),
   },
   handler: async (ctx, { name, slug, imageStorageId, rank, uploadSecret }) => {
     const expectedSecret = process.env.CONVEX_UPLOAD_SECRET;
     if (expectedSecret && uploadSecret !== expectedSecret) {
-      throw new Error('Unauthorized: Invalid upload secret');
+      throw new Error("Unauthorized: Invalid upload secret");
     }
 
     const existing = await ctx.db
-      .query('cafes')
-      .withIndex('by_slug', (q) => q.eq('slug', slug))
+      .query("cafes")
+      .withIndex("by_slug", (q) => q.eq("slug", slug))
       .first();
 
     if (existing) {
       throw new Error(`Cafe with slug "${slug}" already exists`);
     }
 
-    const cafeId = await ctx.db.insert('cafes', {
+    const cafeId = await ctx.db.insert("cafes", {
       name,
       slug,
       imageStorageId,
@@ -94,15 +94,15 @@ export const create = mutation({
 
 export const updateImage = mutation({
   args: {
-    cafeId: v.id('cafes'),
-    storageId: v.id('_storage'),
+    cafeId: v.id("cafes"),
+    storageId: v.id("_storage"),
     uploadSecret: v.optional(v.string()),
   },
   handler: async (ctx, { cafeId, storageId, uploadSecret }) => {
     // Verify upload secret for protected operations
     const expectedSecret = process.env.CONVEX_UPLOAD_SECRET;
     if (expectedSecret && uploadSecret !== expectedSecret) {
-      throw new Error('Unauthorized: Invalid upload secret');
+      throw new Error("Unauthorized: Invalid upload secret");
     }
 
     await ctx.db.patch(cafeId, {

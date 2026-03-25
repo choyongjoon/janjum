@@ -1,5 +1,5 @@
-import type { RatingDistribution } from '../../../convex/reviews';
-import { RATING_TEXTS } from '../../../convex/reviews';
+import type { RatingDistribution } from "../../../convex/reviews";
+import { RATING_TEXTS } from "../../../convex/reviews";
 
 interface UserRatingHistogramProps {
   ratingDistribution: RatingDistribution;

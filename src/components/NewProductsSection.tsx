@@ -1,8 +1,8 @@
-import { convexQuery } from '@convex-dev/react-query';
-import { useSuspenseQuery } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
-import { api } from '../../convex/_generated/api';
-import { ProductCard } from './ProductCard';
+import { convexQuery } from "@convex-dev/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
+import { api } from "../../convex/_generated/api";
+import { ProductCard } from "./ProductCard";
 
 const STALE_TIME = 60 * 60 * 1000; // 1 hour
 
@@ -27,7 +27,7 @@ export function NewProductsSection() {
     <div className="container mx-auto px-4 py-8">
       <div className="mb-6 flex items-center justify-between">
         <h2 className="font-bold text-3xl">
-          신상품{' '}
+          신상품{" "}
           <span className="text-base-content/50 text-xl">
             {data.totalCount}
           </span>

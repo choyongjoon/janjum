@@ -1,18 +1,18 @@
-import { PlaywrightCrawler, type Request } from 'crawlee';
-import type { Page } from 'playwright';
-import { logger } from '../../shared/logger';
-import type { Nutritions } from '../../shared/nutritions';
-import { type Product, waitForLoad, writeProductsToJson } from './crawlerUtils';
-import { extractNutritionFromText } from './nutritionUtils';
+import { PlaywrightCrawler, type Request } from "crawlee";
+import type { Page } from "playwright";
+import { logger } from "../../shared/logger";
+import type { Nutritions } from "../../shared/nutritions";
+import { type Product, waitForLoad, writeProductsToJson } from "./crawlerUtils";
+import { extractNutritionFromText } from "./nutritionUtils";
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
 // ================================================
 
 const SITE_CONFIG = {
-  baseUrl: 'https://m.hollys.co.kr',
-  startUrl: 'https://m.hollys.co.kr/menu/menuList.do',
-  productUrlTemplate: 'https://m.hollys.co.kr',
+  baseUrl: "https://m.hollys.co.kr",
+  startUrl: "https://m.hollys.co.kr/menu/menuList.do",
+  productUrlTemplate: "https://m.hollys.co.kr",
 } as const;
 
 // ================================================
@@ -25,23 +25,23 @@ const NAME_SEPARATOR_REGEX = /\s*\n\s*\t*\s*/;
 
 const SELECTORS = {
   // Category navigation selectors
-  categoryLinks: '.sec_menu > ul > li > a',
+  categoryLinks: ".sec_menu > ul > li > a",
 
   // Product listing selectors
-  productContainers: '.menu_list li',
-  productLinks: '.menu_list li a',
+  productContainers: ".menu_list li",
+  productLinks: ".menu_list li a",
 
   // Product detail page selectors (based on actual HTML structure)
-  detailName: 'h3',
-  detailImage: 'p.img img',
-  detailDescription: '.menuList .description, .menuList p:not(.img)',
-  detailPrice: '.price, .menuPrice',
+  detailName: "h3",
+  detailImage: "p.img img",
+  detailDescription: ".menuList .description, .menuList p:not(.img)",
+  detailPrice: ".price, .menuPrice",
 
   // Listing page selectors (fallback)
-  productName: '.menu_name',
-  productImage: '.menu_img img',
-  productDescription: '.menu_desc',
-  productPrice: '.menu_price',
+  productName: ".menu_name",
+  productImage: ".menu_img img",
+  productDescription: ".menu_desc",
+  productPrice: ".menu_price",
 } as const;
 
 // ================================================
@@ -49,12 +49,12 @@ const SELECTORS = {
 // ================================================
 
 // Test mode configuration
-const isTestMode = process.env.CRAWLER_TEST_MODE === 'true';
+const isTestMode = process.env.CRAWLER_TEST_MODE === "true";
 const maxProductsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS || '3', 10)
+  ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS || "3", 10)
   : Number.POSITIVE_INFINITY;
 const maxRequestsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || '10', 10)
+  ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || "10", 10)
   : 50;
 
 const CRAWLER_CONFIG = {
@@ -64,7 +64,7 @@ const CRAWLER_CONFIG = {
   requestHandlerTimeoutSecs: isTestMode ? 60 : 180, // Reduced timeout since we're parallel
   launchOptions: {
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'] as string[],
+    args: ["--no-sandbox", "--disable-setuid-sandbox"] as string[],
   },
 };
 
@@ -73,14 +73,14 @@ const CRAWLER_CONFIG = {
 // ================================================
 
 const HOLLYS_CATEGORIES = [
-  'COFFEE',
-  '라떼 · 초콜릿 · 티',
-  '할리치노 · 빙수',
-  '스무디 · 주스',
-  '스파클링',
-  '푸드',
-  'MD상품',
-  'MD식품',
+  "COFFEE",
+  "라떼 · 초콜릿 · 티",
+  "할리치노 · 빙수",
+  "스무디 · 주스",
+  "스파클링",
+  "푸드",
+  "MD상품",
+  "MD식품",
 ] as const;
 
 // ================================================
@@ -91,15 +91,15 @@ const HOLLYS_CATEGORIES = [
 async function extractNutritionData(page: Page): Promise<Nutritions | null> {
   try {
     // First, try to find serving size information from other parts of the page
-    let servingSizeInfo = '';
+    let servingSizeInfo = "";
 
     // Check for serving size in description or other text elements
-    const allTextElements = await page.locator('div, p, span').all();
+    const allTextElements = await page.locator("div, p, span").all();
     for (const element of allTextElements) {
-      const text = await element.textContent().catch(() => '');
+      const text = await element.textContent().catch(() => "");
       if (
         text &&
-        (text.includes('ml') || text.includes('mL') || text.includes('ML'))
+        (text.includes("ml") || text.includes("mL") || text.includes("ML"))
       ) {
         logger.debug(
           `Found potential serving size text: ${text.substring(0, 100)}...`
@@ -109,18 +109,18 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
     }
 
     // Try .tableType01 first (structured table)
-    const tableElement = page.locator('.tableType01');
+    const tableElement = page.locator(".tableType01");
     const tableElementCount = await tableElement.count();
 
     if (tableElementCount > 0) {
-      logger.info('Found .tableType01, extracting table data');
+      logger.info("Found .tableType01, extracting table data");
 
       // Extract all table cells to get structured nutrition data
-      const tableRows = await tableElement.locator('tr').all();
-      let nutritionText = '';
+      const tableRows = await tableElement.locator("tr").all();
+      let nutritionText = "";
 
       for (const row of tableRows) {
-        const cellsText = await row.textContent().catch(() => '');
+        const cellsText = await row.textContent().catch(() => "");
         if (cellsText) {
           nutritionText += `${cellsText} `;
         }
@@ -145,29 +145,29 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
     }
 
     // Fallback to .menu_info
-    const menuInfoElement = page.locator('.menu_info');
+    const menuInfoElement = page.locator(".menu_info");
     const menuInfoElementCount = await menuInfoElement.count();
 
     if (menuInfoElementCount > 0) {
-      logger.debug('Found .menu_info, extracting text data');
-      const nutritionText = await menuInfoElement.textContent().catch(() => '');
+      logger.debug("Found .menu_info, extracting text data");
+      const nutritionText = await menuInfoElement.textContent().catch(() => "");
       if (nutritionText) {
         logger.debug(
           `Menu info nutrition text: ${nutritionText.substring(0, 200)}...`
         );
         const nutrition = extractNutritionFromText(nutritionText);
         if (nutrition) {
-          logger.debug('Successfully extracted nutrition data from menu_info');
+          logger.debug("Successfully extracted nutrition data from menu_info");
           return nutrition;
         }
       }
     }
 
-    logger.debug('No nutrition data found in either selector');
+    logger.debug("No nutrition data found in either selector");
     return null;
   } catch (error) {
     logger.debug(
-      'Failed to extract nutrition data from Hollys menu item:',
+      "Failed to extract nutrition data from Hollys menu item:",
       error as Record<string, unknown>
     );
     return null;
@@ -179,7 +179,7 @@ function parseProductName(rawName: string): {
   nameEn: string | null;
 } {
   if (!rawName) {
-    return { name: '', nameEn: null };
+    return { name: "", nameEn: null };
   }
 
   // Clean the raw name by removing extra whitespace
@@ -213,7 +213,7 @@ async function extractCategoriesFromMenu(
   page: Page
 ): Promise<Array<{ name: string; url: string }>> {
   try {
-    logger.info('📄 Extracting categories from menu');
+    logger.info("📄 Extracting categories from menu");
 
     await waitForLoad(page);
 
@@ -224,10 +224,10 @@ async function extractCategoriesFromMenu(
     for (const element of categoryElements) {
       const [text, href] = await Promise.all([
         element.textContent(),
-        element.getAttribute('href'),
+        element.getAttribute("href"),
       ]);
 
-      if (text?.trim() && href && href.startsWith('/menu')) {
+      if (text?.trim() && href?.startsWith("/menu")) {
         const categoryName = text.trim();
 
         // Construct full URL for menu links
@@ -277,9 +277,9 @@ async function extractProductUrls(
     const productUrls: string[] = [];
     for (const link of productLinks) {
       try {
-        const href = await link.getAttribute('href');
+        const href = await link.getAttribute("href");
         if (href) {
-          const productUrl = href.startsWith('http')
+          const productUrl = href.startsWith("http")
             ? href
             : `${SITE_CONFIG.baseUrl}${href}`;
           productUrls.push(productUrl);
@@ -346,26 +346,26 @@ async function extractProductDetails(
           .locator(SELECTORS.detailName)
           .first()
           .textContent({ timeout: 1000 })
-          .then((text) => text || '')
-          .catch(() => ''),
+          .then((text) => text || "")
+          .catch(() => ""),
 
         page
           .locator(SELECTORS.detailImage)
           .first()
-          .getAttribute('src', { timeout: 1000 })
+          .getAttribute("src", { timeout: 1000 })
           .then((src) => {
             if (!src) {
-              return '';
+              return "";
             }
-            if (src.startsWith('http')) {
+            if (src.startsWith("http")) {
               return src;
             }
-            if (src.startsWith('/')) {
+            if (src.startsWith("/")) {
               return `${SITE_CONFIG.baseUrl}${src}`;
             }
             return `${SITE_CONFIG.baseUrl}/${src}`;
           })
-          .catch(() => ''),
+          .catch(() => ""),
 
         page
           .locator(SELECTORS.detailDescription)
@@ -426,7 +426,7 @@ async function handleProductPage(
 
       const totalTime = Date.now() - startTime;
       logger.info(
-        `✅ Extracted: ${productData.name}${productData.nameEn ? ` | ${productData.nameEn}` : ''}${productData.price ? ` (${productData.price})` : ''}${productData.nutritions ? ' with nutrition data' : ''} [${totalTime}ms, extraction: ${extractEnd - extractStart}ms]`
+        `✅ Extracted: ${productData.name}${productData.nameEn ? ` | ${productData.nameEn}` : ""}${productData.price ? ` (${productData.price})` : ""}${productData.nutritions ? " with nutrition data" : ""} [${totalTime}ms, extraction: ${extractEnd - extractStart}ms]`
       );
     } else {
       logger.warn(`⚠️ Failed to extract data from: ${productUrl}`);
@@ -455,7 +455,7 @@ function createBasicProduct(
   if (productInfo.price) {
     const priceMatch = productInfo.price.match(PRICE_REGEX);
     if (priceMatch) {
-      price = Number.parseInt(priceMatch[0].replace(/,/g, ''), 10);
+      price = Number.parseInt(priceMatch[0].replace(/,/g, ""), 10);
     }
   }
 
@@ -490,7 +490,7 @@ async function processDiscoveredCategory(
 
   logger.info(`🌐 Navigating to: ${category.url}`);
   await page.goto(category.url, {
-    waitUntil: 'domcontentloaded',
+    waitUntil: "domcontentloaded",
     timeout: 20_000,
   });
   await waitForLoad(page);
@@ -521,7 +521,7 @@ async function addDelayBetweenCategories(
     await new Promise((resolve) => setTimeout(resolve, 3000));
     logger.info(`🔄 Starting next category: ${nextCategoryName}`);
   } else if (index === total - 1) {
-    logger.info('🎉 All categories completed!');
+    logger.info("🎉 All categories completed!");
   }
 }
 
@@ -558,7 +558,7 @@ async function processDiscoveredCategories(
       logger.error(
         `❌ Failed to process category ${category.name}: ${categoryError}`
       );
-      logger.info('🔄 Continuing with next category...');
+      logger.info("🔄 Continuing with next category...");
     }
   }
 }
@@ -568,7 +568,7 @@ async function processPredefinedCategories(
   crawlerInstance: PlaywrightCrawler
 ): Promise<void> {
   logger.info(
-    '🔖 No categories found from navigation, using predefined categories'
+    "🔖 No categories found from navigation, using predefined categories"
   );
 
   const categoriesToProcess = isTestMode
@@ -597,7 +597,7 @@ async function handleMainMenuPage(
   page: Page,
   crawlerInstance: PlaywrightCrawler
 ) {
-  logger.info('Processing Hollys menu page');
+  logger.info("Processing Hollys menu page");
 
   await waitForLoad(page);
   // Debug screenshot removed for performance
@@ -625,11 +625,11 @@ export const createHollysCrawler = () =>
       const url = request.url;
 
       // Route requests based on URL pattern and userData
-      if (url.includes('menuList.do') && !request.userData?.isProductPage) {
+      if (url.includes("menuList.do") && !request.userData?.isProductPage) {
         // This is a category page
         await handleMainMenuPage(page, crawlerInstance);
       } else if (
-        url.includes('menuView.do') ||
+        url.includes("menuView.do") ||
         request.userData?.isProductPage
       ) {
         // This is a product detail page
@@ -650,9 +650,9 @@ export const runHollysCrawler = async () => {
   try {
     await crawler.run([SITE_CONFIG.startUrl]);
     const dataset = await crawler.getData();
-    await writeProductsToJson(dataset.items as Product[], 'hollys');
+    await writeProductsToJson(dataset.items as Product[], "hollys");
   } catch (error) {
-    logger.error('Hollys crawler failed:', error);
+    logger.error("Hollys crawler failed:", error);
     throw error;
   }
 };
@@ -660,7 +660,7 @@ export const runHollysCrawler = async () => {
 // Only run if this file is executed directly (not imported)
 if (import.meta.url === `file://${process.argv[1]}`) {
   runHollysCrawler().catch((error) => {
-    logger.error('Crawler execution failed:', error);
+    logger.error("Crawler execution failed:", error);
     process.exit(1);
   });
 }

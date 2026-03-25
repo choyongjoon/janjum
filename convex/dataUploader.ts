@@ -1,35 +1,35 @@
-import type { GenericDataModel, GenericMutationCtx } from 'convex/server';
-import { v } from 'convex/values';
-import type { Nutritions } from '../shared/nutritions';
-import { api } from './_generated/api';
-import type { Id } from './_generated/dataModel';
-import { mutation } from './_generated/server';
+import type { GenericDataModel, GenericMutationCtx } from "convex/server";
+import { v } from "convex/values";
+import type { Nutritions } from "../shared/nutritions";
+import { api } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
+import { mutation } from "./_generated/server";
 
 interface CrawlerProduct {
-  name: string;
-  nameEn: string;
+  category: string | null;
   description: string;
   externalCategory: string;
   externalId: string;
   externalImageUrl: string;
   externalUrl: string;
-  price: number | null;
-  category: string | null;
+  imageStorageId?: Id<"_storage">;
+  name: string;
+  nameEn: string;
   nutritions?: Nutritions | null;
-  imageStorageId?: Id<'_storage'>;
+  price: number | null;
 }
 interface UploadResults {
-  processed: number;
   created: number;
-  updated: number;
-  unchanged: number;
-  skipped: number;
-  removed: number;
-  reactivated: number;
   errors: string[];
+  processed: number;
   processingTime: number;
-  removedProducts?: string[];
+  reactivated: number;
   reactivatedProducts?: string[];
+  removed: number;
+  removedProducts?: string[];
+  skipped: number;
+  unchanged: number;
+  updated: number;
 }
 
 // Helper function to clean nutrition data (convert null to undefined)
@@ -58,7 +58,7 @@ function cleanNutritions(
 async function uploadProductsToDatabase(
   ctx: GenericMutationCtx<GenericDataModel>,
   products: CrawlerProduct[],
-  cafeId: Id<'cafes'>,
+  cafeId: Id<"cafes">,
   results: UploadResults,
   downloadImages = false
 ) {
@@ -76,11 +76,11 @@ async function uploadProductsToDatabase(
         nutritions: cleanNutritions(product.nutritions),
         downloadImages,
       });
-      if (result.action === 'created') {
+      if (result.action === "created") {
         results.created++;
-      } else if (result.action === 'updated') {
+      } else if (result.action === "updated") {
         results.updated++;
-      } else if (result.action === 'unchanged') {
+      } else if (result.action === "unchanged") {
         results.unchanged++;
       }
     } catch (error) {
@@ -104,7 +104,7 @@ export const uploadProductsFromJson = mutation({
     // Environment-based authentication
     const allowedSecret = process.env.CONVEX_UPLOAD_SECRET;
     if (!allowedSecret || uploadSecret !== allowedSecret) {
-      throw new Error('Unauthorized: Invalid upload secret');
+      throw new Error("Unauthorized: Invalid upload secret");
     }
 
     const startTime = Date.now();

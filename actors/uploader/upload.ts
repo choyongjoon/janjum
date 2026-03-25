@@ -1,11 +1,11 @@
 #!/usr/bin/env tsx
 
-import { spawn } from 'node:child_process';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { AVAILABLE_CAFES } from 'shared/constants';
-import { logger } from '../../shared/logger';
+import { spawn } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { AVAILABLE_CAFES } from "shared/constants";
+import { logger } from "../../shared/logger";
 
 // ESM equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -15,8 +15,8 @@ type CafeSlug = keyof typeof AVAILABLE_CAFES;
 
 interface UploadOptions {
   dryRun?: boolean;
-  verbose?: boolean;
   file?: string;
+  verbose?: boolean;
 }
 
 // Helper function to handle cafe name validation and addition
@@ -25,7 +25,7 @@ function handleCafeSlug(arg: string, cafeSlugs: CafeSlug[]): void {
     cafeSlugs.push(arg as CafeSlug);
   } else {
     logger.error(`Invalid cafe name: ${arg}`);
-    logger.info(`Available cafes: ${Object.keys(AVAILABLE_CAFES).join(', ')}`);
+    logger.info(`Available cafes: ${Object.keys(AVAILABLE_CAFES).join(", ")}`);
     process.exit(1);
   }
 }
@@ -41,17 +41,17 @@ function parseArgs(): { cafeSlugs: CafeSlug[]; options: UploadOptions } {
     const arg = args[i];
 
     switch (arg) {
-      case '--dry-run':
+      case "--dry-run":
         options.dryRun = true;
         break;
-      case '--verbose':
+      case "--verbose":
         options.verbose = true;
         break;
-      case '--file':
+      case "--file":
         options.file = args[i + 1];
         i++; // Skip next argument as it's the file path
         break;
-      case '--help':
+      case "--help":
         printHelp();
         process.exit(0);
         break;
@@ -74,9 +74,9 @@ function parseArgs(): { cafeSlugs: CafeSlug[]; options: UploadOptions } {
 function findLatestFile(cafeSlug: string): string | null {
   const outputDir = path.join(
     process.cwd(),
-    'actors',
-    'crawler',
-    'crawler-outputs'
+    "actors",
+    "crawler",
+    "crawler-outputs"
   );
 
   if (!fs.existsSync(outputDir)) {
@@ -87,7 +87,7 @@ function findLatestFile(cafeSlug: string): string | null {
 
   const files = fs
     .readdirSync(outputDir)
-    .filter((file) => file.startsWith(cafePattern) && file.endsWith('.json'))
+    .filter((file) => file.startsWith(cafePattern) && file.endsWith(".json"))
     .map((file) => ({
       name: file,
       path: path.join(outputDir, file),
@@ -102,7 +102,7 @@ function findLatestFile(cafeSlug: string): string | null {
 function uploadCafe(cafeSlug: CafeSlug, options: UploadOptions): Promise<void> {
   return new Promise((resolve, reject) => {
     const cafe = AVAILABLE_CAFES[cafeSlug];
-    const uploaderPath = path.join(__dirname, 'uploader.ts');
+    const uploaderPath = path.join(__dirname, "uploader.ts");
 
     // Find the appropriate file
     let filePath = options.file;
@@ -120,24 +120,24 @@ function uploadCafe(cafeSlug: CafeSlug, options: UploadOptions): Promise<void> {
     logger.info(`📁 File: ${path.basename(filePath)}`);
 
     // Build command arguments
-    const args = [uploaderPath, '--cafe-slug', cafe.slug, '--file', filePath];
+    const args = [uploaderPath, "--cafe-slug", cafe.slug, "--file", filePath];
 
     if (options.dryRun) {
-      args.push('--dry-run');
+      args.push("--dry-run");
     }
 
     // Images are always downloaded and optimized by default
 
     if (options.verbose) {
-      args.push('--verbose');
+      args.push("--verbose");
     }
 
-    const child = spawn('tsx', args, {
-      stdio: 'inherit',
+    const child = spawn("tsx", args, {
+      stdio: "inherit",
       cwd: process.cwd(),
     });
 
-    child.on('close', (code) => {
+    child.on("close", (code) => {
       if (code === 0) {
         logger.info(`✅ ${cafe.name} upload completed successfully`);
         resolve();
@@ -147,7 +147,7 @@ function uploadCafe(cafeSlug: CafeSlug, options: UploadOptions): Promise<void> {
       }
     });
 
-    child.on('error', (error) => {
+    child.on("error", (error) => {
       logger.error(`❌ Failed to start ${cafe.name} upload: ${error.message}`);
       reject(error);
     });
@@ -167,7 +167,7 @@ Usage:
 Available Cafes:
 ${Object.entries(AVAILABLE_CAFES)
   .map(([key, cafe]) => `  ${key.padEnd(10)} - ${cafe.name}`)
-  .join('\n')}
+  .join("\n")}
 
 Options:
   --dry-run         Preview changes without uploading to database
@@ -184,12 +184,12 @@ async function main() {
   try {
     const { cafeSlugs, options } = parseArgs();
 
-    logger.info('🎯 Multi-Cafe Uploader Starting');
-    logger.info(`📋 Cafes to upload: ${cafeSlugs.join(', ')}`);
+    logger.info("🎯 Multi-Cafe Uploader Starting");
+    logger.info(`📋 Cafes to upload: ${cafeSlugs.join(", ")}`);
     if (options.dryRun) {
-      logger.info('🔍 DRY RUN MODE - No data will be uploaded');
+      logger.info("🔍 DRY RUN MODE - No data will be uploaded");
     }
-    logger.info('='.repeat(50));
+    logger.info("=".repeat(50));
 
     const startTime = Date.now();
     let successCount = 0;
@@ -207,7 +207,7 @@ async function main() {
 
       // Add a small delay between uploads
       if (cafeSlugs.indexOf(cafeSlug) < cafeSlugs.length - 1) {
-        logger.info('⏳ Waiting 2 seconds before next upload...');
+        logger.info("⏳ Waiting 2 seconds before next upload...");
         await new Promise((resolve) => setTimeout(resolve, 2000));
       }
     }
@@ -216,39 +216,39 @@ async function main() {
     const totalTime = Math.round((endTime - startTime) / 1000);
 
     // Final summary
-    logger.info('='.repeat(50));
-    logger.info('📊 UPLOAD RUN SUMMARY');
+    logger.info("=".repeat(50));
+    logger.info("📊 UPLOAD RUN SUMMARY");
     logger.info(`✅ Successful: ${successCount}/${cafeSlugs.length} cafes`);
     logger.info(`❌ Failed: ${failCount}/${cafeSlugs.length} cafes`);
     logger.info(`⏱️  Total time: ${totalTime} seconds`);
 
     if (failCount > 0) {
-      logger.error('Some uploads failed. Check logs above for details.');
+      logger.error("Some uploads failed. Check logs above for details.");
       process.exit(1);
     } else if (options.dryRun) {
-      logger.info('🔍 Dry run completed - no data was uploaded');
+      logger.info("🔍 Dry run completed - no data was uploaded");
     } else {
-      logger.info('🎉 All uploads completed successfully!');
+      logger.info("🎉 All uploads completed successfully!");
     }
   } catch (error) {
-    logger.error('Fatal error in uploader runner:', error);
+    logger.error("Fatal error in uploader runner:", error);
     process.exit(1);
   }
 }
 
 // Handle graceful shutdown
-process.on('SIGINT', () => {
-  logger.info('🛑 Received SIGINT, shutting down gracefully...');
+process.on("SIGINT", () => {
+  logger.info("🛑 Received SIGINT, shutting down gracefully...");
   process.exit(0);
 });
 
-process.on('SIGTERM', () => {
-  logger.info('🛑 Received SIGTERM, shutting down gracefully...');
+process.on("SIGTERM", () => {
+  logger.info("🛑 Received SIGTERM, shutting down gracefully...");
   process.exit(0);
 });
 
 // Run the main function
 main().catch((error) => {
-  logger.error('Unhandled error:', error);
+  logger.error("Unhandled error:", error);
   process.exit(1);
 });

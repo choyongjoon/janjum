@@ -1,5 +1,5 @@
-import type { Nutritions } from 'shared/nutritions';
-import { NutritionTable } from './NutritionTable';
+import type { Nutritions } from "shared/nutritions";
+import { NutritionTable } from "./NutritionTable";
 
 export const NutritionDialogButton = ({
   nutritions,
@@ -16,7 +16,7 @@ export const NutritionDialogButton = ({
         className="btn btn-neutral btn-xs"
         onClick={() =>
           (
-            document.getElementById('nutritions-modal') as HTMLDialogElement
+            document.getElementById("nutritions-modal") as HTMLDialogElement
           ).showModal()
         }
         type="button"

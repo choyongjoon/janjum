@@ -1,16 +1,16 @@
-import { PlaywrightCrawler, type Request } from 'crawlee';
-import type { Locator, Page } from 'playwright';
-import { logger } from '../../shared/logger';
-import type { Nutritions } from '../../shared/nutritions';
-import { type Product, waitForLoad, writeProductsToJson } from './crawlerUtils';
+import { PlaywrightCrawler, type Request } from "crawlee";
+import type { Locator, Page } from "playwright";
+import { logger } from "../../shared/logger";
+import type { Nutritions } from "../../shared/nutritions";
+import { type Product, waitForLoad, writeProductsToJson } from "./crawlerUtils";
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
 // ================================================
 
 const SITE_CONFIG = {
-  baseUrl: 'https://paikdabang.com',
-  startUrl: 'https://paikdabang.com/menu/menu_new/',
+  baseUrl: "https://paikdabang.com",
+  startUrl: "https://paikdabang.com/menu/menu_new/",
 } as const;
 
 // ================================================
@@ -19,16 +19,16 @@ const SITE_CONFIG = {
 
 const SELECTORS = {
   // Category discovery selectors
-  categoryTabs: 'ul.page_tab a',
+  categoryTabs: "ul.page_tab a",
 
   // Product listing selectors
-  menuItems: '.menu_list > ul > li',
+  menuItems: ".menu_list > ul > li",
 
   // Product data selectors
   productData: {
-    name: 'p.menu_tit',
-    description: 'p.txt',
-    image: 'img',
+    name: "p.menu_tit",
+    description: "p.txt",
+    image: "img",
   },
 } as const;
 
@@ -37,12 +37,12 @@ const SELECTORS = {
 // ================================================
 
 // Test mode configuration
-const isTestMode = process.env.CRAWLER_TEST_MODE === 'true';
+const isTestMode = process.env.CRAWLER_TEST_MODE === "true";
 const maxProductsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS || '3', 10)
+  ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS || "3", 10)
   : Number.POSITIVE_INFINITY;
 const maxRequestsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || '10', 10)
+  ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || "10", 10)
   : 30;
 
 const CRAWLER_CONFIG = {
@@ -52,7 +52,7 @@ const CRAWLER_CONFIG = {
   requestHandlerTimeoutSecs: isTestMode ? 30 : 45,
   launchOptions: {
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'] as string[],
+    args: ["--no-sandbox", "--disable-setuid-sandbox"] as string[],
   },
   maxItemsPerCategory: isTestMode ? maxProductsInTestMode : 200,
 };
@@ -74,7 +74,7 @@ function parseServingSize(
     const ozValue = Number.parseInt(servingSizeMatch[1], 10);
     return {
       size: Math.round(ozValue * 29.5735),
-      unit: 'ml',
+      unit: "ml",
     };
   }
   return null;
@@ -89,23 +89,23 @@ function parseNutritionItem(label: string, value: string): Partial<Nutritions> {
 
   const normalizedLabel = label.trim().toLowerCase();
 
-  if (normalizedLabel.includes('카페인')) {
-    return { caffeine: numValue, caffeineUnit: 'mg' };
+  if (normalizedLabel.includes("카페인")) {
+    return { caffeine: numValue, caffeineUnit: "mg" };
   }
-  if (normalizedLabel.includes('칼로리')) {
-    return { calories: numValue, caloriesUnit: 'kcal' };
+  if (normalizedLabel.includes("칼로리")) {
+    return { calories: numValue, caloriesUnit: "kcal" };
   }
-  if (normalizedLabel.includes('나트륨')) {
-    return { natrium: numValue, natriumUnit: 'mg' };
+  if (normalizedLabel.includes("나트륨")) {
+    return { natrium: numValue, natriumUnit: "mg" };
   }
-  if (normalizedLabel.includes('당류')) {
-    return { sugar: numValue, sugarUnit: 'g' };
+  if (normalizedLabel.includes("당류")) {
+    return { sugar: numValue, sugarUnit: "g" };
   }
-  if (normalizedLabel.includes('포화지방')) {
-    return { saturatedFat: numValue, saturatedFatUnit: 'g' };
+  if (normalizedLabel.includes("포화지방")) {
+    return { saturatedFat: numValue, saturatedFatUnit: "g" };
   }
-  if (normalizedLabel.includes('단백질')) {
-    return { protein: numValue, proteinUnit: 'g' };
+  if (normalizedLabel.includes("단백질")) {
+    return { protein: numValue, proteinUnit: "g" };
   }
 
   return {};
@@ -116,7 +116,7 @@ async function extractNutritionData(
   menuItem: Locator
 ): Promise<Nutritions | null> {
   try {
-    const nutritionBox = menuItem.locator('.ingredient_table_box');
+    const nutritionBox = menuItem.locator(".ingredient_table_box");
 
     if ((await nutritionBox.count()) === 0) {
       return null;
@@ -126,9 +126,9 @@ async function extractNutritionData(
 
     // Extract serving size from the basis text
     const basisText = await nutritionBox
-      .locator('.menu_ingredient_basis')
+      .locator(".menu_ingredient_basis")
       .textContent()
-      .catch(() => '');
+      .catch(() => "");
 
     if (basisText) {
       const servingData = parseServingSize(basisText);
@@ -140,11 +140,11 @@ async function extractNutritionData(
 
     // Extract nutrition values from the structured table
     const nutritionItems = await nutritionBox
-      .locator('.ingredient_table li')
+      .locator(".ingredient_table li")
       .all();
 
     for (const item of nutritionItems) {
-      const divs = await item.locator('div').allTextContents();
+      const divs = await item.locator("div").allTextContents();
       if (divs.length !== 2) {
         continue;
       }
@@ -156,7 +156,7 @@ async function extractNutritionData(
     return Object.keys(nutrition).length > 0 ? nutrition : null;
   } catch (error) {
     logger.debug(
-      'Failed to extract nutrition data from Paik menu item:',
+      "Failed to extract nutrition data from Paik menu item:",
       error as Record<string, unknown>
     );
     return null;
@@ -168,7 +168,7 @@ async function extractCategoryUrls(
   page: Page
 ): Promise<Array<{ url: string; name: string }>> {
   try {
-    logger.info('📄 Extracting category URLs from tabs');
+    logger.info("📄 Extracting category URLs from tabs");
 
     await waitForLoad(page);
 
@@ -182,7 +182,7 @@ async function extractCategoryUrls(
 
     for (const tab of categoryTabs) {
       const [href, text] = await Promise.all([
-        tab.getAttribute('href'),
+        tab.getAttribute("href"),
         tab.textContent(),
       ]);
 
@@ -190,12 +190,12 @@ async function extractCategoryUrls(
         const categoryName = text.trim();
 
         // Skip 신메뉴 (New Menu) to avoid duplicates as requested
-        if (categoryName === '신메뉴') {
+        if (categoryName === "신메뉴") {
           logger.info(`⏭️  Skipping category: ${categoryName} (duplicates)`);
           continue;
         }
 
-        const fullUrl = href.startsWith('http')
+        const fullUrl = href.startsWith("http")
           ? href
           : `${SITE_CONFIG.baseUrl}${href}`;
         categories.push({ url: fullUrl, name: categoryName });
@@ -223,7 +223,7 @@ async function findMenuItems(
     return { items, selector };
   } catch {
     logger.warn(`⚠️  Selector ${selector} not found`);
-    return { items: [], selector: '' };
+    return { items: [], selector: "" };
   }
 }
 
@@ -233,11 +233,11 @@ async function extractProductName(menuItem: Locator): Promise<string> {
     const name = await menuItem
       .locator(SELECTORS.productData.name)
       .textContent({ timeout: 1000 })
-      .then((text: string | null) => text?.trim() || '')
-      .catch(() => '');
+      .then((text: string | null) => text?.trim() || "")
+      .catch(() => "");
     return name;
   } catch {
-    return '';
+    return "";
   }
 }
 
@@ -246,14 +246,14 @@ function extractProductImage(menuItem: Locator): Promise<string> {
   return menuItem
     .locator(SELECTORS.productData.image)
     .first()
-    .getAttribute('src')
+    .getAttribute("src")
     .then((src: string | null) => {
       if (!src) {
-        return '';
+        return "";
       }
-      return src.startsWith('http') ? src : `${SITE_CONFIG.baseUrl}${src}`;
+      return src.startsWith("http") ? src : `${SITE_CONFIG.baseUrl}${src}`;
     })
-    .catch(() => '');
+    .catch(() => "");
 }
 
 // Extract product description with hover fallback
@@ -266,8 +266,8 @@ async function extractProductDescription(
     let description = await menuItem
       .locator(SELECTORS.productData.description)
       .textContent({ timeout: 500 })
-      .then((text: string | null) => text?.trim() || '')
-      .catch(() => '');
+      .then((text: string | null) => text?.trim() || "")
+      .catch(() => "");
 
     // If no description found, try hover
     if (!description) {
@@ -276,13 +276,13 @@ async function extractProductDescription(
       description = await menuItem
         .locator(SELECTORS.productData.description)
         .textContent({ timeout: 500 })
-        .then((text: string | null) => text?.trim() || '')
-        .catch(() => '');
+        .then((text: string | null) => text?.trim() || "")
+        .catch(() => "");
     }
 
     return description;
   } catch {
-    return '';
+    return "";
   }
 }
 
@@ -316,8 +316,8 @@ function isValidProductName(name: string): boolean {
   return !!(
     name &&
     name.length > 2 &&
-    !name.includes('undefined') &&
-    !name.includes('null')
+    !name.includes("undefined") &&
+    !name.includes("null")
   );
 }
 
@@ -382,7 +382,7 @@ async function extractProductsFromPage(
           if (!products.some((p) => p.externalId === product.externalId)) {
             products.push(product);
             logger.info(
-              `✅ Extracted: ${name} (${product.category})${nutritions ? ' with nutrition data' : ''}`
+              `✅ Extracted: ${name} (${product.category})${nutritions ? " with nutrition data" : ""}`
             );
           }
         }
@@ -413,7 +413,7 @@ async function handleMainMenuPage(
   page: Page,
   crawlerInstance: PlaywrightCrawler
 ) {
-  logger.info('Processing main menu page to discover categories');
+  logger.info("Processing main menu page to discover categories");
 
   await waitForLoad(page);
   // Debug screenshot removed for performance
@@ -422,7 +422,7 @@ async function handleMainMenuPage(
   const categories = await extractCategoryUrls(page);
 
   if (categories.length === 0) {
-    logger.error('❌ No categories found');
+    logger.error("❌ No categories found");
     return;
   }
 
@@ -496,9 +496,9 @@ export const runPaikCrawler = async () => {
   try {
     await crawler.run([SITE_CONFIG.startUrl]);
     const dataset = await crawler.getData();
-    await writeProductsToJson(dataset.items as Product[], 'paik');
+    await writeProductsToJson(dataset.items as Product[], "paik");
   } catch (error) {
-    logger.error('Paik crawler failed:', error);
+    logger.error("Paik crawler failed:", error);
     throw error;
   }
 };
@@ -506,7 +506,7 @@ export const runPaikCrawler = async () => {
 // Only run if this file is executed directly (not imported)
 if (import.meta.url === `file://${process.argv[1]}`) {
   runPaikCrawler().catch((error) => {
-    logger.error('Crawler execution failed:', error);
+    logger.error("Crawler execution failed:", error);
     process.exit(1);
   });
 }

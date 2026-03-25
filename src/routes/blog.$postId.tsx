@@ -1,8 +1,8 @@
-import { createFileRoute, Link } from '@tanstack/react-router';
-import { marked } from 'marked';
-import { getBlogPost } from '~/utils/blogData';
-import { formatDateKorean } from '~/utils/dateFormat';
-import { seo } from '~/utils/seo';
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { marked } from "marked";
+import { getBlogPost } from "~/utils/blogData";
+import { formatDateKorean } from "~/utils/dateFormat";
+import { seo } from "~/utils/seo";
 
 // Configure marked options with post-processing
 const processMarkdown = (content: string) => {
@@ -13,7 +13,7 @@ const processMarkdown = (content: string) => {
   }) as string;
 
   // Add <br/> after paragraphs
-  html = html.replace(/<\/p>/g, '</p><br/>');
+  html = html.replace(/<\/p>/g, "</p><br/>");
 
   html = html.replace(/<p /g, '<p class="text-lg" ');
 
@@ -23,7 +23,7 @@ const processMarkdown = (content: string) => {
   return html;
 };
 
-export const Route = createFileRoute('/blog/$postId')({
+export const Route = createFileRoute("/blog/$postId")({
   component: BlogPost,
   loader: (opts) => {
     const post = getBlogPost(opts.params.postId);
@@ -32,10 +32,10 @@ export const Route = createFileRoute('/blog/$postId')({
   head: ({ loaderData }) => ({
     meta: [
       ...seo({
-        title: `${loaderData?.post?.title || '블로그 포스트'} | 잔점`,
-        description: loaderData?.post?.excerpt || '잔점 블로그 포스트입니다.',
-        image: '/android-chrome-512x512.png',
-        keywords: '잔점 블로그, 카페, 음료',
+        title: `${loaderData?.post?.title || "블로그 포스트"} | 잔점`,
+        description: loaderData?.post?.excerpt || "잔점 블로그 포스트입니다.",
+        image: "/android-chrome-512x512.png",
+        keywords: "잔점 블로그, 카페, 음료",
       }),
     ],
   }),

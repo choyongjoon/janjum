@@ -1,7 +1,7 @@
-import { expect, test } from '@playwright/test';
-import { AuthHelper } from './helpers/auth-helpers';
+import { expect, test } from "@playwright/test";
+import { AuthHelper } from "./helpers/auth-helpers";
 
-test.describe('User Settings Journey', () => {
+test.describe("User Settings Journey", () => {
   let authHelper: AuthHelper;
 
   test.beforeEach(async ({ page }) => {
@@ -9,36 +9,36 @@ test.describe('User Settings Journey', () => {
     await authHelper.clearAuth();
   });
 
-  test.describe('New User Journey', () => {
-    test('should complete signup and access settings page', async ({
+  test.describe("New User Journey", () => {
+    test("should complete signup and access settings page", async ({
       page,
     }) => {
       // Step 1: Start as unauthenticated user
-      await page.goto('/');
-      await page.waitForLoadState('networkidle');
+      await page.goto("/");
+      await page.waitForLoadState("networkidle");
 
       // Step 2: Try to access settings (may show auth required)
-      await page.goto('/settings');
-      const pageBody = page.locator('body');
+      await page.goto("/settings");
+      const pageBody = page.locator("body");
       await expect(pageBody).toBeVisible();
 
       // Step 3: Simulate successful OAuth login as new user
       await authHelper.mockNewUser({
-        email: 'newuser@janjum.com',
+        email: "newuser@janjum.com",
         name: undefined, // New user needs to complete profile
         handle: undefined,
       });
 
       // Step 4: Access settings page as authenticated new user
-      await page.goto('/settings');
-      await page.waitForLoadState('networkidle');
+      await page.goto("/settings");
+      await page.waitForLoadState("networkidle");
 
       // Verify page loads successfully
       await expect(pageBody).toBeVisible();
 
       // Step 5: Test basic interaction with any form elements that exist
       const formExists = await page
-        .locator('form')
+        .locator("form")
         .isVisible()
         .catch(() => false);
       const inputExists = await page
@@ -59,8 +59,8 @@ test.describe('User Settings Journey', () => {
           )
           .first();
         if (await textInput.isVisible().catch(() => false)) {
-          await textInput.fill('테스트 입력');
-          await expect(textInput).toHaveValue('테스트 입력');
+          await textInput.fill("테스트 입력");
+          await expect(textInput).toHaveValue("테스트 입력");
         }
 
         // Test submit button functionality if it exists
@@ -83,19 +83,19 @@ test.describe('User Settings Journey', () => {
       expect(true).toBeTruthy();
     });
 
-    test('should handle form validation and API errors', async ({ page }) => {
+    test("should handle form validation and API errors", async ({ page }) => {
       // Setup new user and navigate to settings
-      await authHelper.mockNewUser({ email: 'testuser@janjum.com' });
-      await page.goto('/settings');
-      await page.waitForLoadState('networkidle');
+      await authHelper.mockNewUser({ email: "testuser@janjum.com" });
+      await page.goto("/settings");
+      await page.waitForLoadState("networkidle");
 
       // Verify page is accessible
-      const pageBody = page.locator('body');
+      const pageBody = page.locator("body");
       await expect(pageBody).toBeVisible();
 
       // Test error handling with any available form
       const formExists = await page
-        .locator('form')
+        .locator("form")
         .isVisible()
         .catch(() => false);
       const submitButton = page
@@ -117,7 +117,7 @@ test.describe('User Settings Journey', () => {
         }
 
         // Mock API error response
-        await authHelper.mockApiResponse(false, { error: 'Validation error' });
+        await authHelper.mockApiResponse(false, { error: "Validation error" });
 
         // Submit and check for error handling
         await submitButton.click();
@@ -131,37 +131,37 @@ test.describe('User Settings Journey', () => {
     });
   });
 
-  test.describe('Existing User Journey', () => {
-    test('should allow existing user to access settings', async ({ page }) => {
+  test.describe("Existing User Journey", () => {
+    test("should allow existing user to access settings", async ({ page }) => {
       // Mock existing user and navigate to settings
       await authHelper.mockExistingUser({
-        name: '기존 사용자',
-        handle: 'existing_user',
-        email: 'existing@janjum.com',
+        name: "기존 사용자",
+        handle: "existing_user",
+        email: "existing@janjum.com",
       });
 
-      await page.goto('/settings');
-      await page.waitForLoadState('networkidle');
+      await page.goto("/settings");
+      await page.waitForLoadState("networkidle");
 
       // Verify page is accessible
-      const pageBody = page.locator('body');
+      const pageBody = page.locator("body");
       await expect(pageBody).toBeVisible();
 
       // Success - existing user can access settings
       expect(true).toBeTruthy();
     });
 
-    test('should allow existing user to interact with settings form', async ({
+    test("should allow existing user to interact with settings form", async ({
       page,
     }) => {
       // Mock existing user
       await authHelper.mockExistingUser();
-      await page.goto('/settings');
-      await page.waitForLoadState('networkidle');
+      await page.goto("/settings");
+      await page.waitForLoadState("networkidle");
 
       // Test form interaction if available
       const formExists = await page
-        .locator('form')
+        .locator("form")
         .isVisible()
         .catch(() => false);
       const inputExists = await page
@@ -177,8 +177,8 @@ test.describe('User Settings Journey', () => {
           .first();
 
         if (await textInput.isVisible().catch(() => false)) {
-          await textInput.fill('updated_value');
-          await expect(textInput).toHaveValue('updated_value');
+          await textInput.fill("updated_value");
+          await expect(textInput).toHaveValue("updated_value");
         }
 
         const submitButton = page
@@ -194,16 +194,16 @@ test.describe('User Settings Journey', () => {
     });
   });
 
-  test.describe('Authentication Guards', () => {
-    test('should handle unauthenticated access to settings', async ({
+  test.describe("Authentication Guards", () => {
+    test("should handle unauthenticated access to settings", async ({
       page,
     }) => {
       // Try to access settings without authentication
-      await page.goto('/settings');
-      await page.waitForLoadState('networkidle');
+      await page.goto("/settings");
+      await page.waitForLoadState("networkidle");
 
       // Verify the page responds (doesn't crash)
-      const pageBody = page.locator('body');
+      const pageBody = page.locator("body");
       await expect(pageBody).toBeVisible();
 
       // Success - page handles unauthenticated access gracefully
@@ -211,17 +211,17 @@ test.describe('User Settings Journey', () => {
     });
   });
 
-  test.describe('Basic Settings Functionality', () => {
-    test('should provide basic settings page functionality', async ({
+  test.describe("Basic Settings Functionality", () => {
+    test("should provide basic settings page functionality", async ({
       page,
     }) => {
       // Test with authenticated new user
       await authHelper.mockNewUser();
-      await page.goto('/settings');
-      await page.waitForLoadState('networkidle');
+      await page.goto("/settings");
+      await page.waitForLoadState("networkidle");
 
       // Verify basic page accessibility
-      const pageBody = page.locator('body');
+      const pageBody = page.locator("body");
       await expect(pageBody).toBeVisible();
 
       // The fact that we can load the page without errors and see the body is sufficient

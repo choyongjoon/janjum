@@ -1,26 +1,26 @@
 export interface Nutritions {
-  servingSize?: number;
-  servingSizeUnit?: string;
+  caffeine?: number;
+  caffeineUnit?: string;
   calories?: number;
   caloriesUnit?: string;
   carbohydrates?: number;
   carbohydratesUnit?: string;
-  sugar?: number;
-  sugarUnit?: string;
-  protein?: number;
-  proteinUnit?: string;
-  fat?: number;
-  fatUnit?: string;
-  transFat?: number;
-  transFatUnit?: string;
-  saturatedFat?: number;
-  saturatedFatUnit?: string;
-  natrium?: number;
-  natriumUnit?: string;
   cholesterol?: number;
   cholesterolUnit?: string;
-  caffeine?: number;
-  caffeineUnit?: string;
+  fat?: number;
+  fatUnit?: string;
+  natrium?: number;
+  natriumUnit?: string;
+  protein?: number;
+  proteinUnit?: string;
+  saturatedFat?: number;
+  saturatedFatUnit?: string;
+  servingSize?: number;
+  servingSizeUnit?: string;
+  sugar?: number;
+  sugarUnit?: string;
+  transFat?: number;
+  transFatUnit?: string;
 }
 
 export const dailyStandardNutritions = {

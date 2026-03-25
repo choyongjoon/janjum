@@ -1,13 +1,13 @@
-import { convexQuery } from '@convex-dev/react-query';
-import { useQuery } from '@tanstack/react-query';
-import { createFileRoute, notFound } from '@tanstack/react-router';
-import { ProfileHeader } from '~/components/profile/ProfileHeader';
-import { ProfileReviews } from '~/components/profile/ProfileReviews';
-import { ProfileStats } from '~/components/profile/ProfileStats';
-import { api } from '../../convex/_generated/api';
-import { seo } from '../utils/seo';
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { createFileRoute, notFound } from "@tanstack/react-router";
+import { ProfileHeader } from "~/components/profile/ProfileHeader";
+import { ProfileReviews } from "~/components/profile/ProfileReviews";
+import { ProfileStats } from "~/components/profile/ProfileStats";
+import { api } from "../../convex/_generated/api";
+import { seo } from "../utils/seo";
 
-export const Route = createFileRoute('/user/$handle')({
+export const Route = createFileRoute("/user/$handle")({
   component: UserProfilePage,
   loader: (opts) => {
     // We can't use the context.queryClient here since we're in a loader
@@ -17,10 +17,10 @@ export const Route = createFileRoute('/user/$handle')({
   head: ({ loaderData }) => ({
     meta: [
       ...seo({
-        title: `@${loaderData?.handle || '사용자'}님의 프로필 | 잔점`,
-        description: `@${loaderData?.handle || '사용자'}님의 카페 음료 후기와 프로필을 확인하세요.`,
-        image: '/android-chrome-512x512.png',
-        keywords: '사용자 프로필, 후기, 잔점',
+        title: `@${loaderData?.handle || "사용자"}님의 프로필 | 잔점`,
+        description: `@${loaderData?.handle || "사용자"}님의 카페 음료 후기와 프로필을 확인하세요.`,
+        image: "/android-chrome-512x512.png",
+        keywords: "사용자 프로필, 후기, 잔점",
       }),
     ],
   }),
@@ -50,7 +50,7 @@ function UserProfilePage() {
     error: reviewsError,
   } = useQuery({
     ...convexQuery(api.reviews.getUserReviews, {
-      userId: user?._id || '',
+      userId: user?._id || "",
     }),
     enabled: !!user?._id,
   });
@@ -58,7 +58,7 @@ function UserProfilePage() {
   // Get user's rating statistics
   const { data: userStats, isLoading: statsLoading } = useQuery({
     ...convexQuery(api.reviews.getUserStats, {
-      userId: user?._id || '',
+      userId: user?._id || "",
     }),
     enabled: !!user?._id,
   });

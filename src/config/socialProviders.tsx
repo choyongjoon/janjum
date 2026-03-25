@@ -1,20 +1,20 @@
-export type SocialProvider = 'google' | 'kakao' | 'naver';
+export type SocialProvider = "google" | "kakao" | "naver";
 
 export interface SocialProviderConfig {
+  bgColor: string;
+  borderColor: string;
+  clerkStrategy: "oauth_google" | "oauth_custom_kakao" | "oauth_custom_naver";
+  icon: React.ReactNode;
   key: SocialProvider;
   name: string;
-  clerkStrategy: 'oauth_google' | 'oauth_custom_kakao' | 'oauth_custom_naver';
-  icon: React.ReactNode;
-  bgColor: string;
   textColor: string;
-  borderColor: string;
 }
 
 export const socialProviders: SocialProviderConfig[] = [
   {
-    key: 'google',
-    name: 'Google',
-    clerkStrategy: 'oauth_google',
+    key: "google",
+    name: "Google",
+    clerkStrategy: "oauth_google",
     icon: (
       <svg className="h-5 w-5" viewBox="0 0 24 24">
         <title>Google</title>
@@ -36,37 +36,37 @@ export const socialProviders: SocialProviderConfig[] = [
         />
       </svg>
     ),
-    bgColor: 'bg-white hover:bg-gray-50',
-    textColor: 'text-gray-900',
-    borderColor: 'border-gray-300',
+    bgColor: "bg-white hover:bg-gray-50",
+    textColor: "text-gray-900",
+    borderColor: "border-gray-300",
   },
   {
-    key: 'kakao',
-    name: '카카오',
-    clerkStrategy: 'oauth_custom_kakao',
+    key: "kakao",
+    name: "카카오",
+    clerkStrategy: "oauth_custom_kakao",
     icon: (
       <svg className="h-5 w-5" fill="#3C1E1E" viewBox="0 0 24 24">
         <title>Kakao</title>
         <path d="M12 3C7.03 3 3 6.44 3 10.61c0 2.61 1.67 4.93 4.19 6.29l-.99 3.66c-.09.33.19.59.49.43l4.36-2.75c.32.02.64.03.96.03 4.97 0 8.99-3.44 8.99-7.66C21 6.44 16.97 3 12 3z" />
       </svg>
     ),
-    bgColor: 'bg-[#FEE500] hover:bg-[#FFEB3B]',
-    textColor: 'text-[#3C1E1E]',
-    borderColor: 'border-[#FEE500]',
+    bgColor: "bg-[#FEE500] hover:bg-[#FFEB3B]",
+    textColor: "text-[#3C1E1E]",
+    borderColor: "border-[#FEE500]",
   },
   {
-    key: 'naver',
-    name: '네이버',
-    clerkStrategy: 'oauth_custom_naver',
+    key: "naver",
+    name: "네이버",
+    clerkStrategy: "oauth_custom_naver",
     icon: (
       <svg className="h-5 w-5" fill="white" viewBox="0 0 24 24">
         <title>Naver</title>
         <path d="M16.273 12.845 7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727v12.845z" />
       </svg>
     ),
-    bgColor: 'bg-[#03C75A] hover:bg-[#02B351]',
-    textColor: 'text-white',
-    borderColor: 'border-[#03C75A]',
+    bgColor: "bg-[#03C75A] hover:bg-[#02B351]",
+    textColor: "text-white",
+    borderColor: "border-[#03C75A]",
   },
 ];
 

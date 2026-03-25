@@ -1,15 +1,16 @@
-import { convexQuery, useConvexMutation } from '@convex-dev/react-query';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Id } from 'convex/_generated/dataModel';
-import { useEffect, useState } from 'react';
-import { usePostHogEvents } from '~/hooks/usePostHogEvents';
-import { api } from '../../../convex/_generated/api';
-import { RatingButtonGroup } from './RatingButtonGroup';
+import { convexQuery, useConvexMutation } from "@convex-dev/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { Id } from "convex/_generated/dataModel";
+import { useEffect, useState } from "react";
+import { usePostHogEvents } from "~/hooks/usePostHogEvents";
+import { showToast } from "~/utils/toast";
+import { api } from "../../../convex/_generated/api";
+import { RatingButtonGroup } from "./RatingButtonGroup";
 
 interface ReviewFormProps {
-  productId: Id<'products'>;
-  onSuccess?: () => void;
   onCancel?: () => void;
+  onSuccess?: () => void;
+  productId: Id<"products">;
 }
 
 export function ReviewForm({
@@ -21,9 +22,9 @@ export function ReviewForm({
   const queryClient = useQueryClient();
   const { trackReviewSubmit } = usePostHogEvents();
   const [rating, setRating] = useState<number>(0);
-  const [text, setText] = useState('');
+  const [text, setText] = useState("");
   const [images, setImages] = useState<File[]>([]);
-  const [imageStorageIds, setImageStorageIds] = useState<Id<'_storage'>[]>([]);
+  const [imageStorageIds, setImageStorageIds] = useState<Id<"_storage">[]>([]);
   const [existingImageUrls, setExistingImageUrls] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -31,7 +32,7 @@ export function ReviewForm({
   const { data: existingReview } = useQuery({
     ...convexQuery(api.reviews.getUserReview, {
       productId,
-      userId: currentUser?._id || '',
+      userId: currentUser?._id || "",
     }),
     enabled: !!currentUser?._id,
   });
@@ -40,7 +41,7 @@ export function ReviewForm({
   useEffect(() => {
     if (existingReview) {
       setRating(existingReview.rating);
-      setText(existingReview.text || '');
+      setText(existingReview.text || "");
       setImageStorageIds(existingReview.imageStorageIds || []);
       // We'll get image URLs from the review query that includes imageUrls
       setExistingImageUrls(existingReview.imageUrls || []);
@@ -52,14 +53,14 @@ export function ReviewForm({
   });
 
   const uploadImageMutation = useMutation({
-    mutationFn: async (file: File): Promise<Id<'_storage'>> => {
+    mutationFn: async (file: File): Promise<Id<"_storage">> => {
       // Get upload URL from Convex
       const uploadUrl = await generateUploadUrlMutation.mutateAsync({});
 
       // Upload file to Convex storage
       const result = await fetch(uploadUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': file.type },
+        method: "POST",
+        headers: { "Content-Type": file.type },
         body: file,
       });
 
@@ -68,7 +69,7 @@ export function ReviewForm({
       }
 
       const { storageId } = await result.json();
-      return storageId as Id<'_storage'>;
+      return storageId as Id<"_storage">;
     },
   });
 
@@ -84,7 +85,7 @@ export function ReviewForm({
     const files = Array.from(e.target.files || []);
     const totalImages = existingImageUrls.length + images.length;
     if (files.length + totalImages > 2) {
-      alert('최대 2장까지 업로드할 수 있습니다.');
+      showToast("최대 2장까지 업로드할 수 있습니다.", "error");
       return;
     }
     setImages((prev) => [...prev, ...files]);
@@ -103,12 +104,12 @@ export function ReviewForm({
     e.preventDefault();
 
     if (!currentUser) {
-      alert('후기를 작성하려면 로그인이 필요합니다.');
+      showToast("후기를 작성하려면 로그인이 필요합니다.", "error");
       return;
     }
 
     if (rating === 0) {
-      alert('평점을 선택해주세요.');
+      showToast("평점을 선택해주세요.", "error");
       return;
     }
 
@@ -147,7 +148,7 @@ export function ReviewForm({
       // Track successful review submission
       trackReviewSubmit(productId, rating);
     } catch {
-      alert('후기 등록에 실패했습니다. 다시 시도해주세요.');
+      showToast("후기 등록에 실패했습니다. 다시 시도해주세요.", "error");
     } finally {
       setIsUploading(false);
     }
@@ -175,7 +176,7 @@ export function ReviewForm({
     <div className="card bg-base-100 shadow-md">
       <div className="card-body">
         <h3 className="card-title">
-          {existingReview ? '후기 수정' : '후기 작성'}
+          {existingReview ? "후기 수정" : "후기 작성"}
         </h3>
 
         <form className="space-y-4" onSubmit={handleSubmit}>
@@ -225,12 +226,14 @@ export function ReviewForm({
                       <img
                         alt={`Review attachment ${index + 1}`}
                         className="h-full w-full object-cover"
+                        height={200}
                         src={imageUrl}
+                        width={200}
                       />
                     </div>
                     <button
                       aria-label="이미지 삭제"
-                      className="-top-2 -right-2 btn btn-circle btn-xs btn-error absolute"
+                      className="btn btn-circle btn-xs btn-error absolute -top-2 -right-2"
                       onClick={() => removeExistingImage(index)}
                       type="button"
                     >
@@ -249,12 +252,14 @@ export function ReviewForm({
                       <img
                         alt={`Upload preview ${index + 1}`}
                         className="h-full w-full object-cover"
+                        height={200}
                         src={URL.createObjectURL(file)}
+                        width={200}
                       />
                     </div>
                     <button
                       aria-label="이미지 삭제"
-                      className="-top-2 -right-2 btn btn-circle btn-xs btn-error absolute"
+                      className="btn btn-circle btn-xs btn-error absolute -top-2 -right-2"
                       onClick={() => removeNewImage(index)}
                       type="button"
                     >
@@ -297,7 +302,7 @@ export function ReviewForm({
               {isSubmitting && (
                 <span className="loading loading-spinner loading-sm" />
               )}
-              {existingReview ? '수정하기' : '등록하기'}
+              {existingReview ? "수정하기" : "등록하기"}
             </button>
           </div>
         </form>

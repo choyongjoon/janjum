@@ -1,17 +1,17 @@
-import { PlaywrightCrawler, type Request } from 'crawlee';
-import type { Locator, Page } from 'playwright';
-import { logger } from '../../shared/logger';
-import type { Nutritions } from '../../shared/nutritions';
-import { type Product, waitForLoad, writeProductsToJson } from './crawlerUtils';
+import { PlaywrightCrawler, type Request } from "crawlee";
+import type { Locator, Page } from "playwright";
+import { logger } from "../../shared/logger";
+import type { Nutritions } from "../../shared/nutritions";
+import { type Product, waitForLoad, writeProductsToJson } from "./crawlerUtils";
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
 // ================================================
 
 const SITE_CONFIG = {
-  baseUrl: 'https://www.mega-mgccoffee.com',
-  startUrl: 'https://www.mega-mgccoffee.com/menu/',
-  categoryUrlTemplate: 'https://www.mega-mgccoffee.com/menu/?menu_category1=',
+  baseUrl: "https://www.mega-mgccoffee.com",
+  startUrl: "https://www.mega-mgccoffee.com/menu/",
+  categoryUrlTemplate: "https://www.mega-mgccoffee.com/menu/?menu_category1=",
 } as const;
 
 // ================================================
@@ -31,27 +31,27 @@ const REGEX_PATTERNS = {
 
 const SELECTORS = {
   // Product container selectors (multiple strategies)
-  productContainers: ['ul#menu_list > li'],
+  productContainers: ["ul#menu_list > li"],
 
   // Product data selectors
   productData: {
-    name: '.cont_text_title',
-    nameEn: '.cont_text_info div.text1',
-    description: '.cont_text_info div.text2',
-    image: 'img',
+    name: ".cont_text_title",
+    nameEn: ".cont_text_info div.text1",
+    description: ".cont_text_info div.text2",
+    image: "img",
   },
 
   // Category discovery selectors
   categoryCheckboxes: [
     'input[name="list_checkbox"]',
-    '.category-filter input',
-    '.menu-category input',
+    ".category-filter input",
+    ".menu-category input",
     'input[type="checkbox"][data-category]',
   ],
 
   // Pagination selectors
   pagination: {
-    nextButton: '.board_page_next',
+    nextButton: ".board_page_next",
     loadMoreButton:
       'button:has-text("더보기"), .load-more, button:has-text("Load More")',
   },
@@ -62,12 +62,12 @@ const SELECTORS = {
 // ================================================
 
 // Test mode configuration
-const isTestMode = process.env.CRAWLER_TEST_MODE === 'true';
+const isTestMode = process.env.CRAWLER_TEST_MODE === "true";
 const maxProductsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS || '3', 10)
+  ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS || "3", 10)
   : Number.POSITIVE_INFINITY;
 const maxRequestsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || '10', 10)
+  ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || "10", 10)
   : 10;
 
 const CRAWLER_CONFIG = {
@@ -78,7 +78,7 @@ const CRAWLER_CONFIG = {
   maxPages: isTestMode ? 1 : 50, // Single page in test mode
   launchOptions: {
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
   },
 };
 
@@ -92,60 +92,60 @@ function parseServingInfo(servingInfo: string[], nutrition: Nutritions): void {
     const servingSizeMatch = info.match(REGEX_PATTERNS.modalServingSize);
     if (servingSizeMatch) {
       nutrition.servingSize = Number.parseFloat(servingSizeMatch[1]);
-      nutrition.servingSizeUnit = 'ml';
+      nutrition.servingSizeUnit = "ml";
     }
 
     const caloriesMatch = info.match(REGEX_PATTERNS.modalCalories);
     if (caloriesMatch) {
       nutrition.calories = Number.parseFloat(caloriesMatch[1]);
-      nutrition.caloriesUnit = 'kcal';
+      nutrition.caloriesUnit = "kcal";
     }
   }
 }
 
 // Helper function to parse individual nutrition item
 function parseNutritionItem(item: string, nutrition: Nutritions): void {
-  if (item.includes('포화지방')) {
+  if (item.includes("포화지방")) {
     const match = item.match(REGEX_PATTERNS.modalGrams);
     if (match) {
       nutrition.saturatedFat = Number.parseFloat(match[1]);
-      nutrition.saturatedFatUnit = 'g';
+      nutrition.saturatedFatUnit = "g";
     }
     return;
   }
 
-  if (item.includes('당류')) {
+  if (item.includes("당류")) {
     const match = item.match(REGEX_PATTERNS.modalGrams);
     if (match) {
       nutrition.sugar = Number.parseFloat(match[1]);
-      nutrition.sugarUnit = 'g';
+      nutrition.sugarUnit = "g";
     }
     return;
   }
 
-  if (item.includes('나트륨')) {
+  if (item.includes("나트륨")) {
     const match = item.match(REGEX_PATTERNS.modalMg);
     if (match) {
       nutrition.natrium = Number.parseFloat(match[1]);
-      nutrition.natriumUnit = 'mg';
+      nutrition.natriumUnit = "mg";
     }
     return;
   }
 
-  if (item.includes('단백질')) {
+  if (item.includes("단백질")) {
     const match = item.match(REGEX_PATTERNS.modalGrams);
     if (match) {
       nutrition.protein = Number.parseFloat(match[1]);
-      nutrition.proteinUnit = 'g';
+      nutrition.proteinUnit = "g";
     }
     return;
   }
 
-  if (item.includes('카페인')) {
+  if (item.includes("카페인")) {
     const match = item.match(REGEX_PATTERNS.modalMg);
     if (match) {
       nutrition.caffeine = Number.parseFloat(match[1]);
-      nutrition.caffeineUnit = 'mg';
+      nutrition.caffeineUnit = "mg";
     }
   }
 }
@@ -166,14 +166,14 @@ async function extractNutritionDataFromModal(
   productContainer: Locator
 ): Promise<Nutritions | null> {
   try {
-    logger.debug('Attempting to click product to open modal');
+    logger.debug("Attempting to click product to open modal");
 
     // Click on the product image to open modal
     const productImage = productContainer
       .locator(SELECTORS.productData.image)
       .first();
     if ((await productImage.count()) === 0) {
-      logger.debug('No product image found to click');
+      logger.debug("No product image found to click");
       return null;
     }
 
@@ -184,22 +184,22 @@ async function extractNutritionDataFromModal(
       timeout: 1000,
     });
 
-    logger.debug('Modal opened, extracting nutrition data');
+    logger.debug("Modal opened, extracting nutrition data");
 
     const innerModal = page.locator('.inner_modal[style*="display: block"]');
 
     // Extract serving info (size and calories)
     const servingInfo = await innerModal
-      .locator('.cont_text .cont_text_inner')
+      .locator(".cont_text .cont_text_inner")
       .allTextContents();
 
     // Extract nutrition items from the list
     const nutritionItems = await innerModal
-      .locator('.cont_list ul li')
+      .locator(".cont_list ul li")
       .allTextContents();
 
     if (servingInfo.length === 0 && nutritionItems.length === 0) {
-      logger.debug('No nutrition information found in modal');
+      logger.debug("No nutrition information found in modal");
       await closeModal(page);
       return null;
     }
@@ -212,11 +212,11 @@ async function extractNutritionDataFromModal(
     await closeModal(page);
 
     if (Object.keys(nutrition).length > 0) {
-      logger.debug('Successfully extracted nutrition data from modal');
+      logger.debug("Successfully extracted nutrition data from modal");
       return nutrition;
     }
 
-    logger.debug('No nutrition information found in modal');
+    logger.debug("No nutrition information found in modal");
     return null;
   } catch (error) {
     logger.debug(`Error extracting nutrition data from modal: ${error}`);
@@ -233,11 +233,11 @@ async function extractNutritionDataFromModal(
 // Helper function to close modal
 async function closeModal(page: Page): Promise<void> {
   try {
-    const closeButton = page.locator('.inner_modal .close');
+    const closeButton = page.locator(".inner_modal .close");
     if ((await closeButton.count()) > 0) {
       await closeButton.click();
       await page.waitForSelector('.inner_modal[style*="display: block"]', {
-        state: 'hidden',
+        state: "hidden",
         timeout: 1000,
       });
     }
@@ -245,7 +245,7 @@ async function closeModal(page: Page): Promise<void> {
     logger.debug(`Could not close modal: ${error}`);
     // Press escape as fallback
     try {
-      await page.keyboard.press('Escape');
+      await page.keyboard.press("Escape");
     } catch (escapeError) {
       logger.debug(`Could not press escape: ${escapeError}`);
     }
@@ -262,7 +262,7 @@ async function extractProductData(
         .locator(SELECTORS.productData.name)
         .first()
         .textContent()
-        .then((text) => text?.trim() || ''),
+        .then((text) => text?.trim() || ""),
       container
         .locator(SELECTORS.productData.nameEn)
         .first()
@@ -278,14 +278,14 @@ async function extractProductData(
       container
         .locator(SELECTORS.productData.image)
         .first()
-        .getAttribute('src')
+        .getAttribute("src")
         .then((src) => {
           if (!src) {
-            return '';
+            return "";
           }
-          return src.startsWith('/') ? `${SITE_CONFIG.baseUrl}${src}` : src;
+          return src.startsWith("/") ? `${SITE_CONFIG.baseUrl}${src}` : src;
         })
-        .catch(() => ''),
+        .catch(() => ""),
     ]);
 
     if (name && name.length > 0) {
@@ -295,15 +295,15 @@ async function extractProductData(
         description,
         price: null,
         externalImageUrl: imageUrl,
-        category: 'Drinks',
+        category: "Drinks",
         externalCategory: categoryName,
         externalId: `mega_${name}`,
-        externalUrl: '', // Will be filled by caller
+        externalUrl: "", // Will be filled by caller
         nutritions: undefined, // Will be filled when available
       };
     }
   } catch (error) {
-    logger.error('Error extracting product data:', error);
+    logger.error("Error extracting product data:", error);
   }
   return null;
 }
@@ -322,11 +322,11 @@ async function findMegaProductContainers(
     }
   }
 
-  logger.warn('No product containers found with any selector');
-  return { containers: null, usedSelector: 'none' };
+  logger.warn("No product containers found with any selector");
+  return { containers: null, usedSelector: "none" };
 }
 
-async function extractPageProducts(page: Page, categoryName = 'Default') {
+async function extractPageProducts(page: Page, categoryName = "Default") {
   const products: Product[] = [];
 
   const { containers: productContainers, usedSelector } =
@@ -392,9 +392,9 @@ async function extractMenuCategories(page: Page) {
       const checkboxPromises = Array.from({ length: count }, async (_, i) => {
         const checkbox = checkboxes.nth(i);
         const [value, name] = await Promise.all([
-          checkbox.getAttribute('value').then((v) => v || ''),
+          checkbox.getAttribute("value").then((v) => v || ""),
           checkbox
-            .locator('+ label, ~ label')
+            .locator("+ label, ~ label")
             .textContent()
             .then((t) => t?.trim() || `Category ${i + 1}`),
         ]);
@@ -422,8 +422,8 @@ async function extractMenuCategories(page: Page) {
   // If no categories found, use the main menu page
   if (categories.length === 0) {
     categories.push({
-      name: 'All Menu',
-      value: 'all',
+      name: "All Menu",
+      value: "all",
       url: SITE_CONFIG.startUrl,
     });
   }
@@ -439,14 +439,14 @@ async function handleMainMenuPage(
   page: Page,
   crawlerInstance: PlaywrightCrawler
 ) {
-  logger.info('Processing Mega MGC Coffee main menu page with pagination');
+  logger.info("Processing Mega MGC Coffee main menu page with pagination");
 
   await waitForLoad(page);
 
   // Try to discover categories
   const categories = await extractMenuCategories(page);
   logger.info(
-    `Found ${categories.length} categories: ${categories.map((c) => c.name).join(', ')}`
+    `Found ${categories.length} categories: ${categories.map((c) => c.name).join(", ")}`
   );
 
   let currentPage = 1;
@@ -459,7 +459,7 @@ async function handleMainMenuPage(
     await waitForLoad(page);
 
     // Extract products from the current page
-    const pageProducts = await extractPageProducts(page, 'All Menu');
+    const pageProducts = await extractPageProducts(page, "All Menu");
     logger.info(
       `Found ${pageProducts.products.length} products on page ${currentPage}`
     );
@@ -480,7 +480,7 @@ async function handleMainMenuPage(
     const nextButtonCount = await nextButton.count();
 
     if (nextButtonCount === 0) {
-      logger.info('No next page button found, pagination complete');
+      logger.info("No next page button found, pagination complete");
       break;
     }
 
@@ -488,16 +488,16 @@ async function handleMainMenuPage(
     const isDisabled = await nextButton
       .evaluate((el) => {
         return (
-          el.hasAttribute('disabled') ||
-          el.classList.contains('disabled') ||
-          el.style.display === 'none' ||
+          el.hasAttribute("disabled") ||
+          el.classList.contains("disabled") ||
+          el.style.display === "none" ||
           !(el as HTMLElement).offsetParent
         );
       })
       .catch(() => true);
 
     if (isDisabled) {
-      logger.info('Next page button is disabled, reached end of pagination');
+      logger.info("Next page button is disabled, reached end of pagination");
       break;
     }
 
@@ -530,7 +530,7 @@ async function handleMainMenuPage(
   // If we found categories, enqueue them for processing
   if (categories.length > 1) {
     const categoryRequests = categories
-      .filter((cat) => cat.value !== 'all')
+      .filter((cat) => cat.value !== "all")
       .map((category) => ({
         url: category.url,
         userData: {
@@ -633,7 +633,7 @@ export const createMegaCrawler = () =>
       const url = request.url;
 
       // Handle main menu page
-      if (url.includes('/menu/') && !request.userData?.isCategoryPage) {
+      if (url.includes("/menu/") && !request.userData?.isCategoryPage) {
         await handleMainMenuPage(page, crawlerInstance);
         return;
       }
@@ -655,9 +655,9 @@ export const runMegaCrawler = async () => {
   try {
     await crawler.run([SITE_CONFIG.startUrl]);
     const dataset = await crawler.getData();
-    await writeProductsToJson(dataset.items as Product[], 'mega');
+    await writeProductsToJson(dataset.items as Product[], "mega");
   } catch (error) {
-    logger.error('Mega crawler failed:', error);
+    logger.error("Mega crawler failed:", error);
     throw error;
   }
 };
@@ -665,7 +665,7 @@ export const runMegaCrawler = async () => {
 // Only run if this file is executed directly (not imported)
 if (import.meta.url === `file://${process.argv[1]}`) {
   runMegaCrawler().catch((error) => {
-    logger.error('Crawler execution failed:', error);
+    logger.error("Crawler execution failed:", error);
     process.exit(1);
   });
 }

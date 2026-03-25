@@ -1,19 +1,19 @@
-import dotenv from 'dotenv';
-import pino from 'pino';
+import dotenv from "dotenv";
+import pino from "pino";
 
-dotenv.config({ path: '.env.local' });
+dotenv.config({ path: ".env.local" });
 
 // Create logger with pretty printing in development
 const baseLogger = pino({
-  level: process.env.LOG_LEVEL || 'info',
+  level: process.env.LOG_LEVEL || "info",
   transport:
-    process.env.NODE_ENV === 'development'
+    process.env.NODE_ENV === "development"
       ? {
-          target: 'pino-pretty',
+          target: "pino-pretty",
           options: {
             colorize: true,
-            translateTime: 'HH:MM:ss Z',
-            ignore: 'pid,hostname',
+            translateTime: "HH:MM:ss Z",
+            ignore: "pid,hostname",
           },
         }
       : undefined,
@@ -29,7 +29,7 @@ function formatErrorMessage(message: string, error?: unknown): string {
     return `${message} ${error.message}`;
   }
 
-  if (typeof error === 'string') {
+  if (typeof error === "string") {
     return `${message} ${error}`;
   }
 
@@ -40,21 +40,21 @@ function formatErrorMessage(message: string, error?: unknown): string {
 const logger = {
   trace: (message: string) => baseLogger.trace(message),
   debug: (message: string, data?: Record<string, unknown>) => {
-    if (data && typeof data === 'object') {
+    if (data && typeof data === "object") {
       baseLogger.debug(data, message);
-    } else if (data !== undefined) {
-      baseLogger.debug(formatErrorMessage(message, data));
-    } else {
+    } else if (data === undefined) {
       baseLogger.debug(message);
+    } else {
+      baseLogger.debug(formatErrorMessage(message, data));
     }
   },
   info: (message: string, data?: Record<string, unknown>) => {
-    if (data && typeof data === 'object') {
+    if (data && typeof data === "object") {
       baseLogger.info(data, message);
-    } else if (data !== undefined) {
-      baseLogger.info(formatErrorMessage(message, data));
-    } else {
+    } else if (data === undefined) {
       baseLogger.info(message);
+    } else {
+      baseLogger.info(formatErrorMessage(message, data));
     }
   },
   warn: (message: string, error?: unknown) => {

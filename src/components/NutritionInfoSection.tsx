@@ -1,6 +1,6 @@
-import type { Nutritions } from '~/../../shared/nutritions';
-import { NutritionDialogButton } from './NutritionDialogButton';
-import { NutritionLevels } from './NutritionLevels';
+import type { Nutritions } from "~/../../shared/nutritions";
+import { NutritionDialogButton } from "./NutritionDialogButton";
+import { NutritionLevels } from "./NutritionLevels";
 
 export interface NutritionInfoSectionProps {
   nutritions?: Nutritions | null;

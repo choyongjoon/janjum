@@ -1,15 +1,15 @@
-import { convexQuery } from '@convex-dev/react-query';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '../../../convex/_generated/api';
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "../../../convex/_generated/api";
 
 interface ProfileImageUploadProps {
-  previewUrl: string;
   onImageChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  previewUrl: string;
 }
 
 interface ProfileImageProps {
-  previewUrl: string;
   currentUserImageUrl: string | undefined;
+  previewUrl: string;
 }
 
 function ProfileImage({ previewUrl, currentUserImageUrl }: ProfileImageProps) {
@@ -18,7 +18,9 @@ function ProfileImage({ previewUrl, currentUserImageUrl }: ProfileImageProps) {
       <img
         alt="새 프로필 이미지"
         className="h-full w-full object-cover"
+        height={96}
         src={previewUrl}
+        width={96}
       />
     );
   }
@@ -27,7 +29,9 @@ function ProfileImage({ previewUrl, currentUserImageUrl }: ProfileImageProps) {
       <img
         alt="현재 프로필 이미지"
         className="h-full w-full object-cover"
+        height={96}
         src={currentUserImageUrl}
+        width={96}
       />
     );
   }

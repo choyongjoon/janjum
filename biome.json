@@ -1,8 +1,12 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.1.2/schema.json",
-  "extends": ["ultracite"],
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "extends": [
+    "ultracite/biome/core",
+    "ultracite/biome/react",
+    "ultracite/biome/remix"
+  ],
   "files": {
-    "includes": ["**", "!**/_generated/**", "!**/*.gen.ts"]
+    "includes": ["!**/_generated", "!**/*.gen.ts"]
   },
   "linter": {
     "rules": {
@@ -11,11 +15,6 @@
       },
       "performance": {
         "noImgElement": "off"
-      },
-      "nursery": {
-        "noAwaitInLoop": "off",
-        "noUnknownAtRule": "off",
-        "noNoninteractiveElementInteractions": "off"
       },
       "style": {
         "noHeadElement": "off",

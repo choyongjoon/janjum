@@ -1,10 +1,10 @@
 export function showToast(
   message: string,
-  type: 'success' | 'error' = 'success'
+  type: "success" | "error" = "success"
 ) {
   // Create toast element using DaisyUI toast component
-  const toast = document.createElement('div');
-  toast.className = 'toast toast-top toast-end z-50';
+  const toast = document.createElement("div");
+  toast.className = "toast toast-top toast-end z-50";
 
   // Set content with DaisyUI alert
   toast.innerHTML = `

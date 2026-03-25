@@ -1,16 +1,16 @@
-import { convexQuery } from '@convex-dev/react-query';
-import { useSuspenseQuery } from '@tanstack/react-query';
-import { createFileRoute, Link } from '@tanstack/react-router';
-import type { Id } from 'convex/_generated/dataModel';
-import { NutritionInfoSection } from '~/components/NutritionInfoSection';
-import { RatingSummary } from '~/components/RatingSummary';
-import { api } from '../../convex/_generated/api';
-import { BackLink } from '../components/BackLink';
-import { ExternalLinkIcon } from '../components/icons';
-import { ReviewSection } from '../components/reviews/ReviewSection';
-import { seo } from '../utils/seo';
+import { convexQuery } from "@convex-dev/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import type { Id } from "convex/_generated/dataModel";
+import { NutritionInfoSection } from "~/components/NutritionInfoSection";
+import { RatingSummary } from "~/components/RatingSummary";
+import { api } from "../../convex/_generated/api";
+import { BackLink } from "../components/BackLink";
+import { ExternalLinkIcon } from "../components/icons/ExternalLinkIcon";
+import { ReviewSection } from "../components/reviews/ReviewSection";
+import { seo } from "../utils/seo";
 
-export const Route = createFileRoute('/product/$shortId')({
+export const Route = createFileRoute("/product/$shortId")({
   component: ProductPage,
   loader: async (opts) => {
     const product = await opts.context.queryClient.ensureQueryData(
@@ -20,7 +20,7 @@ export const Route = createFileRoute('/product/$shortId')({
     );
     await opts.context.queryClient.ensureQueryData(
       convexQuery(api.cafes.getById, {
-        cafeId: product?.cafeId as Id<'cafes'>,
+        cafeId: product?.cafeId as Id<"cafes">,
       })
     );
     return { product };
@@ -28,13 +28,13 @@ export const Route = createFileRoute('/product/$shortId')({
   head: ({ loaderData }) => ({
     meta: [
       ...seo({
-        title: `${loaderData?.product?.name || '상품'} | 잔점`,
+        title: `${loaderData?.product?.name || "상품"} | 잔점`,
         description:
           loaderData?.product?.description ||
-          `${loaderData?.product?.name || '상품'} 정보를 확인하세요.`,
+          `${loaderData?.product?.name || "상품"} 정보를 확인하세요.`,
         image:
           loaderData?.product?.externalImageUrl ||
-          '/android-chrome-512x512.png',
+          "/android-chrome-512x512.png",
       }),
     ],
   }),
@@ -50,12 +50,12 @@ function ProductPage() {
   );
 
   const { data: cafe } = useSuspenseQuery(
-    convexQuery(api.cafes.getById, { cafeId: product?.cafeId as Id<'cafes'> })
+    convexQuery(api.cafes.getById, { cafeId: product?.cafeId as Id<"cafes"> })
   );
 
   const { data: reviewStats } = useSuspenseQuery(
     convexQuery(api.reviews.getProductStats, {
-      productId: product?._id as Id<'products'>,
+      productId: product?._id as Id<"products">,
     })
   );
 
@@ -100,7 +100,7 @@ function ProductPage() {
             <div>
               <div className="mb-2 flex items-start justify-between gap-4">
                 <h1
-                  className={`break-keep font-bold text-3xl ${isActive ? '' : 'text-base-content/50'}`}
+                  className={`break-keep font-bold text-3xl ${isActive ? "" : "text-base-content/50"}`}
                 >
                   {product.name}
                 </h1>
@@ -147,20 +147,20 @@ function ProductPage() {
               <div>
                 <span className="text-base-content/60">등록일: </span>
                 <span className="inline-block w-21">
-                  {new Date(product.addedAt).toLocaleDateString('ko-KR')}
+                  {new Date(product.addedAt).toLocaleDateString("ko-KR")}
                 </span>
               </div>
               <div>
                 <span className="text-base-content/60">최종 수정일: </span>
                 <span className="inline-block w-21">
-                  {new Date(product.updatedAt).toLocaleDateString('ko-KR')}
+                  {new Date(product.updatedAt).toLocaleDateString("ko-KR")}
                 </span>
               </div>
               {product.removedAt && (
                 <div>
                   <span className="text-base-content/60">단종일: </span>
                   <span className="inline-block w-21">
-                    {new Date(product.removedAt).toLocaleDateString('ko-KR')}
+                    {new Date(product.removedAt).toLocaleDateString("ko-KR")}
                   </span>
                 </div>
               )}

@@ -1,26 +1,26 @@
-import { PlaywrightCrawler } from 'crawlee';
-import type { Locator, Page } from 'playwright';
-import { logger } from '../../shared/logger';
-import type { Nutritions } from '../../shared/nutritions';
+import { PlaywrightCrawler } from "crawlee";
+import type { Locator, Page } from "playwright";
+import { logger } from "../../shared/logger";
+import type { Nutritions } from "../../shared/nutritions";
 import {
   type Product,
   waitFor,
   waitForLoad,
   writeProductsToJson,
-} from './crawlerUtils';
+} from "./crawlerUtils";
 import {
   extractNutritionFromText,
   hasNutritionKeywords,
-} from './nutritionUtils';
+} from "./nutritionUtils";
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
 // ================================================
 
 const SITE_CONFIG = {
-  baseUrl: 'https://mo.twosome.co.kr',
-  startUrl: 'https://mo.twosome.co.kr/mn/menuInfoList.do',
-  productUrlTemplate: 'https://mo.twosome.co.kr/mn/menuInfoDetail.do?menuCd=',
+  baseUrl: "https://mo.twosome.co.kr",
+  startUrl: "https://mo.twosome.co.kr/mn/menuInfoList.do",
+  productUrlTemplate: "https://mo.twosome.co.kr/mn/menuInfoDetail.do?menuCd=",
 } as const;
 
 // ================================================
@@ -44,20 +44,20 @@ const SERVING_UNIT_REGEX = /(\d+(?:\.\d+)?)\s*(ml|g)/;
 
 const SELECTORS = {
   // Category navigation selectors
-  coffeeBeverage: '커피/음료', // getByText exact
-  categoryList: '#midUl',
-  categoryItems: '#midUl > li',
+  coffeeBeverage: "커피/음료", // getByText exact
+  categoryList: "#midUl",
+  categoryItems: "#midUl > li",
 
   // Product listing selectors
-  productListItems: 'ul.ui-goods-list-default > li',
-  productImg: '.thum-img > img',
-  productName: '.menu-title',
-  productLink: 'a', // get 'data' attribute for menu code
+  productListItems: "ul.ui-goods-list-default > li",
+  productImg: ".thum-img > img",
+  productName: ".menu-title",
+  productLink: "a", // get 'data' attribute for menu code
 
   // Product detail page selectors
-  productDescription: 'dl.menu-detail-info-title > dd',
-  productDetailName: '.menu-detail-info-title h1',
-  productDetailImg: '.menu-detail-img img',
+  productDescription: "dl.menu-detail-info-title > dd",
+  productDetailName: ".menu-detail-info-title h1",
+  productDetailImg: ".menu-detail-img img",
 } as const;
 
 // ================================================
@@ -65,12 +65,12 @@ const SELECTORS = {
 // ================================================
 
 // Test mode configuration
-const isTestMode = process.env.CRAWLER_TEST_MODE === 'true';
+const isTestMode = process.env.CRAWLER_TEST_MODE === "true";
 const maxProductsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS || '3', 10)
+  ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS || "3", 10)
   : Number.POSITIVE_INFINITY;
 const maxRequestsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || '10', 10)
+  ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || "10", 10)
   : 50;
 
 const CRAWLER_CONFIG = {
@@ -82,9 +82,9 @@ const CRAWLER_CONFIG = {
   launchOptions: {
     headless: true,
     args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
     ],
   },
 };
@@ -95,14 +95,14 @@ const CRAWLER_CONFIG = {
 
 // Helper function to debug DL elements
 async function _debugDlElements(page: Page, _menuCode: string): Promise<void> {
-  const allDlElements = page.locator('dl');
+  const allDlElements = page.locator("dl");
   const dlCount = await allDlElements.count();
   logger.info(`📊 Found ${dlCount} dl elements total`);
 
   // Debug: log all dl element classes to find the correct selector
   for (let i = 0; i < Math.min(dlCount, 5); i++) {
     const dlElement = allDlElements.nth(i);
-    const className = await dlElement.getAttribute('class');
+    const className = await dlElement.getAttribute("class");
     logger.info(`📋 dl[${i}] class: "${className}"`);
   }
 }
@@ -116,13 +116,13 @@ function getAlternativeNutritionSelectors(): string[] {
     'dt:has-text("당류")', // Look for DT elements with sugar
     'dl:has-text("열량")', // DL elements containing calories
     'dl:has-text("당류")', // DL elements containing sugar
-    'div.popup-cont', // Popup content areas
-    'div.popup-content', // Alternative popup content
+    "div.popup-cont", // Popup content areas
+    "div.popup-content", // Alternative popup content
     'div[class*="nutrition"]', // Any div with nutrition in class
     'div[class*="menu-detail"]', // Menu detail divs
     'table:has-text("열량")', // Tables containing nutrition
     'ul:has-text("열량")', // Lists containing nutrition
-    'dl', // Try all dl elements (last resort)
+    "dl", // Try all dl elements (last resort)
   ];
 }
 
@@ -163,7 +163,7 @@ async function tryAlternativeNutritionSelectors(
   page: Page,
   menuCode: string
 ): Promise<Nutritions | null> {
-  logger.info('🔍 Trying alternative selectors for nutrition data');
+  logger.info("🔍 Trying alternative selectors for nutrition data");
 
   const alternativeSelectors = getAlternativeNutritionSelectors();
 
@@ -193,7 +193,7 @@ async function tryDlElementsForNutrition(
   page: Page,
   menuCode: string
 ): Promise<Nutritions | null> {
-  const allDlElements = page.locator('dl');
+  const allDlElements = page.locator("dl");
   const dlCount = await allDlElements.count();
 
   // Try just 'dl' elements that might contain nutrition info
@@ -204,7 +204,7 @@ async function tryDlElementsForNutrition(
       logger.info(`📋 Found potential nutrition data in dl[${i}]`);
       const result = extractNutritionFromText(textContent);
       logger.info(
-        `📊 Alternative nutrition extraction result for ${menuCode}: ${result ? 'found data' : 'no data'}`
+        `📊 Alternative nutrition extraction result for ${menuCode}: ${result ? "found data" : "no data"}`
       );
       if (result) {
         return result;
@@ -220,10 +220,10 @@ async function tryPageBodyForNutrition(
   page: Page,
   menuCode: string
 ): Promise<Nutritions | null> {
-  logger.info('🔍 Searching entire page for nutrition keywords');
-  const bodyText = await page.locator('body').textContent();
-  if (bodyText && (bodyText.includes('칼로리') || bodyText.includes('kcal'))) {
-    logger.info('📋 Found nutrition keywords in page body');
+  logger.info("🔍 Searching entire page for nutrition keywords");
+  const bodyText = await page.locator("body").textContent();
+  if (bodyText && (bodyText.includes("칼로리") || bodyText.includes("kcal"))) {
+    logger.info("📋 Found nutrition keywords in page body");
     const result = extractNutritionFromText(bodyText);
     if (result) {
       logger.info(`📊 Extracted nutrition data from page body for ${menuCode}`);
@@ -248,9 +248,9 @@ async function extractNutritionDataFromDetailPage(
 
     // Click "확인" button to confirm nutrition popup
     try {
-      const confirmButton = page.getByText('확인');
+      const confirmButton = page.getByText("확인");
       if ((await confirmButton.count()) > 0) {
-        logger.info('🔘 Clicking 확인 button to reveal nutrition data');
+        logger.info("🔘 Clicking 확인 button to reveal nutrition data");
         await confirmButton.first().click();
         await page.waitForTimeout(1000);
       }
@@ -259,15 +259,15 @@ async function extractNutritionDataFromDetailPage(
     }
 
     // Debug: Check what elements are actually available
-    const allDlElements = await page.locator('dl').count();
-    const wrapperElements = await page.locator('.menu-detail-dl-wrap').count();
+    const allDlElements = await page.locator("dl").count();
+    const wrapperElements = await page.locator(".menu-detail-dl-wrap").count();
     logger.debug(
       `Debug - Found ${allDlElements} dl elements and ${wrapperElements} wrapper elements`
     );
 
     // Look for nutrition data in the structured DL elements
-    const _nutritionContainer = page.locator('.menu-detail-dl-wrap');
-    const nutritionElements = page.locator('.menu-detail-dl');
+    const _nutritionContainer = page.locator(".menu-detail-dl-wrap");
+    const nutritionElements = page.locator(".menu-detail-dl");
     const nutritionElementCount = await nutritionElements.count();
 
     logger.info(
@@ -276,12 +276,12 @@ async function extractNutritionDataFromDetailPage(
 
     // If no structured elements found, try direct text search for the values you showed
     if (nutritionElementCount === 0) {
-      logger.info('🔍 Trying to find nutrition data by direct text search');
+      logger.info("🔍 Trying to find nutrition data by direct text search");
       const pageContent = await page.content();
 
       // Look for the specific patterns from your HTML
-      if (pageContent.includes('1회 제공량') && pageContent.includes('열량')) {
-        logger.info('✅ Found nutrition keywords in page content');
+      if (pageContent.includes("1회 제공량") && pageContent.includes("열량")) {
+        logger.info("✅ Found nutrition keywords in page content");
 
         // Try to extract from page text using the exact patterns
         const nutrition: Nutritions = {};
@@ -297,42 +297,42 @@ async function extractNutritionDataFromDetailPage(
         const caloriesMatch = pageContent.match(CALORIES_REGEX);
         if (caloriesMatch) {
           nutrition.calories = Number.parseFloat(caloriesMatch[1]);
-          nutrition.caloriesUnit = 'kcal';
+          nutrition.caloriesUnit = "kcal";
         }
 
         // Extract sugar (27) - handle "27/27" format, take first number
         const sugarMatch = pageContent.match(SUGAR_REGEX);
         if (sugarMatch) {
           nutrition.sugar = Number.parseFloat(sugarMatch[1]);
-          nutrition.sugarUnit = 'g';
+          nutrition.sugarUnit = "g";
         }
 
         // Extract protein (9) - handle "9/9" format, take first number
         const proteinMatch = pageContent.match(PROTEIN_REGEX);
         if (proteinMatch) {
           nutrition.protein = Number.parseFloat(proteinMatch[1]);
-          nutrition.proteinUnit = 'g';
+          nutrition.proteinUnit = "g";
         }
 
         // Extract saturated fat (9) - handle "9/9" format, take first number
         const satFatMatch = pageContent.match(SATURATED_FAT_REGEX);
         if (satFatMatch) {
           nutrition.saturatedFat = Number.parseFloat(satFatMatch[1]);
-          nutrition.saturatedFatUnit = 'g';
+          nutrition.saturatedFatUnit = "g";
         }
 
         // Extract sodium (165) - handle "165/165" format, take first number
         const sodiumMatch = pageContent.match(SODIUM_REGEX);
         if (sodiumMatch) {
           nutrition.natrium = Number.parseFloat(sodiumMatch[1]);
-          nutrition.natriumUnit = 'mg';
+          nutrition.natriumUnit = "mg";
         }
 
         // Extract caffeine (184) - handle "184/184" format, take first number
         const caffeineMatch = pageContent.match(CAFFEINE_REGEX);
         if (caffeineMatch) {
           nutrition.caffeine = Number.parseFloat(caffeineMatch[1]);
-          nutrition.caffeineUnit = 'mg';
+          nutrition.caffeineUnit = "mg";
         }
 
         // Check if we extracted any nutrition data
@@ -374,8 +374,8 @@ async function extractNutritionDataFromDetailPage(
 
     for (let i = 0; i < nutritionElementCount; i++) {
       const dlElement = nutritionElements.nth(i);
-      const dt = await dlElement.locator('dt').textContent();
-      const dd = await dlElement.locator('dd').textContent();
+      const dt = await dlElement.locator("dt").textContent();
+      const dd = await dlElement.locator("dd").textContent();
 
       if (!(dt && dd)) {
         continue;
@@ -385,7 +385,7 @@ async function extractNutritionDataFromDetailPage(
       const value = dd.trim();
 
       // Parse serving size (1회 제공량 - 355ml)
-      if (label.includes('1회 제공량')) {
+      if (label.includes("1회 제공량")) {
         const match = value.match(SERVING_UNIT_REGEX);
         if (match) {
           nutrition.servingSize = Number.parseFloat(match[1]);
@@ -394,56 +394,56 @@ async function extractNutritionDataFromDetailPage(
       }
 
       // Parse calories (열량 - 290 Kcal)
-      else if (label.includes('열량')) {
+      else if (label.includes("열량")) {
         const match = value.match(NUMBER_REGEX);
         if (match) {
           nutrition.calories = Number.parseFloat(match[1]);
-          nutrition.caloriesUnit = 'kcal';
+          nutrition.caloriesUnit = "kcal";
         }
       }
 
       // Parse sugar (당류 - 27/27)
-      else if (label.includes('당류')) {
+      else if (label.includes("당류")) {
         const match = value.match(NUMBER_REGEX);
         if (match) {
           nutrition.sugar = Number.parseFloat(match[1]);
-          nutrition.sugarUnit = 'g';
+          nutrition.sugarUnit = "g";
         }
       }
 
       // Parse protein (단백질 - 9/16)
-      else if (label.includes('단백질')) {
+      else if (label.includes("단백질")) {
         const match = value.match(NUMBER_REGEX);
         if (match) {
           nutrition.protein = Number.parseFloat(match[1]);
-          nutrition.proteinUnit = 'g';
+          nutrition.proteinUnit = "g";
         }
       }
 
       // Parse saturated fat (포화지방 - 9/60)
-      else if (label.includes('포화지방')) {
+      else if (label.includes("포화지방")) {
         const match = value.match(NUMBER_REGEX);
         if (match) {
           nutrition.saturatedFat = Number.parseFloat(match[1]);
-          nutrition.saturatedFatUnit = 'g';
+          nutrition.saturatedFatUnit = "g";
         }
       }
 
       // Parse sodium (나트륨 - 165/8)
-      else if (label.includes('나트륨')) {
+      else if (label.includes("나트륨")) {
         const match = value.match(NUMBER_REGEX);
         if (match) {
           nutrition.natrium = Number.parseFloat(match[1]);
-          nutrition.natriumUnit = 'mg';
+          nutrition.natriumUnit = "mg";
         }
       }
 
       // Parse caffeine (카페인 - 184)
-      else if (label.includes('카페인')) {
+      else if (label.includes("카페인")) {
         const match = value.match(NUMBER_REGEX);
         if (match) {
           nutrition.caffeine = Number.parseFloat(match[1]);
-          nutrition.caffeineUnit = 'mg';
+          nutrition.caffeineUnit = "mg";
         }
       }
     }
@@ -472,7 +472,7 @@ async function extractCategoriesFromMenu(
   page: Page
 ): Promise<Array<{ name: string; element: Locator }>> {
   try {
-    logger.info('📄 Extracting categories from menu');
+    logger.info("📄 Extracting categories from menu");
 
     await waitForLoad(page);
 
@@ -489,15 +489,15 @@ async function extractCategoriesFromMenu(
       if (
         text?.trim() &&
         text.trim() !== SELECTORS.coffeeBeverage &&
-        text.trim() !== 'NEW'
+        text.trim() !== "NEW"
       ) {
         categories.push({
           name: text.trim(),
           element,
         });
         logger.info(`📋 Found category: ${text.trim()}`);
-      } else if (text?.trim() === 'NEW') {
-        logger.info('📋 Skipping NEW category');
+      } else if (text?.trim() === "NEW") {
+        logger.info("📋 Skipping NEW category");
       }
     }
 
@@ -564,34 +564,34 @@ async function extractProductsFromListing(
               container
                 .locator(SELECTORS.productName)
                 .textContent()
-                .then((text) => text?.trim() || ''),
+                .then((text) => text?.trim() || ""),
               container
                 .locator(SELECTORS.productLink)
-                .getAttribute('data')
+                .getAttribute("data")
                 .then((data) => {
                   if (!data) {
-                    return '';
+                    return "";
                   }
                   // Extract menu code from URL like "/mn/menuInfoDetail.do?menuCd=10192141"
                   const match = data.match(MENU_CODE_REGEX);
-                  return match ? match[1] : '';
+                  return match ? match[1] : "";
                 }),
               container
                 .locator(SELECTORS.productImg)
-                .getAttribute('src')
+                .getAttribute("src")
                 .then((src) => {
                   if (!src) {
-                    return '';
+                    return "";
                   }
-                  if (src.startsWith('http')) {
+                  if (src.startsWith("http")) {
                     return src;
                   }
-                  if (src.startsWith('/')) {
+                  if (src.startsWith("/")) {
                     return `${SITE_CONFIG.baseUrl}${src}`;
                   }
                   return `${SITE_CONFIG.baseUrl}/${src}`;
                 })
-                .catch(() => ''),
+                .catch(() => ""),
             ]);
 
             if (name && menuCode) {
@@ -640,7 +640,7 @@ function createBasicProduct(
     nameEn: null,
     description: null,
     price: null,
-    externalImageUrl: productInfo.imageUrl || '',
+    externalImageUrl: productInfo.imageUrl || "",
     category: null, // Category will be set later
     externalCategory: categoryName,
     externalId,
@@ -684,7 +684,7 @@ async function processProductWithNutrition(
     );
 
     logger.info(
-      `✅ Processed: ${product.name}${nutritions ? ' with nutrition data' : ' (no nutrition data found)'}`
+      `✅ Processed: ${product.name}${nutritions ? " with nutrition data" : " (no nutrition data found)"}`
     );
 
     return createdProduct;
@@ -731,12 +731,11 @@ async function pushProductsInBatches(
   }
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Complex menu parsing logic needs multiple nested conditions
 async function handleMainMenuPage(
   page: Page,
   crawlerInstance: PlaywrightCrawler
 ) {
-  logger.info('Processing main menu page to discover categories');
+  logger.info("Processing main menu page to discover categories");
 
   // Set longer navigation timeout for the page
   setupPageTimeouts(page);
@@ -746,7 +745,7 @@ async function handleMainMenuPage(
   const categories = await extractCategoriesFromMenu(page);
 
   if (categories.length === 0) {
-    logger.error('❌ No categories found');
+    logger.error("❌ No categories found");
     return;
   }
 
@@ -815,7 +814,7 @@ async function handleMainMenuPage(
         const productCodes = products
           .slice(0, 3)
           .map((p) => p.menuCode)
-          .join(', ');
+          .join(", ");
         logger.info(
           `🔍 First product codes in ${categoryName}: ${productCodes}`
         );
@@ -876,10 +875,10 @@ export const createTwosomeCrawler = () =>
 async function checkSiteAccessibility(url: string): Promise<boolean> {
   try {
     const response = await fetch(url, {
-      method: 'HEAD',
+      method: "HEAD",
       headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
       },
     });
     return response.ok || response.status === 403; // 403 might still allow crawler access
@@ -896,19 +895,19 @@ export const runTwosomeCrawler = async () => {
     const isAccessible = await checkSiteAccessibility(SITE_CONFIG.startUrl);
 
     if (!isAccessible) {
-      throw new Error('Primary URL is not accessible');
+      throw new Error("Primary URL is not accessible");
     }
 
     logger.info(`🌐 Starting crawler with URL: ${SITE_CONFIG.startUrl}`);
 
     await crawler.run([SITE_CONFIG.startUrl]);
     const dataset = await crawler.getData();
-    await writeProductsToJson(dataset.items as Product[], 'twosome');
+    await writeProductsToJson(dataset.items as Product[], "twosome");
 
     // Ensure proper cleanup and exit
     await crawler.teardown();
   } catch (error) {
-    logger.error('Twosome crawler failed:', error);
+    logger.error("Twosome crawler failed:", error);
     throw error;
   }
 };
@@ -917,11 +916,11 @@ export const runTwosomeCrawler = async () => {
 if (import.meta.url === `file://${process.argv[1]}`) {
   runTwosomeCrawler()
     .then(() => {
-      logger.info('Crawler completed successfully');
+      logger.info("Crawler completed successfully");
       process.exit(0);
     })
     .catch((error) => {
-      logger.error('Crawler execution failed:', error);
+      logger.error("Crawler execution failed:", error);
       process.exit(1);
     });
 }

@@ -1,9 +1,9 @@
-import { useRef } from 'react';
-import { SearchIcon } from '~/components/icons/SearchIcon';
+import { useRef } from "react";
+import { SearchIcon } from "~/components/icons/SearchIcon";
 
 interface ProductSearchInputProps {
-  value: string;
   onChange: (value: string) => void;
+  value: string;
 }
 
 export function ProductSearchInput({
@@ -29,7 +29,7 @@ export function ProductSearchInput({
           <button
             className="text-base-content/40"
             onClick={() => {
-              onChange('');
+              onChange("");
               inputRef.current?.focus();
             }}
             type="button"

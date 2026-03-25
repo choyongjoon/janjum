@@ -1,23 +1,23 @@
-import { PlaywrightCrawler } from 'crawlee';
-import type { Locator, Page } from 'playwright';
-import { logger } from '../../shared/logger';
-import type { Nutritions } from '../../shared/nutritions';
-import { type Product, waitForLoad, writeProductsToJson } from './crawlerUtils';
-import { extractNutritionFromText } from './nutritionUtils';
+import { PlaywrightCrawler } from "crawlee";
+import type { Locator, Page } from "playwright";
+import { logger } from "../../shared/logger";
+import type { Nutritions } from "../../shared/nutritions";
+import { type Product, waitForLoad, writeProductsToJson } from "./crawlerUtils";
+import { extractNutritionFromText } from "./nutritionUtils";
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
 // ================================================
 
 const SITE_CONFIG = {
-  baseUrl: 'https://www.baristapaulbassett.co.kr',
-  startUrl: 'https://www.baristapaulbassett.co.kr/menu/List.pb',
+  baseUrl: "https://www.baristapaulbassett.co.kr",
+  startUrl: "https://www.baristapaulbassett.co.kr/menu/List.pb",
   categoryUrls: [
-    'https://www.baristapaulbassett.co.kr/menu/List.pb?cid1=A', // COFFEE
-    'https://www.baristapaulbassett.co.kr/menu/List.pb?cid1=B', // BEVERAGE
-    'https://www.baristapaulbassett.co.kr/menu/List.pb?cid1=C', // ICE-CREAM
-    'https://www.baristapaulbassett.co.kr/menu/List.pb?cid1=D', // FOOD
-    'https://www.baristapaulbassett.co.kr/menu/List.pb?cid1=E', // PRODUCT
+    "https://www.baristapaulbassett.co.kr/menu/List.pb?cid1=A", // COFFEE
+    "https://www.baristapaulbassett.co.kr/menu/List.pb?cid1=B", // BEVERAGE
+    "https://www.baristapaulbassett.co.kr/menu/List.pb?cid1=C", // ICE-CREAM
+    "https://www.baristapaulbassett.co.kr/menu/List.pb?cid1=D", // FOOD
+    "https://www.baristapaulbassett.co.kr/menu/List.pb?cid1=E", // PRODUCT
   ],
 } as const;
 
@@ -31,15 +31,15 @@ const SELECTORS = {
 
   // Product data selectors
   productData: {
-    nameContainer: '.txtArea',
-    nameEn: '.txtArea .sTxt',
-    image: 'img',
-    productLink: 'a',
+    nameContainer: ".txtArea",
+    nameEn: ".txtArea .sTxt",
+    image: "img",
+    productLink: "a",
   },
 
   // Product detail page selectors
   productDetail: {
-    nutritional: '.nutritional',
+    nutritional: ".nutritional",
   },
 } as const;
 
@@ -55,12 +55,12 @@ const GO_VIEW_REGEX = /goView\s*\(\s*['"]([^'"]+)['"]\s*\)/;
 // ================================================
 
 // Test mode configuration
-const isTestMode = process.env.CRAWLER_TEST_MODE === 'true';
+const isTestMode = process.env.CRAWLER_TEST_MODE === "true";
 const maxProductsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS || '3', 10)
+  ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS || "3", 10)
   : Number.POSITIVE_INFINITY;
 const maxRequestsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || '10', 10)
+  ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || "10", 10)
   : 100;
 
 const CRAWLER_CONFIG = {
@@ -70,7 +70,7 @@ const CRAWLER_CONFIG = {
   requestHandlerTimeoutSecs: isTestMode ? 20 : 30,
   launchOptions: {
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
   },
 };
 
@@ -93,18 +93,18 @@ async function extractNutritionFromItem(
 
     if (nutritionalCount > 0) {
       logger.debug(
-        'Found .nutritional selector within item, extracting nutrition data'
+        "Found .nutritional selector within item, extracting nutrition data"
       );
       const nutritionText = await nutritionalElement
         .textContent()
-        .catch(() => '');
+        .catch(() => "");
 
       if (nutritionText) {
         logger.debug(`Nutrition text from item: ${nutritionText}`);
         const nutrition = extractNutritionFromText(nutritionText);
         if (nutrition) {
           logger.info(
-            'Successfully extracted nutrition data from item .nutritional'
+            "Successfully extracted nutrition data from item .nutritional"
           );
           return nutrition;
         }
@@ -116,7 +116,7 @@ async function extractNutritionFromItem(
     return null;
   } catch (error) {
     logger.debug(
-      'Failed to extract nutrition data from Paul Bassett item:',
+      "Failed to extract nutrition data from Paul Bassett item:",
       error as Record<string, unknown>
     );
     return null;
@@ -124,7 +124,6 @@ async function extractNutritionFromItem(
 }
 
 // Extract nutrition data from product detail page
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: refactor later
 async function extractNutritionFromDetailPage(
   page: Page,
   productUrl: string,
@@ -137,14 +136,14 @@ async function extractNutritionFromDetailPage(
 
     // Try multiple selectors for nutrition information
     const nutritionSelectors = [
-      '.nutritional',
-      '.nutrition-info',
-      '.product-nutrition',
+      ".nutritional",
+      ".nutrition-info",
+      ".product-nutrition",
       '[class*="nutrition"]',
       'table:has-text("칼로리")',
       'div:has-text("영양")',
       'div:has-text("칼로리")',
-      '.product-detail .nutrition',
+      ".product-detail .nutrition",
     ];
 
     for (const selector of nutritionSelectors) {
@@ -158,13 +157,13 @@ async function extractNutritionFromDetailPage(
           // Try to extract from all matching elements
           for (let i = 0; i < count; i++) {
             const element = elements.nth(i);
-            const textContent = await element.textContent().catch(() => '');
+            const textContent = await element.textContent().catch(() => "");
 
             if (
               textContent &&
-              (textContent.includes('칼로리') ||
-                textContent.includes('영양') ||
-                textContent.includes('kcal'))
+              (textContent.includes("칼로리") ||
+                textContent.includes("영양") ||
+                textContent.includes("kcal"))
             ) {
               logger.info(`🔍 Found nutrition text in element ${i}`);
               const nutrition = extractNutritionFromText(textContent);
@@ -198,17 +197,17 @@ async function extractNutritionFromDetailPage(
 
 // Map category IDs to category names and types
 const CATEGORY_MAP = {
-  A: { name: 'COFFEE', type: 'Coffee' },
-  B: { name: 'BEVERAGE', type: 'Beverage' },
-  C: { name: 'ICE-CREAM', type: 'Dessert' },
-  D: { name: 'FOOD', type: 'Food' },
-  E: { name: 'PRODUCT', type: 'Product' },
-  default: { name: 'COFFEE', type: 'Coffee' },
+  A: { name: "COFFEE", type: "Coffee" },
+  B: { name: "BEVERAGE", type: "Beverage" },
+  C: { name: "ICE-CREAM", type: "Dessert" },
+  D: { name: "FOOD", type: "Food" },
+  E: { name: "PRODUCT", type: "Product" },
+  default: { name: "COFFEE", type: "Coffee" },
 } as const;
 
 function getCategoryFromUrl(url: string): { name: string; type: string } {
   const urlObj = new URL(url);
-  const cid1 = urlObj.searchParams.get('cid1');
+  const cid1 = urlObj.searchParams.get("cid1");
   return (
     CATEGORY_MAP[cid1 as keyof typeof CATEGORY_MAP] || CATEGORY_MAP.default
   );
@@ -226,40 +225,40 @@ async function extractProductFromItem(
       .first();
     const fullNameText = await nameContainerElement
       .textContent()
-      .then((text) => text?.trim() || '')
-      .catch(() => '');
+      .then((text) => text?.trim() || "")
+      .catch(() => "");
 
     // Extract English name from the span element
     const nameEnElement = item.locator(SELECTORS.productData.nameEn).first();
     const nameEn = await nameEnElement
       .textContent()
-      .then((text) => text?.trim() || '')
-      .catch(() => '');
+      .then((text) => text?.trim() || "")
+      .catch(() => "");
 
     // Get Korean name by removing the English part from the full text
     const name = nameEn
-      ? fullNameText.replace(nameEn, '').trim()
+      ? fullNameText.replace(nameEn, "").trim()
       : fullNameText;
 
     // Extract image src
     const imageSrc = await item
       .locator(SELECTORS.productData.image)
       .first()
-      .getAttribute('src')
-      .catch(() => '');
+      .getAttribute("src")
+      .catch(() => "");
 
     // Extract product detail page URL
     const productLink = await item
       .locator(SELECTORS.productData.productLink)
       .first()
-      .getAttribute('href')
-      .catch(() => '');
+      .getAttribute("href")
+      .catch(() => "");
 
     // Extract product ID from onclick or data attributes for detail page URL
-    let productDetailUrl = '';
-    let productId = '';
+    let productDetailUrl = "";
+    let productId = "";
 
-    if (productLink && productLink !== '#') {
+    if (productLink && productLink !== "#") {
       // Use the actual link if it's not "#"
       productDetailUrl = new URL(productLink, SITE_CONFIG.baseUrl).href;
     } else {
@@ -269,11 +268,11 @@ async function extractProductFromItem(
         const onclickAttr = await item
           .locator(SELECTORS.productData.productLink)
           .first()
-          .getAttribute('onclick')
-          .catch(() => '');
+          .getAttribute("onclick")
+          .catch(() => "");
 
         // Debug: Log onclick attribute for first product
-        if (name === '오렌지플로우 피즈프레소') {
+        if (name === "오렌지플로우 피즈프레소") {
           logger.info(`🔍 Debug: onclick attribute: "${onclickAttr}"`);
         }
 
@@ -281,22 +280,22 @@ async function extractProductFromItem(
         const dpidMatch = onclickAttr?.match(GO_VIEW_REGEX);
         if (dpidMatch) {
           productId = dpidMatch[1];
-          if (name === '오렌지플로우 피즈프레소') {
+          if (name === "오렌지플로우 피즈프레소") {
             logger.info(`🔍 Debug: extracted dpid: "${productId}"`);
           }
         } else {
           // Try to extract from other attributes or generate based on naming
           // For now, generate a mock dpid based on product name
-          const cleanName = (nameEn || name).replace(/[^a-zA-Z0-9]/g, '');
+          const cleanName = (nameEn || name).replace(/[^a-zA-Z0-9]/g, "");
           productId = `PB${cleanName.substring(0, 6).toUpperCase()}00`;
         }
 
         // Construct proper detail page URL
         const categoryId =
-          getCategoryFromUrl(pageUrl).name === 'COFFEE' ? 'A' : 'B';
+          getCategoryFromUrl(pageUrl).name === "COFFEE" ? "A" : "B";
         productDetailUrl = `${SITE_CONFIG.baseUrl}/menu/View.pb?cid1=${categoryId}&cid2=&dpid=${productId}`;
 
-        if (name === '오렌지플로우 피즈프레소') {
+        if (name === "오렌지플로우 피즈프레소") {
           logger.info(`🔍 Debug: final URL: "${productDetailUrl}"`);
         }
       } catch (error) {
@@ -305,10 +304,10 @@ async function extractProductFromItem(
           error as Record<string, unknown>
         );
         // Fallback: generate mock dpid
-        const cleanName = (nameEn || name).replace(/[^a-zA-Z0-9]/g, '');
+        const cleanName = (nameEn || name).replace(/[^a-zA-Z0-9]/g, "");
         productId = `PB${cleanName.substring(0, 6).toUpperCase()}00`;
         const categoryId =
-          getCategoryFromUrl(pageUrl).name === 'COFFEE' ? 'A' : 'B';
+          getCategoryFromUrl(pageUrl).name === "COFFEE" ? "A" : "B";
         productDetailUrl = `${SITE_CONFIG.baseUrl}/menu/View.pb?cid1=${categoryId}&cid2=&dpid=${productId}`;
       }
     }
@@ -321,10 +320,10 @@ async function extractProductFromItem(
     // This is handled separately in the extraction pipeline
 
     // Check for status labels (New/Best)
-    const fullText = (await item.textContent().catch(() => '')) || '';
-    const hasNewLabel = fullText.includes('[New]') || fullText.includes('NEW');
+    const fullText = (await item.textContent().catch(() => "")) || "";
+    const hasNewLabel = fullText.includes("[New]") || fullText.includes("NEW");
     const hasBestLabel =
-      fullText.includes('[Best]') || fullText.includes('BEST');
+      fullText.includes("[Best]") || fullText.includes("BEST");
 
     if (!name || name.length <= 2) {
       return null; // Filter out empty or very short names
@@ -333,11 +332,11 @@ async function extractProductFromItem(
     // Determine category from URL
     const categoryInfo = getCategoryFromUrl(pageUrl);
 
-    let description = '';
+    let description = "";
     if (hasNewLabel) {
-      description = 'New Product';
+      description = "New Product";
     } else if (hasBestLabel) {
-      description = 'Best Seller';
+      description = "Best Seller";
     }
 
     const product: Product = {
@@ -346,25 +345,25 @@ async function extractProductFromItem(
       description,
       externalCategory: categoryInfo.name,
       externalId: (nameEn || name)
-        .replace(/\s+/g, '-')
+        .replace(/\s+/g, "-")
         .toLowerCase()
-        .replace(EXTERNAL_ID_REGEX, ''),
+        .replace(EXTERNAL_ID_REGEX, ""),
       externalImageUrl: imageSrc
         ? new URL(imageSrc, SITE_CONFIG.baseUrl).href
-        : '',
+        : "",
       externalUrl: productDetailUrl || pageUrl,
       price: null,
       category: categoryInfo.type,
       nutritions,
     };
 
-    let statusInfo = '';
+    let statusInfo = "";
     if (hasNewLabel) {
-      statusInfo = ' [New]';
+      statusInfo = " [New]";
     } else if (hasBestLabel) {
-      statusInfo = ' [Best]';
+      statusInfo = " [Best]";
     }
-    const nutritionInfo = nutritions ? ' with nutrition data' : '';
+    const nutritionInfo = nutritions ? " with nutrition data" : "";
     logger.info(
       `✅ Extracted [${categoryInfo.name}]: ${product.name}${statusInfo}${nutritionInfo}`
     );
@@ -388,15 +387,15 @@ async function _extractProductDetailsFromPage(
 
     // Extract detailed information from product page
     const name = basicInfo.name;
-    const nameEn = ''; // Extract from page if available
-    const description = ''; // Extract from page if available
+    const nameEn = ""; // Extract from page if available
+    const description = ""; // Extract from page if available
 
     // Extract image (update selector as needed)
     const imageSrc = await page
-      .locator('img')
+      .locator("img")
       .first()
-      .getAttribute('src')
-      .catch(() => '');
+      .getAttribute("src")
+      .catch(() => "");
 
     // Extract nutrition data (currently not available on Paul Bassett pages)
     const nutritions: Nutritions | null = null;
@@ -407,12 +406,12 @@ async function _extractProductDetailsFromPage(
       description,
       externalCategory: basicInfo.categoryInfo.name,
       externalId: name
-        .replace(/\s+/g, '-')
+        .replace(/\s+/g, "-")
         .toLowerCase()
-        .replace(EXTERNAL_ID_REGEX, ''),
+        .replace(EXTERNAL_ID_REGEX, ""),
       externalImageUrl: imageSrc
         ? new URL(imageSrc, SITE_CONFIG.baseUrl).href
-        : '',
+        : "",
       externalUrl: basicInfo.productUrl,
       price: null,
       category: basicInfo.categoryInfo.type,
@@ -503,7 +502,7 @@ async function extractProductsFromPage(page: Page): Promise<Product[]> {
 // ================================================
 
 async function handleMenuPage(page: Page, crawlerInstance: PlaywrightCrawler) {
-  logger.info('Processing Paul Bassett menu page');
+  logger.info("Processing Paul Bassett menu page");
 
   await waitForLoad(page);
   // Debug screenshot removed for performance
@@ -546,15 +545,15 @@ export const runPaulBassettCrawler = async () => {
       ? [SITE_CONFIG.startUrl]
       : SITE_CONFIG.categoryUrls;
     logger.info(
-      `Crawling ${urlsToCrawl.length} category pages${isTestMode ? ' (test mode - main page only)' : ''}`
+      `Crawling ${urlsToCrawl.length} category pages${isTestMode ? " (test mode - main page only)" : ""}`
     );
 
     await crawler.run(urlsToCrawl);
     const dataset = await crawler.getData();
-    await writeProductsToJson(dataset.items as Product[], 'paulbassett');
+    await writeProductsToJson(dataset.items as Product[], "paulbassett");
   } catch (error) {
     logger.error(
-      'Paul Bassett crawler failed:',
+      "Paul Bassett crawler failed:",
       error as Record<string, unknown>
     );
     throw error;
@@ -564,7 +563,7 @@ export const runPaulBassettCrawler = async () => {
 // Only run if this file is executed directly (not imported)
 if (import.meta.url === `file://${process.argv[1]}`) {
   runPaulBassettCrawler().catch((error) => {
-    logger.error('Crawler execution failed:', error as Record<string, unknown>);
+    logger.error("Crawler execution failed:", error as Record<string, unknown>);
     process.exit(1);
   });
 }

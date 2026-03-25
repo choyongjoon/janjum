@@ -1,22 +1,22 @@
-import { PlaywrightCrawler } from 'crawlee';
-import type { Page } from 'playwright';
-import { logger } from '../../shared/logger';
-import type { Nutritions } from '../../shared/nutritions';
+import { PlaywrightCrawler } from "crawlee";
+import type { Page } from "playwright";
+import { logger } from "../../shared/logger";
+import type { Nutritions } from "../../shared/nutritions";
 import {
   type Product,
   waitFor,
   waitForLoad,
   writeProductsToJson,
-} from './crawlerUtils';
+} from "./crawlerUtils";
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
 // ================================================
 
 const SITE_CONFIG = {
-  baseUrl: 'https://www.lotteeatz.com',
-  brandPage: 'https://www.lotteeatz.com/brand/angel',
-  brandCode: 'ANGELINUS',
+  baseUrl: "https://www.lotteeatz.com",
+  brandPage: "https://www.lotteeatz.com/brand/angel",
+  brandCode: "ANGELINUS",
 } as const;
 
 const REP_CODE_REGEX = /goBrandDetail\('(REP_\w+)'\)/;
@@ -28,9 +28,9 @@ const PRICE_REGEX = /[\d,]+/;
 // CRAWLER CONFIGURATION
 // ================================================
 
-const isTestMode = process.env.CRAWLER_TEST_MODE === 'true';
+const isTestMode = process.env.CRAWLER_TEST_MODE === "true";
 const maxProductsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS ?? '3', 10)
+  ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS ?? "3", 10)
   : Number.POSITIVE_INFINITY;
 
 const CRAWLER_CONFIG = {
@@ -42,9 +42,9 @@ const CRAWLER_CONFIG = {
   launchOptions: {
     headless: true,
     args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
     ],
   },
 };
@@ -58,9 +58,9 @@ function extractRepCode(onclick: string): string | null {
 }
 
 function extractBgImageUrl(style: string): string {
-  const raw = style.match(BG_IMAGE_URL_REGEX)?.[1] ?? '';
+  const raw = style.match(BG_IMAGE_URL_REGEX)?.[1] ?? "";
   // Strip cloudinary/dims resizing suffix to get original image
-  return raw.replace(IMAGE_DIMS_SUFFIX_REGEX, '');
+  return raw.replace(IMAGE_DIMS_SUFFIX_REGEX, "");
 }
 
 function parsePrice(text: string): number | null {
@@ -68,7 +68,7 @@ function parsePrice(text: string): number | null {
   if (!m) {
     return null;
   }
-  return Number.parseInt(m[0].replace(/,/g, ''), 10);
+  return Number.parseInt(m[0].replace(/,/g, ""), 10);
 }
 
 function buildProductUrl(repCode: string): string {
@@ -80,8 +80,8 @@ function buildProductUrl(repCode: string): string {
 // ================================================
 
 interface DiscoveredProduct {
-  repCode: string;
   categoryName: string;
+  repCode: string;
 }
 
 async function discoverProductsFromBrandPage(
@@ -94,14 +94,14 @@ async function discoverProductsFromBrandPage(
   const seenCodes = new Set<string>();
 
   // Get all category tabs: .tab-item elements, category name from .tab-text span
-  const tabItems = await page.locator('#categoryList .tab-item').all();
+  const tabItems = await page.locator("#categoryList .tab-item").all();
   logger.info(`Found ${tabItems.length} category tabs`);
 
   const tabsToProcess = isTestMode ? tabItems.slice(0, 2) : tabItems;
 
   for (const tabItem of tabsToProcess) {
     const categoryName =
-      (await tabItem.locator('.tab-text').textContent())?.trim() ?? '기타';
+      (await tabItem.locator(".tab-text").textContent())?.trim() ?? "기타";
 
     logger.info(`Processing category: ${categoryName}`);
 
@@ -117,7 +117,7 @@ async function discoverProductsFromBrandPage(
     logger.info(`  Found ${productLinks.length} products in ${categoryName}`);
 
     for (const link of productLinks) {
-      const onclick = (await link.getAttribute('onclick')) ?? '';
+      const onclick = (await link.getAttribute("onclick")) ?? "";
       const repCode = extractRepCode(onclick);
       if (!repCode || seenCodes.has(repCode)) {
         continue;
@@ -143,7 +143,7 @@ async function discoverProductsFromBrandPage(
 async function extractNutritionFromTable(
   page: Page
 ): Promise<Nutritions | null> {
-  const rows = await page.locator('table.tbl-row-info tr').all();
+  const rows = await page.locator("table.tbl-row-info tr").all();
   if (rows.length === 0) {
     return null;
   }
@@ -151,51 +151,51 @@ async function extractNutritionFromTable(
   const nutrition: Nutritions = {};
 
   for (const row of rows) {
-    const label = (await row.locator('th').textContent())?.trim() ?? '';
-    const value = (await row.locator('td').textContent())?.trim() ?? '';
+    const label = (await row.locator("th").textContent())?.trim() ?? "";
+    const value = (await row.locator("td").textContent())?.trim() ?? "";
 
     if (!(label && value)) {
       continue;
     }
 
-    const num = Number.parseFloat(value.replace(/[^\d.]/g, ''));
+    const num = Number.parseFloat(value.replace(/[^\d.]/g, ""));
     if (Number.isNaN(num)) {
       continue;
     }
 
-    if (label.includes('총중량') || label.includes('제공량')) {
+    if (label.includes("총중량") || label.includes("제공량")) {
       nutrition.servingSize = num;
-      nutrition.servingSizeUnit = value.includes('ml') ? 'ml' : 'g';
-    } else if (label.includes('열량') || label.includes('칼로리')) {
+      nutrition.servingSizeUnit = value.includes("ml") ? "ml" : "g";
+    } else if (label.includes("열량") || label.includes("칼로리")) {
       nutrition.calories = num;
-      nutrition.caloriesUnit = 'kcal';
-    } else if (label.includes('탄수화물')) {
+      nutrition.caloriesUnit = "kcal";
+    } else if (label.includes("탄수화물")) {
       nutrition.carbohydrates = num;
-      nutrition.carbohydratesUnit = 'g';
-    } else if (label.includes('당류')) {
+      nutrition.carbohydratesUnit = "g";
+    } else if (label.includes("당류")) {
       nutrition.sugar = num;
-      nutrition.sugarUnit = 'g';
-    } else if (label.includes('단백질')) {
+      nutrition.sugarUnit = "g";
+    } else if (label.includes("단백질")) {
       nutrition.protein = num;
-      nutrition.proteinUnit = 'g';
-    } else if (label.includes('포화지방')) {
+      nutrition.proteinUnit = "g";
+    } else if (label.includes("포화지방")) {
       nutrition.saturatedFat = num;
-      nutrition.saturatedFatUnit = 'g';
-    } else if (label.includes('트랜스')) {
+      nutrition.saturatedFatUnit = "g";
+    } else if (label.includes("트랜스")) {
       nutrition.transFat = num;
-      nutrition.transFatUnit = 'g';
-    } else if (label.includes('지방')) {
+      nutrition.transFatUnit = "g";
+    } else if (label.includes("지방")) {
       nutrition.fat = num;
-      nutrition.fatUnit = 'g';
-    } else if (label.includes('나트륨')) {
+      nutrition.fatUnit = "g";
+    } else if (label.includes("나트륨")) {
       nutrition.natrium = num;
-      nutrition.natriumUnit = 'mg';
-    } else if (label.includes('콜레스테롤')) {
+      nutrition.natriumUnit = "mg";
+    } else if (label.includes("콜레스테롤")) {
       nutrition.cholesterol = num;
-      nutrition.cholesterolUnit = 'mg';
-    } else if (label.includes('카페인')) {
+      nutrition.cholesterolUnit = "mg";
+    } else if (label.includes("카페인")) {
       nutrition.caffeine = num;
-      nutrition.caffeineUnit = 'mg';
+      nutrition.caffeineUnit = "mg";
     }
   }
 
@@ -211,7 +211,7 @@ async function extractProductFromDetailPage(
   await waitFor(1000);
 
   // Name: .prod-tit text — must exclude the .chk-bookmark child
-  const nameEl = page.locator('.prod-detail-header .prod-tit').first();
+  const nameEl = page.locator(".prod-detail-header .prod-tit").first();
   if ((await nameEl.count()) === 0) {
     logger.warn(`No .prod-tit found for ${repCode}`);
     return null;
@@ -222,8 +222,8 @@ async function extractProductFromDetailPage(
       (n) => n.nodeType === Node.TEXT_NODE
     );
     return textNodes
-      .map((n) => n.textContent ?? '')
-      .join('')
+      .map((n) => n.textContent ?? "")
+      .join("")
       .trim();
   });
 
@@ -235,24 +235,24 @@ async function extractProductFromDetailPage(
   // Image: background-image from .thumb-img style
   const thumbStyle =
     (await page
-      .locator('.cont-prod-detail .thumb-img')
+      .locator(".cont-prod-detail .thumb-img")
       .first()
-      .getAttribute('style')) ?? '';
+      .getAttribute("style")) ?? "";
   const externalImageUrl = extractBgImageUrl(thumbStyle);
 
   // Description: p.btext
-  const descEl = page.locator('p.btext').first();
+  const descEl = page.locator("p.btext").first();
   const description =
     (await descEl.count()) > 0
       ? ((await descEl.textContent())?.trim() ?? null)
       : null;
 
   // Price: .prod-price .val
-  const priceEl = page.locator('.cont-prod-detail .prod-price .val').first();
+  const priceEl = page.locator(".cont-prod-detail .prod-price .val").first();
   const priceText =
     (await priceEl.count()) > 0
-      ? ((await priceEl.textContent())?.trim() ?? '')
-      : '';
+      ? ((await priceEl.textContent())?.trim() ?? "")
+      : "";
   const price = priceText ? parsePrice(priceText) : null;
 
   // Nutrition from table
@@ -284,7 +284,7 @@ async function handleBrandPage(
   logger.info(`Discovered ${products.length} products across all categories`);
 
   if (products.length === 0) {
-    logger.error('No products found on brand page');
+    logger.error("No products found on brand page");
     return;
   }
 
@@ -311,7 +311,7 @@ async function handleProductPage(
   if (product) {
     await crawlerInstance.pushData(product);
     logger.info(
-      `Saved: ${product.name} [${product.externalCategory}]${product.nutritions ? ' +nutrition' : ''}${product.price ? ` (${product.price}원)` : ''}`
+      `Saved: ${product.name} [${product.externalCategory}]${product.nutritions ? " +nutrition" : ""}${product.price ? ` (${product.price}원)` : ""}`
     );
   }
 }
@@ -356,13 +356,13 @@ export const runAngelinusCrawler = async () => {
     const dataset = await crawler.getData();
 
     if (dataset.items.length === 0) {
-      throw new Error('No products extracted for angelinus');
+      throw new Error("No products extracted for angelinus");
     }
 
-    await writeProductsToJson(dataset.items as Product[], 'angelinus');
+    await writeProductsToJson(dataset.items as Product[], "angelinus");
     await crawler.teardown();
   } catch (error) {
-    logger.error('Angelinus crawler failed:', error);
+    logger.error("Angelinus crawler failed:", error);
     throw error;
   }
 };
@@ -370,11 +370,11 @@ export const runAngelinusCrawler = async () => {
 if (import.meta.url === `file://${process.argv[1]}`) {
   runAngelinusCrawler()
     .then(() => {
-      logger.info('Crawler completed successfully');
+      logger.info("Crawler completed successfully");
       process.exit(0);
     })
     .catch((error) => {
-      logger.error('Crawler execution failed:', error);
+      logger.error("Crawler execution failed:", error);
       process.exit(1);
     });
 }

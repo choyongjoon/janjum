@@ -7,38 +7,38 @@
  * but are not referenced by any database records.
  */
 
-import { createInterface } from 'node:readline';
-import { ConvexHttpClient } from 'convex/browser';
-import { api } from '../convex/_generated/api';
-import type { Id } from '../convex/_generated/dataModel';
-import { logger } from '../shared/logger';
+import { createInterface } from "node:readline";
+import { ConvexHttpClient } from "convex/browser";
+import { api } from "../convex/_generated/api";
+import type { Id } from "../convex/_generated/dataModel";
+import { logger } from "../shared/logger";
 
 // Initialize Convex client
 const convexUrl = process.env.VITE_CONVEX_URL;
 if (!convexUrl) {
-  logger.error('VITE_CONVEX_URL environment variable is required');
+  logger.error("VITE_CONVEX_URL environment variable is required");
   process.exit(1);
 }
 const client = new ConvexHttpClient(convexUrl);
 
 interface StorageReference {
-  table: string;
   field: string;
   recordId: string;
-  storageId: Id<'_storage'>;
+  storageId: Id<"_storage">;
+  table: string;
 }
 
 interface DanglingFile {
-  storageId: Id<'_storage'>;
+  contentType?: string;
   filename?: string;
   size?: number;
-  contentType?: string;
+  storageId: Id<"_storage">;
 }
 
-async function getAllStorageFiles(): Promise<Id<'_storage'>[]> {
+async function getAllStorageFiles(): Promise<Id<"_storage">[]> {
   try {
-    logger.info('Fetching all storage files...');
-    const allStorageIds: Id<'_storage'>[] = [];
+    logger.info("Fetching all storage files...");
+    const allStorageIds: Id<"_storage">[] = [];
     let cursor: string | null = null;
     let hasMore = true;
     let pageCount = 0;
@@ -46,12 +46,12 @@ async function getAllStorageFiles(): Promise<Id<'_storage'>[]> {
     while (hasMore) {
       pageCount++;
       logger.info(
-        `Fetching page ${pageCount}${cursor ? ` (cursor: ${cursor.slice(0, 8)}...)` : ''}...`
+        `Fetching page ${pageCount}${cursor ? ` (cursor: ${cursor.slice(0, 8)}...)` : ""}...`
       );
 
       const result: {
-        files: Id<'_storage'>[];
-        nextCursor: Id<'_storage'> | null | undefined;
+        files: Id<"_storage">[];
+        nextCursor: Id<"_storage"> | null | undefined;
         hasMore: boolean;
         total: number;
       } = await client.query(api.storage.getAllStorageFiles, {
@@ -71,7 +71,7 @@ async function getAllStorageFiles(): Promise<Id<'_storage'>[]> {
     logger.info(`Found ${allStorageIds.length} total storage files`);
     return allStorageIds;
   } catch (error) {
-    logger.error('Error fetching storage files:', error);
+    logger.error("Error fetching storage files:", error);
     throw error;
   }
 }
@@ -81,8 +81,8 @@ async function getCafeReferences(): Promise<StorageReference[]> {
   const cafes = await client.query(api.cafes.getAllWithImages);
   for (const cafe of cafes) {
     references.push({
-      table: 'cafes',
-      field: 'imageStorageId',
+      table: "cafes",
+      field: "imageStorageId",
       recordId: cafe._id,
       // biome-ignore lint/style/noNonNullAssertion: safe by query
       storageId: cafe.imageStorageId!,
@@ -96,8 +96,8 @@ async function getProductReferences(): Promise<StorageReference[]> {
   const products = await client.query(api.products.getAllWithImages);
   for (const product of products) {
     references.push({
-      table: 'products',
-      field: 'imageStorageId',
+      table: "products",
+      field: "imageStorageId",
       recordId: product._id,
       // biome-ignore lint/style/noNonNullAssertion: safe by query
       storageId: product.imageStorageId!,
@@ -113,8 +113,8 @@ async function getReviewReferences(): Promise<StorageReference[]> {
     // biome-ignore lint/style/noNonNullAssertion: safe by query
     for (const storageId of review.imageStorageIds!) {
       references.push({
-        table: 'reviews',
-        field: 'imageStorageIds',
+        table: "reviews",
+        field: "imageStorageIds",
         recordId: review._id,
         storageId,
       });
@@ -128,8 +128,8 @@ async function getUserReferences(): Promise<StorageReference[]> {
   const users = await client.query(api.users.getAllWithImages);
   for (const user of users) {
     references.push({
-      table: 'users',
-      field: 'imageStorageId',
+      table: "users",
+      field: "imageStorageId",
       recordId: user._id,
       // biome-ignore lint/style/noNonNullAssertion: safe by query
       storageId: user.imageStorageId!,
@@ -140,7 +140,7 @@ async function getUserReferences(): Promise<StorageReference[]> {
 
 async function getStorageReferences(): Promise<StorageReference[]> {
   try {
-    logger.info('Scanning database for image references...');
+    logger.info("Scanning database for image references...");
 
     const [cafeRefs, productRefs, reviewRefs, userRefs] = await Promise.all([
       getCafeReferences(),
@@ -151,13 +151,13 @@ async function getStorageReferences(): Promise<StorageReference[]> {
 
     return [...cafeRefs, ...productRefs, ...reviewRefs, ...userRefs];
   } catch (error) {
-    logger.error('Error getting storage references:', error);
+    logger.error("Error getting storage references:", error);
     throw error;
   }
 }
 
 async function findDanglingFiles(): Promise<DanglingFile[]> {
-  logger.info('Starting dangling file detection...');
+  logger.info("Starting dangling file detection...");
 
   const [allStorageFiles, references] = await Promise.all([
     getAllStorageFiles(),
@@ -193,7 +193,7 @@ async function findDanglingFiles(): Promise<DanglingFile[]> {
     }
   } catch (error) {
     logger.warn(
-      'Could not get metadata for some files, proceeding with basic info:',
+      "Could not get metadata for some files, proceeding with basic info:",
       error
     );
     // Fallback to basic storage ID info
@@ -214,7 +214,7 @@ function promptForConfirmation(message: string): Promise<boolean> {
   return new Promise((resolve) => {
     rl.question(`${message} (y/N): `, (answer) => {
       rl.close();
-      resolve(answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes');
+      resolve(answer.toLowerCase() === "y" || answer.toLowerCase() === "yes");
     });
   });
 }
@@ -238,12 +238,12 @@ async function performDeletion(files: DanglingFile[]): Promise<void> {
   const uploadSecret = process.env.CONVEX_UPLOAD_SECRET;
   if (!uploadSecret) {
     logger.error(
-      'CONVEX_UPLOAD_SECRET environment variable is required for deletion'
+      "CONVEX_UPLOAD_SECRET environment variable is required for deletion"
     );
     return;
   }
 
-  logger.info('Deleting dangling files...');
+  logger.info("Deleting dangling files...");
 
   const batchSize = 10;
   let totalDeleted = 0;
@@ -292,7 +292,7 @@ async function deleteDanglingFiles(
   dryRun = true
 ): Promise<void> {
   if (files.length === 0) {
-    logger.info('No dangling files found.');
+    logger.info("No dangling files found.");
     return;
   }
 
@@ -300,7 +300,7 @@ async function deleteDanglingFiles(
 
   if (dryRun) {
     logger.info(
-      'DRY RUN: No files were deleted. Use --delete to actually remove them.'
+      "DRY RUN: No files were deleted. Use --delete to actually remove them."
     );
     return;
   }
@@ -310,7 +310,7 @@ async function deleteDanglingFiles(
   );
 
   if (!confirmed) {
-    logger.info('Deletion cancelled.');
+    logger.info("Deletion cancelled.");
     return;
   }
 
@@ -319,7 +319,7 @@ async function deleteDanglingFiles(
 
 async function showStorageStats() {
   try {
-    logger.info('Fetching storage statistics...');
+    logger.info("Fetching storage statistics...");
     const stats = await client.query(api.storage.getStorageStats);
 
     logger.info(`Storage Statistics:
@@ -327,15 +327,15 @@ async function showStorageStats() {
   Total size: ${stats.totalSizeMB} MB
   Content types: ${JSON.stringify(stats.contentTypes, null, 2)}`);
   } catch (error) {
-    logger.error('Error fetching storage statistics:', error);
+    logger.error("Error fetching storage statistics:", error);
   }
 }
 
 async function main() {
   const args = process.argv.slice(2);
-  const dryRun = !args.includes('--delete');
-  const help = args.includes('--help') || args.includes('-h');
-  const stats = args.includes('--stats');
+  const dryRun = !args.includes("--delete");
+  const help = args.includes("--help") || args.includes("-h");
+  const stats = args.includes("--stats");
 
   if (help) {
     logger.info(`Usage: tsx scripts/cleanupDanglingStorage.ts [options]
@@ -371,15 +371,15 @@ Examples:
     }
 
     if (dryRun) {
-      logger.info('Running in DRY RUN mode - no files will be deleted');
+      logger.info("Running in DRY RUN mode - no files will be deleted");
     } else {
-      logger.info('Running in DELETE mode - files will be permanently removed');
+      logger.info("Running in DELETE mode - files will be permanently removed");
     }
 
     const danglingFiles = await findDanglingFiles();
     await deleteDanglingFiles(danglingFiles, dryRun);
   } catch (error) {
-    logger.error('Script failed:', error);
+    logger.error("Script failed:", error);
     process.exit(1);
   }
 }
@@ -387,7 +387,7 @@ Examples:
 // Self-executing async function
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch((error) => {
-    logger.error('Unhandled error:', error);
+    logger.error("Unhandled error:", error);
     process.exit(1);
   });
 }

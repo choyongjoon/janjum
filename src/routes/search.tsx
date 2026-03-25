@@ -1,21 +1,21 @@
-import { convexQuery } from '@convex-dev/react-query';
-import { useSuspenseQuery } from '@tanstack/react-query';
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { useMemo, useState } from 'react';
-import { usePostHogEvents } from '~/hooks/usePostHogEvents';
-import { api } from '../../convex/_generated/api';
-import { SearchIcon } from '../components/icons';
-import { ProductCard } from '../components/ProductCard';
-import { NameSearchInput } from '../components/search/NameSearchForm';
+import { convexQuery } from "@convex-dev/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
+import { usePostHogEvents } from "~/hooks/usePostHogEvents";
+import { api } from "../../convex/_generated/api";
+import { SearchIcon } from "../components/icons/SearchIcon";
+import { ProductCard } from "../components/ProductCard";
+import { NameSearchInput } from "../components/search/NameSearchForm";
 
 interface SearchFilters {
   searchTerm?: string;
 }
 
-export const Route = createFileRoute('/search')({
+export const Route = createFileRoute("/search")({
   component: SearchPage,
   validateSearch: (search: Record<string, unknown>): SearchFilters => ({
-    searchTerm: (search.searchTerm as string) || '',
+    searchTerm: (search.searchTerm as string) || "",
   }),
   loader: async (opts) => {
     const searchFilters = opts.location.search as SearchFilters;
@@ -39,7 +39,7 @@ function SearchPage() {
 
   // Local state for form inputs
   const [formState, setFormState] = useState({
-    searchTerm: searchTerm || '',
+    searchTerm: searchTerm || "",
   });
 
   // Get search results
@@ -67,9 +67,9 @@ function SearchPage() {
     }
 
     navigate({
-      to: '/search',
+      to: "/search",
       search: {
-        searchTerm: trimmedSearchTerm || '',
+        searchTerm: trimmedSearchTerm || "",
       },
     });
   };
@@ -91,7 +91,7 @@ function SearchPage() {
                 }))
               }
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
+                if (e.key === "Enter") {
                   e.preventDefault();
                   handleSearch();
                 }

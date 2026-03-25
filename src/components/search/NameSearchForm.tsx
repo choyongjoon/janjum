@@ -1,9 +1,9 @@
-import { convexQuery } from '@convex-dev/react-query';
-import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
-import { type ChangeEvent, type KeyboardEventHandler, useState } from 'react';
-import { usePostHogEvents } from '~/hooks/usePostHogEvents';
-import { api } from '../../../convex/_generated/api';
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
+import { type ChangeEvent, type KeyboardEventHandler, useState } from "react";
+import { usePostHogEvents } from "~/hooks/usePostHogEvents";
+import { api } from "../../../convex/_generated/api";
 
 export function NameSearchInput({
   value,
@@ -36,7 +36,7 @@ export function NameSearchInput({
     trackSearch(suggestion.name, 1);
 
     navigate({
-      to: '/product/$shortId',
+      to: "/product/$shortId",
       params: { shortId: suggestion.shortId },
     });
   };

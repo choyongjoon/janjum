@@ -1,21 +1,21 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { logger } from '../../shared/logger';
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { logger } from "../../shared/logger";
 import type {
   CategorizationRule,
   CategorizationRules,
   CategorizerInput,
   CategorizerResult,
   Category,
-} from './types';
+} from "./types";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export class ProductCategorizer {
   private rules: CategorizationRules = {
-    version: '1.0.0',
+    version: "1.0.0",
     lastUpdated: Date.now(),
     rules: [],
     stats: {
@@ -24,11 +24,11 @@ export class ProductCategorizer {
       averageConfidence: 0,
     },
   };
-  private rulesPath: string;
+  private readonly rulesPath: string;
 
   constructor(rulesPath?: string) {
     this.rulesPath =
-      rulesPath || path.join(__dirname, 'categorizer-rules.json');
+      rulesPath || path.join(__dirname, "categorizer-rules.json");
     this.loadRules();
   }
 
@@ -38,7 +38,7 @@ export class ProductCategorizer {
   private loadRules(): void {
     try {
       if (fs.existsSync(this.rulesPath)) {
-        const rulesData = fs.readFileSync(this.rulesPath, 'utf-8');
+        const rulesData = fs.readFileSync(this.rulesPath, "utf-8");
         this.rules = JSON.parse(rulesData);
         logger.debug(`Loaded ${this.rules.rules.length} categorization rules`);
       } else {
@@ -46,7 +46,7 @@ export class ProductCategorizer {
           `Rules file not found at ${this.rulesPath}, using empty rules`
         );
         this.rules = {
-          version: '1.0.0',
+          version: "1.0.0",
           lastUpdated: Date.now(),
           rules: [],
           stats: {
@@ -85,11 +85,11 @@ export class ProductCategorizer {
       const directRule = this.findDirectRule(input.externalCategory);
       if (directRule) {
         this.incrementRuleUsage(directRule.id);
-        this.updateStats('high');
+        this.updateStats("high");
         return {
           category: directRule.targetCategory,
           confidence: directRule.confidence,
-          source: 'direct',
+          source: "direct",
           matchedRule: directRule.id,
         };
       }
@@ -103,17 +103,17 @@ export class ProductCategorizer {
       return {
         category: patternResult.rule.targetCategory,
         confidence: patternResult.rule.confidence,
-        source: 'pattern',
+        source: "pattern",
         matchedRule: patternResult.rule.id,
       };
     }
 
     // Step 3: Fallback to default category
-    this.updateStats('low');
+    this.updateStats("low");
     return {
-      category: '그 외',
-      confidence: 'low',
-      source: 'fallback',
+      category: "그 외",
+      confidence: "low",
+      source: "fallback",
     };
   }
 
@@ -124,7 +124,7 @@ export class ProductCategorizer {
     return (
       this.rules.rules.find(
         (rule) =>
-          rule.type === 'direct' &&
+          rule.type === "direct" &&
           rule.condition.externalCategory === externalCategory
       ) || null
     );
@@ -152,7 +152,7 @@ export class ProductCategorizer {
    */
   private getSortedPatternRules(): CategorizationRule[] {
     return this.rules.rules
-      .filter((rule) => rule.type === 'pattern')
+      .filter((rule) => rule.type === "pattern")
       .sort((a, b) => {
         const priorityA = a.priority ?? 999;
         const priorityB = b.priority ?? 999;
@@ -216,7 +216,7 @@ export class ProductCategorizer {
     }
 
     try {
-      const regex = new RegExp(rule.condition.namePattern, 'i');
+      const regex = new RegExp(rule.condition.namePattern, "i");
       return regex.test(name);
     } catch (error) {
       logger.warn(`Invalid regex pattern in rule ${rule.id}:`, error);
@@ -230,7 +230,7 @@ export class ProductCategorizer {
   learnFromHumanInput(
     input: CategorizerInput,
     humanCategory: Category,
-    ruleType: 'direct' | 'pattern' = 'direct'
+    ruleType: "direct" | "pattern" = "direct"
   ): void {
     const now = Date.now();
     const ruleId = `human-${ruleType}-${now}`;
@@ -241,15 +241,15 @@ export class ProductCategorizer {
       type: ruleType,
       condition: {},
       targetCategory: humanCategory,
-      confidence: 'high',
-      createdBy: 'human',
+      confidence: "high",
+      createdBy: "human",
       createdAt: now,
       usageCount: 1,
     };
 
-    if (ruleType === 'direct' && input.externalCategory) {
+    if (ruleType === "direct" && input.externalCategory) {
       newRule.condition.externalCategory = input.externalCategory;
-    } else if (ruleType === 'pattern') {
+    } else if (ruleType === "pattern") {
       // Extract key words from product name for pattern creation
       const keywords = this.extractKeywords(input.name);
       if (keywords.length > 0) {
@@ -277,34 +277,34 @@ export class ProductCategorizer {
     // Simple keyword extraction - can be enhanced with NLP
     const commonKeywords = [
       // Coffee
-      '아메리카노',
-      '라떼',
-      '카푸치노',
-      '에스프레소',
-      '모카',
-      '마키아또',
-      '콜드브루',
+      "아메리카노",
+      "라떼",
+      "카푸치노",
+      "에스프레소",
+      "모카",
+      "마키아또",
+      "콜드브루",
       // Tea
-      '차이',
-      '얼그레이',
-      '녹차',
-      '홍차',
-      '허브티',
+      "차이",
+      "얼그레이",
+      "녹차",
+      "홍차",
+      "허브티",
       // Blended
-      '프라푸치노',
-      '블렌디드',
-      '쉐이크',
-      '프라페',
+      "프라푸치노",
+      "블렌디드",
+      "쉐이크",
+      "프라페",
       // Smoothie
-      '스무디',
-      '요거트',
+      "스무디",
+      "요거트",
       // Juice
-      '주스',
-      '오렌지',
-      '자몽',
+      "주스",
+      "오렌지",
+      "자몽",
       // Ade
-      '에이드',
-      '레모네이드',
+      "에이드",
+      "레모네이드",
     ];
 
     const foundKeywords = commonKeywords.filter((keyword) =>
@@ -327,7 +327,7 @@ export class ProductCategorizer {
   /**
    * Update categorization statistics
    */
-  private updateStats(confidence: 'high' | 'medium' | 'low'): void {
+  private updateStats(confidence: "high" | "medium" | "low"): void {
     this.rules.stats.totalCategorizations++;
 
     // Update average confidence (simplified calculation)
@@ -343,7 +343,7 @@ export class ProductCategorizer {
   /**
    * Get categorization statistics
    */
-  getStats(): CategorizationRules['stats'] {
+  getStats(): CategorizationRules["stats"] {
     return { ...this.rules.stats };
   }
 
@@ -358,7 +358,7 @@ export class ProductCategorizer {
    * Add a custom rule
    */
   addRule(
-    rule: Omit<CategorizationRule, 'id' | 'createdAt' | 'usageCount'>
+    rule: Omit<CategorizationRule, "id" | "createdAt" | "usageCount">
   ): string {
     const ruleId = `custom-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
     const newRule: CategorizationRule = {

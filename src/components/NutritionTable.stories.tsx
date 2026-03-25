@@ -1,6 +1,6 @@
-import type { Meta, StoryObj } from '@storybook/react-vite';
+import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { NutritionTable } from './NutritionTable';
+import { NutritionTable } from "./NutritionTable";
 
 const meta = {
   component: NutritionTable,
@@ -13,19 +13,19 @@ export const Primary: Story = {
   args: {
     nutritions: {
       servingSize: 473,
-      servingSizeUnit: 'ml',
+      servingSizeUnit: "ml",
       calories: 355,
-      caloriesUnit: 'kcal',
+      caloriesUnit: "kcal",
       sugar: 35,
-      sugarUnit: 'g',
+      sugarUnit: "g",
       protein: 8,
-      proteinUnit: 'g',
+      proteinUnit: "g",
       saturatedFat: 5,
-      saturatedFatUnit: 'g',
+      saturatedFatUnit: "g",
       natrium: 112,
-      natriumUnit: 'mg',
+      natriumUnit: "mg",
       caffeine: 25,
-      caffeineUnit: 'mg',
+      caffeineUnit: "mg",
     },
   },
 };
@@ -34,19 +34,19 @@ export const Secondary: Story = {
   args: {
     nutritions: {
       servingSize: 473,
-      servingSizeUnit: 'ml',
+      servingSizeUnit: "ml",
       calories: 100,
-      caloriesUnit: 'kcal',
+      caloriesUnit: "kcal",
       sugar: 23,
-      sugarUnit: 'g',
+      sugarUnit: "g",
       protein: 0,
-      proteinUnit: 'g',
+      proteinUnit: "g",
       saturatedFat: 0,
-      saturatedFatUnit: 'g',
+      saturatedFatUnit: "g",
       natrium: 0,
-      natriumUnit: 'mg',
+      natriumUnit: "mg",
       caffeine: 415,
-      caffeineUnit: 'mg',
+      caffeineUnit: "mg",
     },
   },
 };

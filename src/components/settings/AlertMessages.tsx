@@ -1,6 +1,6 @@
 interface AlertMessagesProps {
-  successMessage: string;
   errorMessage: string;
+  successMessage: string;
 }
 
 export function AlertMessages({

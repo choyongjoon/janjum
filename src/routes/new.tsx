@@ -1,11 +1,11 @@
-import { useSuspenseQuery } from '@tanstack/react-query';
-import { createFileRoute } from '@tanstack/react-router';
-import { recentProductsAllQueryOptions } from '~/components/NewProductsSection';
-import { ProductCard } from '~/components/ProductCard';
-import type { Doc } from '../../convex/_generated/dataModel';
-import { seo } from '../utils/seo';
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
+import { recentProductsAllQueryOptions } from "~/components/NewProductsSection";
+import { ProductCard } from "~/components/ProductCard";
+import type { Doc } from "../../convex/_generated/dataModel";
+import { seo } from "../utils/seo";
 
-export const Route = createFileRoute('/new')({
+export const Route = createFileRoute("/new")({
   component: NewProductsPage,
   loader: async (opts) => {
     await opts.context.queryClient.ensureQueryData(
@@ -15,15 +15,15 @@ export const Route = createFileRoute('/new')({
   head: () => ({
     meta: [
       ...seo({
-        title: '신상품 - 잔점',
-        description: '최근 30일 이내에 새로 추가된 카페 음료를 확인하세요.',
-        keywords: '신상품, 신메뉴, 카페, 음료, 잔점',
+        title: "신상품 - 잔점",
+        description: "최근 30일 이내에 새로 추가된 카페 음료를 확인하세요.",
+        keywords: "신상품, 신메뉴, 카페, 음료, 잔점",
       }),
     ],
   }),
 });
 
-type ProductWithCafe = Doc<'products'> & {
+type ProductWithCafe = Doc<"products"> & {
   cafeName: string;
   imageUrl?: string;
 };
@@ -34,10 +34,10 @@ function formatRelativeDate(timestamp: number): string {
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
   if (days === 0) {
-    return '오늘';
+    return "오늘";
   }
   if (days === 1) {
-    return '어제';
+    return "어제";
   }
   if (days < 7) {
     return `${days}일 전`;

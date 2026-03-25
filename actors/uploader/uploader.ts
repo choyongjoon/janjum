@@ -1,69 +1,69 @@
 #!/usr/bin/env ts-node
-import fs from 'node:fs';
-import path from 'node:path';
-import { ConvexClient } from 'convex/browser';
-import dotenv from 'dotenv';
-import sharp from 'sharp';
-import { api } from '../../convex/_generated/api';
-import { logger } from '../../shared/logger';
+import fs from "node:fs";
+import path from "node:path";
+import { ConvexClient } from "convex/browser";
+import dotenv from "dotenv";
+import sharp from "sharp";
+import { api } from "../../convex/_generated/api";
+import { logger } from "../../shared/logger";
 
 const IMAGE_CONCURRENCY = 10;
 
 // Load environment variables from .env.local
-dotenv.config({ path: '.env.local' });
+dotenv.config({ path: ".env.local" });
 
 const CONVEX_URL = process.env.VITE_CONVEX_URL;
 
 interface UploadOptions {
-  file: string;
   cafeSlug: string;
   dryRun?: boolean;
+  file: string;
   verbose?: boolean;
 }
 
 interface ProductData {
-  name: string;
-  nameEn: string | null;
+  category: string;
   description: string | null;
   externalCategory: string | null;
   externalId: string;
   externalImageUrl: string;
   externalUrl: string;
-  price: number | null;
-  category: string;
   // added by this script
   imageStorageId?: string;
+  name: string;
+  nameEn: string | null;
+  price: number | null;
 }
 
 interface UploadResult {
-  processed: number;
   created: number;
-  updated: number;
-  unchanged: number;
-  skipped: number;
-  removed: number;
-  reactivated: number;
   errors: string[];
-  processingTime: number;
   message?: string;
-  samples?: Array<{ name: string; category: string }>;
-  removedProducts?: string[];
+  processed: number;
+  processingTime: number;
+  reactivated: number;
   reactivatedProducts?: string[];
+  removed: number;
+  removedProducts?: string[];
+  samples?: Array<{ name: string; category: string }>;
+  skipped: number;
+  unchanged: number;
+  updated: number;
 }
 
 class ProductUploader {
-  private client: ConvexClient;
+  private readonly client: ConvexClient;
 
   constructor() {
     logger.info(`Initializing ConvexClient with URL: ${CONVEX_URL}`);
     try {
       if (!CONVEX_URL) {
-        throw new Error('VITE_CONVEX_URL is not set');
+        throw new Error("VITE_CONVEX_URL is not set");
       }
       this.client = new ConvexClient(CONVEX_URL);
-      logger.info('ConvexClient initialized successfully');
+      logger.info("ConvexClient initialized successfully");
     } catch (error) {
-      logger.error('Failed to initialize ConvexClient:', error);
+      logger.error("Failed to initialize ConvexClient:", error);
       throw error;
     }
   }
@@ -93,10 +93,10 @@ class ProductUploader {
       this.handleUploadResult(result, verbose, dryRun);
       return result;
     } catch (error) {
-      logger.error('Upload failed:', error);
+      logger.error("Upload failed:", error);
       if (error instanceof Error) {
-        logger.error('Error message:', error.message);
-        logger.error('Error stack:', error.stack);
+        logger.error("Error message:", error.message);
+        logger.error("Error stack:", error.stack);
       }
       throw error;
     }
@@ -112,7 +112,7 @@ class ProductUploader {
   }
 
   private readAndValidateFile(filePath: string): ProductData[] {
-    const fileContent = fs.readFileSync(filePath, 'utf-8');
+    const fileContent = fs.readFileSync(filePath, "utf-8");
     let products: ProductData[];
 
     try {
@@ -122,7 +122,7 @@ class ProductUploader {
     }
 
     if (!Array.isArray(products)) {
-      throw new Error('JSON file must contain an array of products');
+      throw new Error("JSON file must contain an array of products");
     }
 
     return products;
@@ -135,7 +135,7 @@ class ProductUploader {
   ): void {
     logger.info(`Reading file: ${filePath}`);
     logger.info(`Cafe: ${cafeSlug}`);
-    logger.info(`Dry run: ${dryRun ? 'Yes' : 'No'}`);
+    logger.info(`Dry run: ${dryRun ? "Yes" : "No"}`);
   }
 
   private async performUpload(
@@ -146,7 +146,7 @@ class ProductUploader {
   ): Promise<UploadResult> {
     const uploadSecret = process.env.CONVEX_UPLOAD_SECRET;
     if (!uploadSecret) {
-      throw new Error('CONVEX_UPLOAD_SECRET environment variable is required');
+      throw new Error("CONVEX_UPLOAD_SECRET environment variable is required");
     }
 
     // Pre-process images if downloadImages is enabled
@@ -191,7 +191,7 @@ class ProductUploader {
 
       return productMap;
     } catch (error) {
-      logger.warn('Failed to fetch existing products from database:', error);
+      logger.warn("Failed to fetch existing products from database:", error);
       // Return empty map to continue with normal processing
       return new Map();
     }
@@ -302,7 +302,7 @@ class ProductUploader {
 
     // Handle SSL certificate issues with Gongcha website
     const originalRejectUnauthorized = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
     try {
       // Extract the domain from the image URL to set appropriate referer
@@ -311,12 +311,12 @@ class ProductUploader {
 
       const response = await fetch(imageUrl, {
         headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-          Accept: 'image/webp,image/apng,image/*,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9,ko;q=0.8',
-          'Cache-Control': 'no-cache',
-          Pragma: 'no-cache',
+          "User-Agent":
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+          Accept: "image/webp,image/apng,image/*,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9,ko;q=0.8",
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
           Referer: refererUrl,
         },
       });
@@ -338,7 +338,9 @@ class ProductUploader {
       let wasOptimized = false;
       let finalSize = originalSize;
 
-      if (metadata.format !== 'webp') {
+      if (metadata.format === "webp") {
+        logger.info(`Image for ${productName} is already WebP format`);
+      } else {
         // Optimize using Sharp
         finalBuffer = Buffer.from(
           await sharp(imageBuffer).webp({ quality: 85, effort: 6 }).toBuffer()
@@ -354,8 +356,6 @@ class ProductUploader {
         logger.info(
           `Optimized ${productName}: ${originalSize} bytes → ${finalSize} bytes (${reduction}% reduction)`
         );
-      } else {
-        logger.info(`Image for ${productName} is already WebP format`);
       }
 
       // Upload to Convex storage
@@ -365,9 +365,9 @@ class ProductUploader {
       });
 
       const uploadResponse = await fetch(uploadUrl, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'image/webp',
+          "Content-Type": "image/webp",
         },
         body: new Uint8Array(finalBuffer),
       });
@@ -390,10 +390,10 @@ class ProductUploader {
       };
     } finally {
       // Restore original SSL setting
-      if (originalRejectUnauthorized !== undefined) {
-        process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalRejectUnauthorized;
-      } else {
+      if (originalRejectUnauthorized === undefined) {
         process.env.NODE_TLS_REJECT_UNAUTHORIZED = undefined;
+      } else {
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalRejectUnauthorized;
       }
     }
   }
@@ -406,7 +406,7 @@ class ProductUploader {
     this.printResults(result, verbose);
 
     if (!dryRun && result.errors.length === 0) {
-      logger.info('Upload completed successfully!');
+      logger.info("Upload completed successfully!");
     } else if (result.errors.length > 0) {
       logger.warn(`Upload completed with ${result.errors.length} errors`);
       if (verbose) {
@@ -418,7 +418,7 @@ class ProductUploader {
   }
 
   private printBasicResults(result: UploadResult): void {
-    logger.info('Results:');
+    logger.info("Results:");
     logger.info(`  Processed: ${result.processed}`);
     logger.info(`  Created: ${result.created}`);
     logger.info(`  Updated: ${result.updated}`);
@@ -436,7 +436,7 @@ class ProductUploader {
 
   private printSampleProducts(result: UploadResult, verbose: boolean): void {
     if (verbose && result.samples) {
-      logger.info('Sample processed products:');
+      logger.info("Sample processed products:");
       for (const [index, product] of result.samples.entries()) {
         logger.info(`  ${index + 1}. ${product.name} (${product.category})`);
       }
@@ -448,7 +448,7 @@ class ProductUploader {
     verbose: boolean
   ): void {
     if (result.removed && result.removed > 0) {
-      logger.info('\n❌ Removed Products Summary:');
+      logger.info("\n❌ Removed Products Summary:");
       logger.info(`  ${result.removed} product(s) no longer found on website`);
 
       if (
@@ -461,7 +461,7 @@ class ProductUploader {
           logger.info(`  ${index + 1}. ${productName}`);
         }
       } else if (!verbose && result.removed > 0) {
-        logger.info('  Use --verbose to see product names');
+        logger.info("  Use --verbose to see product names");
       }
     }
   }
@@ -471,7 +471,7 @@ class ProductUploader {
     verbose: boolean
   ): void {
     if (result.reactivated && result.reactivated > 0) {
-      logger.info('\n✅ Reactivated Products Summary:');
+      logger.info("\n✅ Reactivated Products Summary:");
       logger.info(
         `  ${result.reactivated} previously removed product(s) found again`
       );
@@ -491,7 +491,7 @@ class ProductUploader {
           logger.info(`  ${index + 1}. ${productName}`);
         }
       } else if (!verbose && result.reactivated > 0) {
-        logger.info('  Use --verbose to see product names');
+        logger.info("  Use --verbose to see product names");
       }
     }
   }
@@ -501,7 +501,7 @@ class ProductUploader {
       (result.removed && result.removed > 0) ||
       (result.reactivated && result.reactivated > 0)
     ) {
-      logger.info('\n📊 Product Lifecycle Summary:');
+      logger.info("\n📊 Product Lifecycle Summary:");
       if (result.removed && result.removed > 0) {
         logger.info(`  Products marked as removed: ${result.removed}`);
       }
@@ -523,28 +523,28 @@ class ProductUploader {
 // CLI Interface
 async function main() {
   try {
-    logger.info('Starting main function...');
+    logger.info("Starting main function...");
     const args = process.argv.slice(2);
 
-    logger.info('Creating ProductUploader instance...');
+    logger.info("Creating ProductUploader instance...");
     const uploader = new ProductUploader();
-    logger.info('ProductUploader created successfully');
+    logger.info("ProductUploader created successfully");
 
     // Default upload command
     const options: UploadOptions = {
-      file: '',
-      cafeSlug: '',
-      dryRun: args.includes('--dry-run'),
-      verbose: args.includes('--verbose') || args.includes('-v'),
+      file: "",
+      cafeSlug: "",
+      dryRun: args.includes("--dry-run"),
+      verbose: args.includes("--verbose") || args.includes("-v"),
     };
 
     // Parse file option
-    const fileIndex = args.indexOf('--file');
+    const fileIndex = args.indexOf("--file");
     if (fileIndex !== -1 && args[fileIndex + 1]) {
       options.file = args[fileIndex + 1];
     }
 
-    const cafeSlugIndex = args.indexOf('--cafe-slug');
+    const cafeSlugIndex = args.indexOf("--cafe-slug");
     if (cafeSlugIndex !== -1 && args[cafeSlugIndex + 1]) {
       options.cafeSlug = args[cafeSlugIndex + 1];
     }
@@ -552,19 +552,19 @@ async function main() {
     await uploader.uploadFromFile(options);
     process.exit(0);
   } catch (error) {
-    logger.error('Upload failed:', error);
+    logger.error("Upload failed:", error);
     if (error instanceof Error) {
-      logger.error('Error message:', error.message);
-      logger.error('Error stack:', error.stack);
+      logger.error("Error message:", error.message);
+      logger.error("Error stack:", error.stack);
     }
     process.exit(1);
   }
 }
 
 // Only run if this file is executed directly (not imported)
-if (process.argv[1]?.endsWith('uploader.ts')) {
+if (process.argv[1]?.endsWith("uploader.ts")) {
   main().catch((error) => {
-    logger.error('Application error:', error);
+    logger.error("Application error:", error);
     process.exit(1);
   });
 }

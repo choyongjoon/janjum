@@ -1,16 +1,16 @@
-import { v } from 'convex/values';
-import type { Nutritions } from '../shared/nutritions';
-import { api } from './_generated/api';
-import type { Id } from './_generated/dataModel';
-import { type MutationCtx, mutation, query } from './_generated/server';
+import { v } from "convex/values";
+import type { Nutritions } from "../shared/nutritions";
+import { api } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
+import { type MutationCtx, mutation, query } from "./_generated/server";
 
 export const getByCafe = query({
-  args: { cafeId: v.id('cafes') },
+  args: { cafeId: v.id("cafes") },
   handler: async (ctx, { cafeId }) => {
     const products = await ctx.db
-      .query('products')
-      .withIndex('by_cafe_active', (q) =>
-        q.eq('cafeId', cafeId).eq('isActive', true)
+      .query("products")
+      .withIndex("by_cafe_active", (q) =>
+        q.eq("cafeId", cafeId).eq("isActive", true)
       )
       .collect();
 
@@ -45,7 +45,7 @@ export const getByCafe = query({
 export const search = query({
   args: {
     searchTerm: v.optional(v.string()),
-    cafeId: v.optional(v.id('cafes')),
+    cafeId: v.optional(v.id("cafes")),
     category: v.optional(v.string()),
     limit: v.optional(v.number()),
   },
@@ -58,14 +58,14 @@ export const search = query({
     // Filter by cafe if specified
     let products = cafeId
       ? await ctx.db
-          .query('products')
-          .withIndex('by_cafe_active', (q) =>
-            q.eq('cafeId', cafeId).eq('isActive', true)
+          .query("products")
+          .withIndex("by_cafe_active", (q) =>
+            q.eq("cafeId", cafeId).eq("isActive", true)
           )
           .collect()
       : await ctx.db
-          .query('products')
-          .filter((q) => q.eq(q.field('isActive'), true))
+          .query("products")
+          .filter((q) => q.eq(q.field("isActive"), true))
           .collect();
 
     // Filter by category if specified
@@ -77,9 +77,9 @@ export const search = query({
 
     // Filter by search term if specified
     if (searchTerm?.trim()) {
-      const term = searchTerm.toLowerCase().replace(/\s+/g, '');
+      const term = searchTerm.toLowerCase().replace(/\s+/g, "");
       products = products.filter((p) =>
-        p.name.toLowerCase().replace(/\s+/g, '').includes(term)
+        p.name.toLowerCase().replace(/\s+/g, "").includes(term)
       );
     }
 
@@ -89,7 +89,7 @@ export const search = query({
         const cafe = await ctx.db.get(product.cafeId);
         return {
           ...product,
-          cafeName: cafe?.name || '',
+          cafeName: cafe?.name || "",
           imageUrl: product.imageStorageId
             ? (await ctx.storage.getUrl(product.imageStorageId)) || undefined
             : undefined,
@@ -114,16 +114,16 @@ export const getSuggestions = query({
       return [];
     }
 
-    const products = await ctx.db.query('products').collect();
-    const term = searchTerm.toLowerCase().replace(/\s+/g, '');
+    const products = await ctx.db.query("products").collect();
+    const term = searchTerm.toLowerCase().replace(/\s+/g, "");
 
     // Filter active products and search in name/nameEn
     const matches = products
       .filter((p) => p.isActive)
       .filter(
         (p) =>
-          p.name.toLowerCase().replace(/\s+/g, '').includes(term) ||
-          p.nameEn?.toLowerCase().replace(/\s+/g, '').includes(term)
+          p.name.toLowerCase().replace(/\s+/g, "").includes(term) ||
+          p.nameEn?.toLowerCase().replace(/\s+/g, "").includes(term)
       )
       .map((p) => ({
         id: p._id,
@@ -137,34 +137,34 @@ export const getSuggestions = query({
   },
 });
 
-type UpsertProductArgs = {
-  cafeId: Id<'cafes'>;
+interface UpsertProductArgs {
+  cafeId: Id<"cafes">;
+  category?: string;
+  description?: string;
+  downloadImages?: boolean;
+  externalId: string;
+  externalImageUrl?: string;
+  externalUrl: string;
+  imageStorageId?: Id<"_storage">;
+  isActive?: boolean;
   name: string;
   nameEn?: string;
-  category?: string;
-  description?: string;
-  externalImageUrl?: string;
-  imageStorageId?: Id<'_storage'>;
-  externalId: string;
-  externalUrl: string;
-  price?: number;
   nutritions?: Nutritions;
-  downloadImages?: boolean;
-  isActive?: boolean;
-};
+  price?: number;
+}
 
-type ExistingProduct = {
-  _id: Id<'products'>;
-  name: string;
+interface ExistingProduct {
+  _id: Id<"products">;
   category?: string;
-  price?: number;
   description?: string;
   externalImageUrl?: string;
-  imageStorageId?: Id<'_storage'>;
-  nutritions?: Nutritions;
+  imageStorageId?: Id<"_storage">;
   isActive?: boolean;
+  name: string;
+  nutritions?: Nutritions;
+  price?: number;
   removedAt?: number;
-};
+}
 
 function hasNutritionChanges(
   existing?: Nutritions,
@@ -233,7 +233,7 @@ function hasProductChanges(
 function scheduleImageDownloadIfNeeded(
   ctx: MutationCtx,
   args: UpsertProductArgs,
-  productId: Id<'products'>,
+  productId: Id<"products">,
   shouldDownload: boolean
 ): void {
   if (
@@ -274,10 +274,10 @@ async function handleExistingProduct(
     const shouldDownloadImage = !existing.imageStorageId;
     scheduleImageDownloadIfNeeded(ctx, args, existing._id, shouldDownloadImage);
 
-    return { action: 'updated', id: existing._id };
+    return { action: "updated", id: existing._id };
   }
 
-  return { action: 'unchanged', id: existing._id };
+  return { action: "unchanged", id: existing._id };
 }
 
 async function createNewProduct(
@@ -300,23 +300,23 @@ async function createNewProduct(
   // Remove downloadImages flag from stored data
   const { downloadImages: _downloadImages, ...dataToStore } = insertData;
 
-  const id = await ctx.db.insert('products', dataToStore);
+  const id = await ctx.db.insert("products", dataToStore);
 
   scheduleImageDownloadIfNeeded(ctx, args, id, true);
 
-  return { action: 'created', id };
+  return { action: "created", id };
 }
 
 export const upsertProduct = mutation({
   args: {
-    cafeId: v.id('cafes'),
+    cafeId: v.id("cafes"),
     name: v.string(),
     nameEn: v.optional(v.string()),
     category: v.optional(v.string()),
     externalCategory: v.optional(v.string()),
     description: v.optional(v.string()),
     externalImageUrl: v.optional(v.string()),
-    imageStorageId: v.optional(v.id('_storage')),
+    imageStorageId: v.optional(v.id("_storage")),
     externalId: v.string(),
     externalUrl: v.string(),
     price: v.optional(v.number()),
@@ -353,8 +353,8 @@ export const upsertProduct = mutation({
     const now = Date.now();
 
     const existing = await ctx.db
-      .query('products')
-      .withIndex('by_external_id', (q) => q.eq('externalId', args.externalId))
+      .query("products")
+      .withIndex("by_external_id", (q) => q.eq("externalId", args.externalId))
       .first();
 
     if (existing) {
@@ -374,22 +374,22 @@ export const getRecent = query({
     const oneDayMs = 24 * 60 * 60 * 1000;
 
     const products = await ctx.db
-      .query('products')
-      .withIndex('by_is_active_added_at', (q) =>
-        q.eq('isActive', true).gte('addedAt', thirtyDaysAgo)
+      .query("products")
+      .withIndex("by_is_active_added_at", (q) =>
+        q.eq("isActive", true).gte("addedAt", thirtyDaysAgo)
       )
       .collect();
 
     // Cache cafe lookups to avoid redundant queries
     const cafeCache = new Map<string, { name: string; creationTime: number }>();
-    const getCafe = async (cafeId: Id<'cafes'>) => {
+    const getCafe = async (cafeId: Id<"cafes">) => {
       const cached = cafeCache.get(cafeId);
       if (cached) {
         return cached;
       }
       const cafe = await ctx.db.get(cafeId);
       const result = {
-        name: cafe?.name || '',
+        name: cafe?.name || "",
         creationTime: cafe?._creationTime ?? 0,
       };
       cafeCache.set(cafeId, result);
@@ -428,7 +428,7 @@ export const getRecent = query({
 });
 
 export const getById = query({
-  args: { productId: v.id('products') },
+  args: { productId: v.id("products") },
   handler: async (ctx, { productId }) => {
     return await ctx.db.get(productId);
   },
@@ -442,8 +442,8 @@ export const getByExternalId = query({
   handler: async (ctx, { cafeSlug, externalId }) => {
     // First find the cafe by slug
     const cafe = await ctx.db
-      .query('cafes')
-      .withIndex('by_slug', (q) => q.eq('slug', cafeSlug))
+      .query("cafes")
+      .withIndex("by_slug", (q) => q.eq("slug", cafeSlug))
       .first();
 
     if (!cafe) {
@@ -452,9 +452,9 @@ export const getByExternalId = query({
 
     // Then find the product by cafeId and externalId
     const product = await ctx.db
-      .query('products')
-      .withIndex('by_cafe_external_id', (q) =>
-        q.eq('cafeId', cafe._id).eq('externalId', externalId)
+      .query("products")
+      .withIndex("by_cafe_external_id", (q) =>
+        q.eq("cafeId", cafe._id).eq("externalId", externalId)
       )
       .first();
 
@@ -470,8 +470,8 @@ export const getByExternalIds = query({
   handler: async (ctx, { cafeSlug, externalIds }) => {
     // First find the cafe by slug
     const cafe = await ctx.db
-      .query('cafes')
-      .withIndex('by_slug', (q) => q.eq('slug', cafeSlug))
+      .query("cafes")
+      .withIndex("by_slug", (q) => q.eq("slug", cafeSlug))
       .first();
 
     if (!cafe) {
@@ -480,12 +480,12 @@ export const getByExternalIds = query({
 
     // Query products by cafeId and filter by externalIds
     const products = await ctx.db
-      .query('products')
-      .withIndex('by_cafe', (q) => q.eq('cafeId', cafe._id))
+      .query("products")
+      .withIndex("by_cafe", (q) => q.eq("cafeId", cafe._id))
       .filter((q) =>
         q.or(
           ...externalIds.map((externalId) =>
-            q.eq(q.field('externalId'), externalId)
+            q.eq(q.field("externalId"), externalId)
           )
         )
       )
@@ -503,8 +503,8 @@ export const getByShortId = query({
   handler: async (ctx, { shortId }) => {
     // First try to find by shortId
     const product = await ctx.db
-      .query('products')
-      .withIndex('by_short_id', (q) => q.eq('shortId', shortId))
+      .query("products")
+      .withIndex("by_short_id", (q) => q.eq("shortId", shortId))
       .first();
 
     if (!product) {
@@ -525,15 +525,15 @@ export const getByShortId = query({
 
 export const updateImage = mutation({
   args: {
-    productId: v.id('products'),
-    storageId: v.id('_storage'),
+    productId: v.id("products"),
+    storageId: v.id("_storage"),
     uploadSecret: v.optional(v.string()),
   },
   handler: async (ctx, { productId, storageId, uploadSecret }) => {
     // Verify upload secret for protected operations
     const expectedSecret = process.env.CONVEX_UPLOAD_SECRET;
     if (expectedSecret && uploadSecret !== expectedSecret) {
-      throw new Error('Unauthorized: Invalid upload secret');
+      throw new Error("Unauthorized: Invalid upload secret");
     }
 
     // Get the current product to check for existing image
@@ -568,8 +568,8 @@ export const getAllWithImages = query({
   args: {},
   handler: async (ctx) => {
     const products = await ctx.db
-      .query('products')
-      .filter((q) => q.neq(q.field('imageStorageId'), undefined))
+      .query("products")
+      .filter((q) => q.neq(q.field("imageStorageId"), undefined))
       .collect();
 
     // Sort by updatedAt (latest first) to prioritize recent uploads
@@ -579,19 +579,19 @@ export const getAllWithImages = query({
 
 export const deleteProduct = mutation({
   args: {
-    productId: v.id('products'),
+    productId: v.id("products"),
     uploadSecret: v.optional(v.string()),
   },
   handler: async (ctx, { productId, uploadSecret }) => {
     // Verify upload secret for protected operations
     const expectedSecret = process.env.CONVEX_UPLOAD_SECRET;
     if (expectedSecret && uploadSecret !== expectedSecret) {
-      throw new Error('Unauthorized: Invalid upload secret');
+      throw new Error("Unauthorized: Invalid upload secret");
     }
 
     const product = await ctx.db.get(productId);
     if (!product) {
-      return { success: false, error: 'Product not found' };
+      return { success: false, error: "Product not found" };
     }
 
     // Clean up associated image
@@ -612,7 +612,7 @@ export const deleteProduct = mutation({
 
 export const markAsRemoved = mutation({
   args: {
-    cafeId: v.id('cafes'),
+    cafeId: v.id("cafes"),
     currentExternalIds: v.array(v.string()),
   },
   handler: async (ctx, { cafeId, currentExternalIds }) => {
@@ -620,9 +620,9 @@ export const markAsRemoved = mutation({
 
     // Get all active products for this cafe
     const allProducts = await ctx.db
-      .query('products')
-      .withIndex('by_cafe', (q) => q.eq('cafeId', cafeId))
-      .filter((q) => q.eq(q.field('isActive'), true))
+      .query("products")
+      .withIndex("by_cafe", (q) => q.eq("cafeId", cafeId))
+      .filter((q) => q.eq(q.field("isActive"), true))
       .collect();
 
     const removedProducts: string[] = [];
@@ -643,9 +643,9 @@ export const markAsRemoved = mutation({
 
     // Find products that were previously removed but are now back
     const previouslyRemovedProducts = await ctx.db
-      .query('products')
-      .withIndex('by_cafe', (q) => q.eq('cafeId', cafeId))
-      .filter((q) => q.eq(q.field('isActive'), false))
+      .query("products")
+      .withIndex("by_cafe", (q) => q.eq("cafeId", cafeId))
+      .filter((q) => q.eq(q.field("isActive"), false))
       .collect();
 
     for (const product of previouslyRemovedProducts) {

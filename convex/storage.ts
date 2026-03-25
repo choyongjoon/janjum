@@ -1,6 +1,6 @@
-import { v } from 'convex/values';
-import type { Id } from './_generated/dataModel';
-import { mutation, query } from './_generated/server';
+import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
+import { mutation, query } from "./_generated/server";
 
 /**
  * Get storage files from the system with pagination
@@ -15,14 +15,14 @@ export const getAllStorageFiles = query({
     // Ensure we don't exceed Convex limits
     const safeLimit = Math.min(limit, 8000);
 
-    let storageQuery = ctx.db.system.query('_storage');
+    let storageQuery = ctx.db.system.query("_storage");
 
     if (cursor) {
       // Resume from cursor
-      storageQuery = storageQuery.filter((q) => q.gt(q.field('_id'), cursor));
+      storageQuery = storageQuery.filter((q) => q.gt(q.field("_id"), cursor));
     }
 
-    const storageFiles = await storageQuery.order('asc').take(safeLimit + 1); // Take one extra to check if there are more
+    const storageFiles = await storageQuery.order("asc").take(safeLimit + 1); // Take one extra to check if there are more
 
     const hasMore = storageFiles.length > safeLimit;
     const items = hasMore ? storageFiles.slice(0, safeLimit) : storageFiles;
@@ -41,7 +41,7 @@ export const getAllStorageFiles = query({
  * Get metadata for multiple storage files
  */
 export const getStorageMetadata = query({
-  args: { storageIds: v.array(v.id('_storage')) },
+  args: { storageIds: v.array(v.id("_storage")) },
   handler: async (ctx, { storageIds }) => {
     const metadataPromises = storageIds.map(async (storageId) => {
       try {
@@ -69,14 +69,14 @@ export const getStorageMetadata = query({
  */
 export const deleteStorageFile = mutation({
   args: {
-    storageId: v.id('_storage'),
+    storageId: v.id("_storage"),
     uploadSecret: v.optional(v.string()),
   },
   handler: async (ctx, { storageId, uploadSecret }) => {
     // Verify upload secret for protected operations
     const expectedSecret = process.env.CONVEX_UPLOAD_SECRET;
     if (expectedSecret && uploadSecret !== expectedSecret) {
-      throw new Error('Unauthorized: Invalid upload secret');
+      throw new Error("Unauthorized: Invalid upload secret");
     }
 
     try {
@@ -97,19 +97,19 @@ export const deleteStorageFile = mutation({
  */
 export const deleteStorageFiles = mutation({
   args: {
-    storageIds: v.array(v.id('_storage')),
+    storageIds: v.array(v.id("_storage")),
     uploadSecret: v.optional(v.string()),
   },
   handler: async (ctx, { storageIds, uploadSecret }) => {
     // Verify upload secret for protected operations
     const expectedSecret = process.env.CONVEX_UPLOAD_SECRET;
     if (expectedSecret && uploadSecret !== expectedSecret) {
-      throw new Error('Unauthorized: Invalid upload secret');
+      throw new Error("Unauthorized: Invalid upload secret");
     }
 
     const results: Array<{
       success: boolean;
-      storageId: Id<'_storage'>;
+      storageId: Id<"_storage">;
       error?: string;
     }> = [];
 
@@ -144,7 +144,7 @@ export const deleteStorageFiles = mutation({
 export const getStorageStats = query({
   args: {},
   handler: async (ctx) => {
-    const storageFiles = await ctx.db.system.query('_storage').collect();
+    const storageFiles = await ctx.db.system.query("_storage").collect();
 
     let totalSize = 0;
     const totalFiles = storageFiles.length;

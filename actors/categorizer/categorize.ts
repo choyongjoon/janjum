@@ -1,18 +1,18 @@
 #!/usr/bin/env tsx
 
-import fs from 'node:fs';
-import path from 'node:path';
-import readline from 'node:readline';
-import { AVAILABLE_CAFES } from '../../shared/constants';
-import { logger } from '../../shared/logger';
-import { ProductCategorizer } from './categorizer';
+import fs from "node:fs";
+import path from "node:path";
+import readline from "node:readline";
+import { AVAILABLE_CAFES } from "../../shared/constants";
+import { logger } from "../../shared/logger";
+import { ProductCategorizer } from "./categorizer";
 import type {
   CategorizeOptions,
   CategorizerResult,
   CategorizeStats,
   Category,
   ProductForCategorize,
-} from './types';
+} from "./types";
 
 // Initialize categorizer
 const categorizer = new ProductCategorizer();
@@ -31,31 +31,31 @@ function parseArgs(): {
     const arg = args[i];
 
     switch (arg) {
-      case '--dry-run':
+      case "--dry-run":
         options.dryRun = true;
         break;
-      case '--interactive':
+      case "--interactive":
         options.interactive = true;
         break;
-      case '--verbose':
+      case "--verbose":
         options.verbose = true;
         break;
-      case '--file':
+      case "--file":
         options.file = args[i + 1];
         i++; // Skip next argument
         break;
-      case '--confidence':
-        options.confidence = args[i + 1] as 'all' | 'low' | 'medium';
+      case "--confidence":
+        options.confidence = args[i + 1] as "all" | "low" | "medium";
         i++; // Skip next argument
         break;
-      case '--limit':
+      case "--limit":
         options.limit = Number.parseInt(args[i + 1], 10);
         i++; // Skip next argument
         break;
-      case '--force':
+      case "--force":
         options.force = true;
         break;
-      case '--help':
+      case "--help":
         printHelp();
         process.exit(0);
         break;
@@ -63,10 +63,10 @@ function parseArgs(): {
         // Check if it's a valid cafe slug
         if (arg in AVAILABLE_CAFES) {
           cafeSlugs.push(arg);
-        } else if (!arg.startsWith('--')) {
+        } else if (!arg.startsWith("--")) {
           logger.error(`Invalid cafe slug: ${arg}`);
           logger.info(
-            `Available cafes: ${Object.keys(AVAILABLE_CAFES).join(', ')}`
+            `Available cafes: ${Object.keys(AVAILABLE_CAFES).join(", ")}`
           );
           process.exit(1);
         }
@@ -95,7 +95,7 @@ Usage:
 Available Cafes:
 ${Object.entries(AVAILABLE_CAFES)
   .map(([key, cafe]) => `  ${key.padEnd(10)} - ${cafe.name}`)
-  .join('\n')}
+  .join("\n")}
 
 Description:
   Categorizes products from crawler JSON files. Runs between crawl and upload commands.
@@ -125,9 +125,9 @@ Examples:
 function findLatestFileForCafe(cafeSlug: string): string | null {
   const outputDir = path.join(
     process.cwd(),
-    'actors',
-    'crawler',
-    'crawler-outputs'
+    "actors",
+    "crawler",
+    "crawler-outputs"
   );
 
   if (!fs.existsSync(outputDir)) {
@@ -138,7 +138,7 @@ function findLatestFileForCafe(cafeSlug: string): string | null {
 
   const files = fs
     .readdirSync(outputDir)
-    .filter((file) => file.startsWith(cafePattern) && file.endsWith('.json'))
+    .filter((file) => file.startsWith(cafePattern) && file.endsWith(".json"))
     .map((file) => ({
       name: file,
       path: path.join(outputDir, file),
@@ -153,13 +153,13 @@ function findLatestFileForCafe(cafeSlug: string): string | null {
 function findRecentCrawlerFiles(cafeSlugs: string[]): string[] {
   const outputDir = path.join(
     process.cwd(),
-    'actors',
-    'crawler',
-    'crawler-outputs'
+    "actors",
+    "crawler",
+    "crawler-outputs"
   );
 
   if (!fs.existsSync(outputDir)) {
-    logger.warn('Crawler outputs directory does not exist');
+    logger.warn("Crawler outputs directory does not exist");
     return [];
   }
 
@@ -185,7 +185,7 @@ function findRecentCrawlerFiles(cafeSlugs: string[]): string[] {
 
     return recentFiles;
   } catch (error) {
-    logger.error('Failed to find crawler files:', error);
+    logger.error("Failed to find crawler files:", error);
     return [];
   }
 }
@@ -200,7 +200,7 @@ function getProductsFromJson(
       throw new Error(`JSON file not found: ${filePath}`);
     }
 
-    const jsonData = fs.readFileSync(filePath, 'utf-8');
+    const jsonData = fs.readFileSync(filePath, "utf-8");
     const products: ProductForCategorize[] = JSON.parse(jsonData);
 
     logger.info(
@@ -208,7 +208,7 @@ function getProductsFromJson(
     );
     return limit ? products.slice(0, limit) : products;
   } catch (error) {
-    logger.error('Failed to read products from JSON file:', error);
+    logger.error("Failed to read products from JSON file:", error);
     throw error;
   }
 }
@@ -220,12 +220,12 @@ function writeProductsToJson(
 ) {
   try {
     const jsonData = JSON.stringify(products, null, 2);
-    fs.writeFileSync(filePath, jsonData, 'utf-8');
+    fs.writeFileSync(filePath, jsonData, "utf-8");
     logger.info(
       `💾 Wrote ${products.length} products to JSON file: ${filePath}`
     );
   } catch (error) {
-    logger.error('Failed to write products to JSON file:', error);
+    logger.error("Failed to write products to JSON file:", error);
     throw error;
   }
 }
@@ -241,33 +241,33 @@ function getHumanCategoryChoice(
   });
 
   const categories: Category[] = [
-    '커피',
-    '차',
-    '블렌디드',
-    '스무디',
-    '주스',
-    '에이드',
-    '아이스크림',
-    '그 외',
+    "커피",
+    "차",
+    "블렌디드",
+    "스무디",
+    "주스",
+    "에이드",
+    "아이스크림",
+    "그 외",
   ];
 
   logger.info(`\n📦 Product: ${productName}`);
   if (externalCategory) {
     logger.info(`🏷️  External Category: ${externalCategory}`);
   }
-  logger.info('\nAvailable categories:');
+  logger.info("\nAvailable categories:");
   categories.forEach((cat, index) => {
     logger.info(`  ${index + 1}. ${cat}`);
   });
 
   return new Promise((resolve) => {
-    rl.question('\nSelect category (1-8): ', (answer) => {
+    rl.question("\nSelect category (1-8): ", (answer) => {
       const choice = Number.parseInt(answer, 10);
       if (choice >= 1 && choice <= 8) {
         resolve(categories[choice - 1]);
       } else {
         logger.info('Invalid choice, defaulting to "그 외"');
-        resolve('그 외');
+        resolve("그 외");
       }
       rl.close();
     });
@@ -313,7 +313,7 @@ function shouldSkipProduct(
 ): boolean {
   if (
     options.confidence &&
-    options.confidence !== 'all' &&
+    options.confidence !== "all" &&
     result.confidence !== options.confidence
   ) {
     if (options.verbose) {
@@ -335,7 +335,7 @@ async function getFinalCategory(
 
   if (
     options.interactive &&
-    (result.confidence === 'low' || result.source === 'fallback')
+    (result.confidence === "low" || result.source === "fallback")
   ) {
     finalCategory = await getHumanCategoryChoice(
       product.name,
@@ -363,7 +363,7 @@ function updateCategoryStats(
   stats: CategorizeStats
 ): void {
   stats.confidenceBreakdown[result.confidence]++;
-  if (result.source !== 'human') {
+  if (result.source !== "human") {
     stats.sourceBreakdown[result.source]++;
   }
 }
@@ -379,10 +379,10 @@ function handleCategoryUpdate(
   const shouldUpdate = options.force || product.category !== finalCategory;
 
   // Format the applied rule for debugging
-  const ruleInfo = result.matchedRule ? ` | Rule: ${result.matchedRule}` : '';
+  const ruleInfo = result.matchedRule ? ` | Rule: ${result.matchedRule}` : "";
   const externalCategoryInfo = product.externalCategory
     ? ` | External: "${product.externalCategory}"`
-    : '';
+    : "";
 
   if (shouldUpdate) {
     // Update the category in memory
@@ -391,7 +391,7 @@ function handleCategoryUpdate(
     stats.updated++;
 
     const action =
-      options.force && oldCategory === finalCategory ? 'Forced' : 'Updated';
+      options.force && oldCategory === finalCategory ? "Forced" : "Updated";
     logger.info(
       `✅ ${action} "${product.name}": ${oldCategory} → ${finalCategory} | Source: ${result.source} | Confidence: ${result.confidence}${ruleInfo}${externalCategoryInfo}`
     );
@@ -432,38 +432,38 @@ function printSummary(
   const endTime = Date.now();
   const totalTime = Math.round((endTime - startTime) / 1000);
 
-  logger.info('='.repeat(50));
-  logger.info('📊 CATEGORIZATION SUMMARY');
+  logger.info("=".repeat(50));
+  logger.info("📊 CATEGORIZATION SUMMARY");
   logger.info(`📦 Processed: ${stats.processed} products`);
   logger.info(`✅ Updated: ${stats.updated} products`);
   logger.info(`➡️  Unchanged: ${stats.unchanged} products`);
   logger.info(`❌ Errors: ${stats.errors} products`);
   logger.info(`⏱️  Total time: ${totalTime} seconds`);
 
-  logger.info('\n🎯 Confidence Breakdown:');
+  logger.info("\n🎯 Confidence Breakdown:");
   logger.info(`  High: ${stats.confidenceBreakdown.high}`);
   logger.info(`  Medium: ${stats.confidenceBreakdown.medium}`);
   logger.info(`  Low: ${stats.confidenceBreakdown.low}`);
 
-  logger.info('\n🔧 Source Breakdown:');
+  logger.info("\n🔧 Source Breakdown:");
   logger.info(`  Direct: ${stats.sourceBreakdown.direct}`);
   logger.info(`  Pattern: ${stats.sourceBreakdown.pattern}`);
   logger.info(`  Fallback: ${stats.sourceBreakdown.fallback}`);
   logger.info(`  Human: ${stats.sourceBreakdown.human}`);
 
   if (options.dryRun) {
-    logger.info('\n🔍 DRY RUN MODE - No data was actually updated');
+    logger.info("\n🔍 DRY RUN MODE - No data was actually updated");
   }
 
   if (options.force) {
     logger.info(
-      '\n⚡ FORCE MODE - All products were processed regardless of current category'
+      "\n⚡ FORCE MODE - All products were processed regardless of current category"
     );
   }
 
   // Show categorizer statistics
   const categorizerStats = categorizer.getStats();
-  logger.info('\n📈 Categorizer Statistics:');
+  logger.info("\n📈 Categorizer Statistics:");
   logger.info(
     `  Total categorizations: ${categorizerStats.totalCategorizations}`
   );
@@ -503,21 +503,21 @@ async function categorizeProducts(
     } else {
       // Process recent crawler JSON files for specified cafes
       logger.info(
-        `🤖 Processing most recent crawler files for cafes: ${cafeSlugs.join(', ')}`
+        `🤖 Processing most recent crawler files for cafes: ${cafeSlugs.join(", ")}`
       );
       filesToProcess = findRecentCrawlerFiles(cafeSlugs);
 
       if (filesToProcess.length === 0) {
-        logger.warn('⚠️  No recent crawler files found. Run crawlers first.');
+        logger.warn("⚠️  No recent crawler files found. Run crawlers first.");
         return;
       }
     }
 
     // Process each file
     for (const filePath of filesToProcess) {
-      logger.info(`\n${'='.repeat(60)}`);
+      logger.info(`\n${"=".repeat(60)}`);
       logger.info(`🏪 Processing: ${path.basename(filePath)}`);
-      logger.info(`${'='.repeat(60)}`);
+      logger.info(`${"=".repeat(60)}`);
 
       try {
         const processedProducts = await processJsonProducts(
@@ -539,7 +539,7 @@ async function categorizeProducts(
       }
     }
   } catch (error) {
-    logger.error('Error during categorization:', error);
+    logger.error("Error during categorization:", error);
     throw error;
   }
 
@@ -551,52 +551,52 @@ async function main() {
   try {
     const { options, cafeSlugs } = parseArgs();
 
-    logger.info('🏷️  Product Categorizer Starting');
-    logger.info(`🏪 Will process cafes: ${cafeSlugs.join(', ')}`);
+    logger.info("🏷️  Product Categorizer Starting");
+    logger.info(`🏪 Will process cafes: ${cafeSlugs.join(", ")}`);
     logger.info(
-      '🤖 Will process most recent crawler file for each specified cafe'
+      "🤖 Will process most recent crawler file for each specified cafe"
     );
 
     logger.info(
-      '💾 Categories will be written back to JSON files automatically'
+      "💾 Categories will be written back to JSON files automatically"
     );
 
     if (options.dryRun) {
-      logger.info('🔍 DRY RUN MODE - No data will be updated');
+      logger.info("🔍 DRY RUN MODE - No data will be updated");
     }
 
     if (options.interactive) {
-      logger.info('🤝 INTERACTIVE MODE - Will ask for human input');
+      logger.info("🤝 INTERACTIVE MODE - Will ask for human input");
     }
 
     if (options.force) {
-      logger.info('⚡ FORCE MODE - Will override all categories');
+      logger.info("⚡ FORCE MODE - Will override all categories");
     }
 
-    logger.info('='.repeat(50));
+    logger.info("=".repeat(50));
 
     await categorizeProducts(options, cafeSlugs);
 
-    logger.info('🎉 Categorization completed successfully!');
+    logger.info("🎉 Categorization completed successfully!");
   } catch (error) {
-    logger.error('Fatal error in categorizer:', error);
+    logger.error("Fatal error in categorizer:", error);
     process.exit(1);
   }
 }
 
 // Handle graceful shutdown
-process.on('SIGINT', () => {
-  logger.info('🛑 Received SIGINT, shutting down gracefully...');
+process.on("SIGINT", () => {
+  logger.info("🛑 Received SIGINT, shutting down gracefully...");
   process.exit(0);
 });
 
-process.on('SIGTERM', () => {
-  logger.info('🛑 Received SIGTERM, shutting down gracefully...');
+process.on("SIGTERM", () => {
+  logger.info("🛑 Received SIGTERM, shutting down gracefully...");
   process.exit(0);
 });
 
 // Run the main function
 main().catch((error) => {
-  logger.error('Unhandled error:', error);
+  logger.error("Unhandled error:", error);
   process.exit(1);
 });

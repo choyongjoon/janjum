@@ -1,17 +1,17 @@
-import type { SVGProps } from 'react';
+import type { SVGProps } from "react";
 
 interface ExternalLinkIconProps extends SVGProps<SVGSVGElement> {
-  size?: 'sm' | 'md' | 'lg';
+  size?: "sm" | "md" | "lg";
 }
 
 export function ExternalLinkIcon({
-  size = 'md',
+  size = "md",
   ...props
 }: ExternalLinkIconProps) {
   const sizeClasses = {
-    sm: 'h-3 w-3',
-    md: 'h-4 w-4',
-    lg: 'h-5 w-5',
+    sm: "h-3 w-3",
+    md: "h-4 w-4",
+    lg: "h-5 w-5",
   };
 
   return (

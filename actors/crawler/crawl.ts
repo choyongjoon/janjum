@@ -1,10 +1,10 @@
 #!/usr/bin/env tsx
 
-import { spawn } from 'node:child_process';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { AVAILABLE_CAFES } from 'shared/constants';
-import { logger } from '../../shared/logger';
+import { spawn } from "node:child_process";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { AVAILABLE_CAFES } from "shared/constants";
+import { logger } from "../../shared/logger";
 
 // ESM equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -25,7 +25,7 @@ Usage:
 Available Crawlers:
 ${Object.entries(AVAILABLE_CAFES)
   .map(([key, crawler]) => `  ${key.padEnd(10)} - ${crawler.name}`)
-  .join('\n')}
+  .join("\n")}
 
 Options:
   --help, -h         Show this help message
@@ -37,7 +37,7 @@ function parseArgs(): CrawlerName[] {
   const args = process.argv.slice(2);
 
   // Check for help flags
-  if (args.includes('--help') || args.includes('-h')) {
+  if (args.includes("--help") || args.includes("-h")) {
     printHelp();
     process.exit(0);
   }
@@ -60,9 +60,9 @@ function parseArgs(): CrawlerName[] {
   }
 
   if (invalidCrawlers.length > 0) {
-    logger.error(`Invalid crawler names: ${invalidCrawlers.join(', ')}`);
+    logger.error(`Invalid crawler names: ${invalidCrawlers.join(", ")}`);
     logger.info(
-      `Available crawlers: ${Object.keys(AVAILABLE_CAFES).join(', ')}`
+      `Available crawlers: ${Object.keys(AVAILABLE_CAFES).join(", ")}`
     );
     process.exit(1);
   }
@@ -78,15 +78,15 @@ function runCrawler(crawlerName: CrawlerName): Promise<void> {
 
     logger.info(`🚀 Starting ${crawler.name} crawler...`);
 
-    const child = spawn('tsx', [crawlerPath], {
-      stdio: ['inherit', 'pipe', 'inherit'],
+    const child = spawn("tsx", [crawlerPath], {
+      stdio: ["inherit", "pipe", "inherit"],
       cwd: process.cwd(),
     });
 
-    let lastErrorMsg = '';
-    child.stdout?.on('data', (chunk: Buffer) => {
+    let lastErrorMsg = "";
+    child.stdout?.on("data", (chunk: Buffer) => {
       process.stdout.write(chunk);
-      for (const line of chunk.toString().split('\n')) {
+      for (const line of chunk.toString().split("\n")) {
         try {
           const parsed = JSON.parse(line) as { level?: number; msg?: string };
           if (parsed.level && parsed.level >= 50 && parsed.msg) {
@@ -98,12 +98,12 @@ function runCrawler(crawlerName: CrawlerName): Promise<void> {
       }
     });
 
-    child.on('close', (code) => {
+    child.on("close", (code) => {
       if (code === 0) {
         logger.info(`✅ ${crawler.name} crawler completed successfully`);
         resolve();
       } else {
-        const reason = lastErrorMsg ? `\n  Reason: ${lastErrorMsg}` : '';
+        const reason = lastErrorMsg ? `\n  Reason: ${lastErrorMsg}` : "";
         logger.error(
           `❌ ${crawler.name} crawler failed with exit code ${code}${reason}`
         );
@@ -115,7 +115,7 @@ function runCrawler(crawlerName: CrawlerName): Promise<void> {
       }
     });
 
-    child.on('error', (error) => {
+    child.on("error", (error) => {
       logger.error(
         `❌ Failed to start ${crawler.name} crawler: ${error.message}`
       );
@@ -129,9 +129,9 @@ async function main() {
   try {
     const crawlersToRun = parseArgs();
 
-    logger.info('🎯 Crawler Runner Starting');
-    logger.info(`📋 Crawlers to run: ${crawlersToRun.join(', ')}`);
-    logger.info('='.repeat(50));
+    logger.info("🎯 Crawler Runner Starting");
+    logger.info(`📋 Crawlers to run: ${crawlersToRun.join(", ")}`);
+    logger.info("=".repeat(50));
 
     const startTime = Date.now();
     let successCount = 0;
@@ -149,7 +149,7 @@ async function main() {
 
       // Add a small delay between crawlers
       if (crawlersToRun.indexOf(crawlerName) < crawlersToRun.length - 1) {
-        logger.info('⏳ Waiting 3 seconds before next crawler...');
+        logger.info("⏳ Waiting 3 seconds before next crawler...");
         await new Promise((resolve) => setTimeout(resolve, 3000));
       }
     }
@@ -158,8 +158,8 @@ async function main() {
     const totalTime = Math.round((endTime - startTime) / 1000);
 
     // Final summary
-    logger.info('='.repeat(50));
-    logger.info('📊 CRAWLER RUN SUMMARY');
+    logger.info("=".repeat(50));
+    logger.info("📊 CRAWLER RUN SUMMARY");
     logger.info(
       `✅ Successful: ${successCount}/${crawlersToRun.length} crawlers`
     );
@@ -167,30 +167,30 @@ async function main() {
     logger.info(`⏱️  Total time: ${totalTime} seconds`);
 
     if (failCount > 0) {
-      logger.error('Some crawlers failed. Check logs above for details.');
+      logger.error("Some crawlers failed. Check logs above for details.");
       process.exit(1);
     } else {
-      logger.info('🎉 All crawlers completed successfully!');
+      logger.info("🎉 All crawlers completed successfully!");
     }
   } catch (error) {
-    logger.error('Fatal error in crawler runner:', error);
+    logger.error("Fatal error in crawler runner:", error);
     process.exit(1);
   }
 }
 
 // Handle graceful shutdown
-process.on('SIGINT', () => {
-  logger.info('🛑 Received SIGINT, shutting down gracefully...');
+process.on("SIGINT", () => {
+  logger.info("🛑 Received SIGINT, shutting down gracefully...");
   process.exit(0);
 });
 
-process.on('SIGTERM', () => {
-  logger.info('🛑 Received SIGTERM, shutting down gracefully...');
+process.on("SIGTERM", () => {
+  logger.info("🛑 Received SIGTERM, shutting down gracefully...");
   process.exit(0);
 });
 
 // Run the main function
 main().catch((error) => {
-  logger.error('Unhandled error:', error);
+  logger.error("Unhandled error:", error);
   process.exit(1);
 });

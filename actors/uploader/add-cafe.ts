@@ -1,13 +1,13 @@
 #!/usr/bin/env tsx
 
-import { ConvexClient } from 'convex/browser';
-import dotenv from 'dotenv';
-import { AVAILABLE_CAFES } from 'shared/constants';
-import sharp from 'sharp';
-import { api } from '../../convex/_generated/api';
-import { logger } from '../../shared/logger';
+import { ConvexClient } from "convex/browser";
+import dotenv from "dotenv";
+import { AVAILABLE_CAFES } from "shared/constants";
+import sharp from "sharp";
+import { api } from "../../convex/_generated/api";
+import { logger } from "../../shared/logger";
 
-dotenv.config({ path: '.env.local' });
+dotenv.config({ path: ".env.local" });
 
 const CONVEX_URL = process.env.VITE_CONVEX_URL;
 const UPLOAD_SECRET = process.env.CONVEX_UPLOAD_SECRET;
@@ -26,25 +26,25 @@ const TOUCH_ICON_REGEX =
 
 // Known cafe website URLs for og:image fetching
 const CAFE_WEBSITES: Partial<Record<CafeKey, string>> = {
-  starbucks: 'https://www.starbucks.co.kr',
-  compose: 'https://composecoffee.com',
-  mega: 'https://www.mega-mgccoffee.com',
-  paik: 'https://paikdabang.com',
-  ediya: 'https://www.ediya.com',
-  twosome: 'https://www.twosome.co.kr',
-  coffeebean: 'https://www.coffeebeankorea.com',
-  hollys: 'https://www.hollys.co.kr',
-  paulbassett: 'https://www.paulbassett.co.kr',
-  mammoth: 'https://mmthcoffee.com',
-  gongcha: 'https://www.gong-cha.co.kr',
-  oozy: 'https://oozycoffee.com',
-  angelinus: 'https://www.lotteeatz.com/brand/angel',
+  starbucks: "https://www.starbucks.co.kr",
+  compose: "https://composecoffee.com",
+  mega: "https://www.mega-mgccoffee.com",
+  paik: "https://paikdabang.com",
+  ediya: "https://www.ediya.com",
+  twosome: "https://www.twosome.co.kr",
+  coffeebean: "https://www.coffeebeankorea.com",
+  hollys: "https://www.hollys.co.kr",
+  paulbassett: "https://www.paulbassett.co.kr",
+  mammoth: "https://mmthcoffee.com",
+  gongcha: "https://www.gong-cha.co.kr",
+  oozy: "https://oozycoffee.com",
+  angelinus: "https://www.lotteeatz.com/brand/angel",
 };
 
 function parseArgs(): ParsedArgs {
   const args = process.argv.slice(2);
 
-  if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
+  if (args.length === 0 || args.includes("--help") || args.includes("-h")) {
     logger.info(`
 Usage:
   pnpm add-cafe <cafe-key> [--image-url <url>]
@@ -52,7 +52,7 @@ Usage:
 Available cafes:
 ${Object.entries(AVAILABLE_CAFES)
   .map(([key, cafe]) => `  ${key.padEnd(14)} - ${cafe.name}`)
-  .join('\n')}
+  .join("\n")}
 
 Options:
   --image-url <url>  Provide a specific image URL (otherwise fetches og:image from website)
@@ -63,12 +63,12 @@ Options:
   const cafeKey = args[0];
   if (!(cafeKey in AVAILABLE_CAFES)) {
     logger.error(`Invalid cafe key: ${cafeKey}`);
-    logger.info(`Available: ${Object.keys(AVAILABLE_CAFES).join(', ')}`);
+    logger.info(`Available: ${Object.keys(AVAILABLE_CAFES).join(", ")}`);
     process.exit(1);
   }
 
   let imageUrl: string | undefined;
-  const imageUrlIndex = args.indexOf('--image-url');
+  const imageUrlIndex = args.indexOf("--image-url");
   if (imageUrlIndex !== -1 && args[imageUrlIndex + 1]) {
     imageUrl = args[imageUrlIndex + 1];
   }
@@ -77,7 +77,7 @@ Options:
 }
 
 function resolveUrl(url: string, baseUrl: string): string {
-  return url.startsWith('http') ? url : new URL(url, baseUrl).href;
+  return url.startsWith("http") ? url : new URL(url, baseUrl).href;
 }
 
 async function fetchOgImage(siteUrl: string): Promise<string | null> {
@@ -85,8 +85,8 @@ async function fetchOgImage(siteUrl: string): Promise<string | null> {
 
   const response = await fetch(siteUrl, {
     headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+      "User-Agent":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
     },
   });
 
@@ -118,9 +118,9 @@ async function downloadAndOptimizeImage(
   const imageUrlObj = new URL(imageUrl);
   const response = await fetch(imageUrl, {
     headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-      Accept: 'image/webp,image/apng,image/*,*/*;q=0.8',
+      "User-Agent":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+      Accept: "image/webp,image/apng,image/*,*/*;q=0.8",
       Referer: `${imageUrlObj.protocol}//${imageUrlObj.hostname}/`,
     },
   });
@@ -136,7 +136,7 @@ async function downloadAndOptimizeImage(
 
   const metadata = await sharp(imageBuffer).metadata();
 
-  if (metadata.format === 'webp') {
+  if (metadata.format === "webp") {
     logger.info(`Image is already WebP (${originalSize} bytes)`);
     return imageBuffer;
   }
@@ -165,8 +165,8 @@ async function uploadToStorage(
   });
 
   const uploadResponse = await fetch(uploadUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'image/webp' },
+    method: "POST",
+    headers: { "Content-Type": "image/webp" },
     body: new Uint8Array(imageBuffer),
   });
 
@@ -200,7 +200,7 @@ async function fetchAndUploadImage(
   imageUrl: string | undefined
 ): Promise<string | undefined> {
   if (!imageUrl) {
-    logger.warn('No image URL found, creating cafe without image');
+    logger.warn("No image URL found, creating cafe without image");
     return;
   }
 
@@ -214,10 +214,10 @@ async function fetchAndUploadImage(
 
 async function main() {
   if (!CONVEX_URL) {
-    throw new Error('VITE_CONVEX_URL is not set');
+    throw new Error("VITE_CONVEX_URL is not set");
   }
   if (!UPLOAD_SECRET) {
-    throw new Error('CONVEX_UPLOAD_SECRET is not set');
+    throw new Error("CONVEX_UPLOAD_SECRET is not set");
   }
 
   const { cafeKey, imageUrl: providedImageUrl } = parseArgs();
@@ -235,7 +235,7 @@ async function main() {
     logger.info(
       `Cafe "${cafe.name}" already exists with image (id: ${existing._id})`
     );
-    logger.info('Nothing to do.');
+    logger.info("Nothing to do.");
     process.exit(0);
   }
 
@@ -267,11 +267,11 @@ async function main() {
     logger.info(`Created cafe "${cafe.name}" (id: ${cafeId})`);
   }
 
-  logger.info('Done!');
+  logger.info("Done!");
   process.exit(0);
 }
 
 main().catch((error) => {
-  logger.error('Failed to add cafe:', error);
+  logger.error("Failed to add cafe:", error);
   process.exit(1);
 });

@@ -1,18 +1,18 @@
-import { PlaywrightCrawler } from 'crawlee';
-import type { Locator, Page } from 'playwright';
-import { logger } from '../../shared/logger';
-import type { Nutritions } from '../../shared/nutritions';
-import { type Product, waitForLoad, writeProductsToJson } from './crawlerUtils';
+import { PlaywrightCrawler } from "crawlee";
+import type { Locator, Page } from "playwright";
+import { logger } from "../../shared/logger";
+import type { Nutritions } from "../../shared/nutritions";
+import { type Product, waitForLoad, writeProductsToJson } from "./crawlerUtils";
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
 // ================================================
 
 const SITE_CONFIG = {
-  baseUrl: 'https://www.coffeebeankorea.com',
-  startUrl: 'https://www.coffeebeankorea.com/menu/list.asp?category=13',
+  baseUrl: "https://www.coffeebeankorea.com",
+  startUrl: "https://www.coffeebeankorea.com/menu/list.asp?category=13",
   categoryUrlTemplate:
-    'https://www.coffeebeankorea.com/menu/list.asp?category=13',
+    "https://www.coffeebeankorea.com/menu/list.asp?category=13",
 } as const;
 
 // ================================================
@@ -21,18 +21,18 @@ const SITE_CONFIG = {
 
 const SELECTORS = {
   // Category navigation selectors
-  categoryLinks: 'ul.lnb_wrap2 > li:nth-child(1) > ul:nth-child(2) li a',
+  categoryLinks: "ul.lnb_wrap2 > li:nth-child(1) > ul:nth-child(2) li a",
 
-  pagination: 'div.paging > a',
+  pagination: "div.paging > a",
 
   // Product listing selectors
-  productContainers: '.menu_list > li',
+  productContainers: ".menu_list > li",
 
   // Product data selectors
-  productName: 'dl.txt > dt > span:nth-child(2)',
-  nameEn: 'dl.txt > dt > span:nth-child(1)',
-  productImage: 'img',
-  productDescription: 'dl.txt > dd',
+  productName: "dl.txt > dt > span:nth-child(2)",
+  nameEn: "dl.txt > dt > span:nth-child(1)",
+  productImage: "img",
+  productDescription: "dl.txt > dd",
 } as const;
 
 // ================================================
@@ -40,12 +40,12 @@ const SELECTORS = {
 // ================================================
 
 // Test mode configuration
-const isTestMode = process.env.CRAWLER_TEST_MODE === 'true';
+const isTestMode = process.env.CRAWLER_TEST_MODE === "true";
 const maxProductsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS || '3', 10)
+  ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS || "3", 10)
   : Number.POSITIVE_INFINITY;
 const maxRequestsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || '10', 10)
+  ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || "10", 10)
   : 50;
 
 const CRAWLER_CONFIG = {
@@ -55,7 +55,7 @@ const CRAWLER_CONFIG = {
   requestHandlerTimeoutSecs: isTestMode ? 60 : 240,
   launchOptions: {
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'] as string[],
+    args: ["--no-sandbox", "--disable-setuid-sandbox"] as string[],
   },
 } as const;
 
@@ -69,7 +69,7 @@ async function extractNutritionData(
 ): Promise<Nutritions | null> {
   try {
     // Look for nutrition data in the .info selector
-    const nutritionElement = container.locator('.info');
+    const nutritionElement = container.locator(".info");
 
     // Check if nutrition element exists
     const nutritionElementCount = await nutritionElement.count();
@@ -78,7 +78,7 @@ async function extractNutritionData(
     }
 
     // Extract nutrition data from dl elements
-    const dlElements = nutritionElement.locator('dl');
+    const dlElements = nutritionElement.locator("dl");
     const dlCount = await dlElements.count();
 
     if (dlCount === 0) {
@@ -89,8 +89,8 @@ async function extractNutritionData(
 
     for (let i = 0; i < dlCount; i++) {
       const dl = dlElements.nth(i);
-      const dt = await dl.locator('dt').textContent();
-      const dd = await dl.locator('dd').textContent();
+      const dt = await dl.locator("dt").textContent();
+      const dd = await dl.locator("dd").textContent();
 
       if (!(dt && dd)) {
         continue;
@@ -101,29 +101,29 @@ async function extractNutritionData(
         continue;
       }
 
-      const label = dd.replace(/\s+/g, ' ').trim().toLowerCase();
+      const label = dd.replace(/\s+/g, " ").trim().toLowerCase();
 
-      if (label.includes('열량') || label.includes('kcal')) {
+      if (label.includes("열량") || label.includes("kcal")) {
         nutritions.calories = value;
-        nutritions.caloriesUnit = 'kcal';
-      } else if (label.includes('나트륨') || label.includes('sodium')) {
+        nutritions.caloriesUnit = "kcal";
+      } else if (label.includes("나트륨") || label.includes("sodium")) {
         nutritions.natrium = value;
-        nutritions.natriumUnit = 'mg';
-      } else if (label.includes('탄수화물') || label.includes('carbohydrate')) {
+        nutritions.natriumUnit = "mg";
+      } else if (label.includes("탄수화물") || label.includes("carbohydrate")) {
         nutritions.carbohydrates = value;
-        nutritions.carbohydratesUnit = 'g';
-      } else if (label.includes('당') || label.includes('sugar')) {
+        nutritions.carbohydratesUnit = "g";
+      } else if (label.includes("당") || label.includes("sugar")) {
         nutritions.sugar = value;
-        nutritions.sugarUnit = 'g';
-      } else if (label.includes('단백질') || label.includes('protein')) {
+        nutritions.sugarUnit = "g";
+      } else if (label.includes("단백질") || label.includes("protein")) {
         nutritions.protein = value;
-        nutritions.proteinUnit = 'g';
-      } else if (label.includes('카페인') || label.includes('caffeine')) {
+        nutritions.proteinUnit = "g";
+      } else if (label.includes("카페인") || label.includes("caffeine")) {
         nutritions.caffeine = value;
-        nutritions.caffeineUnit = 'mg';
-      } else if (label.includes('포화지방') || label.includes('saturated')) {
+        nutritions.caffeineUnit = "mg";
+      } else if (label.includes("포화지방") || label.includes("saturated")) {
         nutritions.saturatedFat = value;
-        nutritions.saturatedFatUnit = 'g';
+        nutritions.saturatedFatUnit = "g";
       }
     }
 
@@ -133,7 +133,7 @@ async function extractNutritionData(
       : null;
   } catch (error) {
     logger.debug(
-      'Failed to extract nutrition data from Coffeebean menu item:',
+      "Failed to extract nutrition data from Coffeebean menu item:",
       error as Record<string, unknown>
     );
     return null;
@@ -144,7 +144,7 @@ async function extractCategoriesFromMenu(
   page: Page
 ): Promise<Array<{ name: string; url: string }>> {
   try {
-    logger.info('📄 Extracting categories from menu');
+    logger.info("📄 Extracting categories from menu");
 
     await waitForLoad(page);
 
@@ -155,12 +155,12 @@ async function extractCategoriesFromMenu(
     for (const element of categoryElements) {
       const [text, href] = await Promise.all([
         element.textContent(),
-        element.getAttribute('href'),
+        element.getAttribute("href"),
       ]);
 
       if (text?.trim() && href) {
         const categoryName = text.trim();
-        const fullUrl = href.startsWith('http')
+        const fullUrl = href.startsWith("http")
           ? href
           : `${SITE_CONFIG.baseUrl}${href}`;
 
@@ -186,12 +186,12 @@ async function findNextPageLink(
 ): Promise<Locator | null> {
   for (const link of paginationLinks) {
     const linkText = await link.textContent();
-    const href = await link.getAttribute('href');
+    const href = await link.getAttribute("href");
 
     if (
       href &&
-      (linkText?.includes('다음') ||
-        linkText?.includes('next') ||
+      (linkText?.includes("다음") ||
+        linkText?.includes("next") ||
         linkText?.trim() === String(currentPage + 1))
     ) {
       return link;
@@ -209,7 +209,7 @@ function shouldContinuePagination(
   }[]
 ): boolean {
   if (isTestMode) {
-    logger.info('🧪 Test mode: limiting to first page only');
+    logger.info("🧪 Test mode: limiting to first page only");
     return false;
   }
 
@@ -370,7 +370,7 @@ async function extractProductsFromCurrentPage(
                 container
                   .locator(SELECTORS.productName)
                   .textContent()
-                  .then((text) => text?.trim() || ''),
+                  .then((text) => text?.trim() || ""),
                 container
                   .locator(SELECTORS.nameEn)
                   .textContent()
@@ -378,20 +378,20 @@ async function extractProductsFromCurrentPage(
                   .catch(() => null),
                 container
                   .locator(SELECTORS.productImage)
-                  .getAttribute('src')
+                  .getAttribute("src")
                   .then((src) => {
                     if (!src) {
-                      return '';
+                      return "";
                     }
-                    if (src.startsWith('http')) {
+                    if (src.startsWith("http")) {
                       return src;
                     }
-                    if (src.startsWith('/')) {
+                    if (src.startsWith("/")) {
                       return `${SITE_CONFIG.baseUrl}${src}`;
                     }
                     return `${SITE_CONFIG.baseUrl}/${src}`;
                   })
-                  .catch(() => ''),
+                  .catch(() => ""),
                 container
                   .locator(SELECTORS.productDescription)
                   .textContent()
@@ -402,7 +402,7 @@ async function extractProductsFromCurrentPage(
 
             if (name) {
               logger.info(
-                `✅ Extracted: ${name}${nameEn ? ` (${nameEn})` : ''} [Page ${pageNumber}]${nutritions ? ' with nutrition data' : ''}`
+                `✅ Extracted: ${name}${nameEn ? ` (${nameEn})` : ""} [Page ${pageNumber}]${nutritions ? " with nutrition data" : ""}`
               );
               return { name, nameEn, imageUrl, description, nutritions };
             }
@@ -471,7 +471,7 @@ async function handleMainMenuPage(
   page: Page,
   crawlerInstance: PlaywrightCrawler
 ) {
-  logger.info('Processing coffeebean menu page');
+  logger.info("Processing coffeebean menu page");
 
   await waitForLoad(page);
   // Debug screenshot removed for performance
@@ -519,8 +519,8 @@ async function handleMainMenuPage(
     logger.info(
       '🔖 No categories found, processing current page as "All Items"'
     );
-    const products = await extractProductsFromListing(page, 'All Items');
-    await processProducts(products, 'All Items', page.url(), crawlerInstance);
+    const products = await extractProductsFromListing(page, "All Items");
+    await processProducts(products, "All Items", page.url(), crawlerInstance);
   }
 }
 
@@ -579,9 +579,9 @@ export const runCoffeebeanCrawler = async () => {
   try {
     await crawler.run([SITE_CONFIG.startUrl]);
     const dataset = await crawler.getData();
-    await writeProductsToJson(dataset.items as Product[], 'coffeebean');
+    await writeProductsToJson(dataset.items as Product[], "coffeebean");
   } catch (error) {
-    logger.error('Coffeebean crawler failed:', error);
+    logger.error("Coffeebean crawler failed:", error);
     throw error;
   }
 };
@@ -589,7 +589,7 @@ export const runCoffeebeanCrawler = async () => {
 // Only run if this file is executed directly (not imported)
 if (import.meta.url === `file://${process.argv[1]}`) {
   runCoffeebeanCrawler().catch((error) => {
-    logger.error('Crawler execution failed:', error);
+    logger.error("Crawler execution failed:", error);
     process.exit(1);
   });
 }

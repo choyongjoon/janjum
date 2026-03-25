@@ -1,16 +1,16 @@
-import { PlaywrightCrawler } from 'crawlee';
-import type { Locator, Page } from 'playwright';
-import { logger } from '../../shared/logger';
-import type { Nutritions } from '../../shared/nutritions';
-import { type Product, waitForLoad, writeProductsToJson } from './crawlerUtils';
+import { PlaywrightCrawler } from "crawlee";
+import type { Locator, Page } from "playwright";
+import { logger } from "../../shared/logger";
+import type { Nutritions } from "../../shared/nutritions";
+import { type Product, waitForLoad, writeProductsToJson } from "./crawlerUtils";
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
 // ================================================
 
 const SITE_CONFIG = {
-  baseUrl: 'https://www.gong-cha.co.kr',
-  startUrl: 'https://www.gong-cha.co.kr/brand/menu/product?category=001001',
+  baseUrl: "https://www.gong-cha.co.kr",
+  startUrl: "https://www.gong-cha.co.kr/brand/menu/product?category=001001",
 } as const;
 
 // ================================================
@@ -22,12 +22,12 @@ const SITE_CONFIG = {
 // ================================================
 
 // Test mode configuration
-const isTestMode = process.env.CRAWLER_TEST_MODE === 'true';
+const isTestMode = process.env.CRAWLER_TEST_MODE === "true";
 const maxProductsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS || '3', 10)
+  ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS || "3", 10)
   : Number.POSITIVE_INFINITY;
 const maxRequestsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || '10', 10)
+  ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || "10", 10)
   : 150;
 
 const CRAWLER_CONFIG = {
@@ -38,13 +38,13 @@ const CRAWLER_CONFIG = {
   launchOptions: {
     headless: true,
     args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-web-security',
-      '--disable-features=VizDisplayCompositor',
-      '--disable-background-timer-throttling',
-      '--disable-backgrounding-occluded-windows',
-      '--disable-renderer-backgrounding',
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-web-security",
+      "--disable-features=VizDisplayCompositor",
+      "--disable-background-timer-throttling",
+      "--disable-backgrounding-occluded-windows",
+      "--disable-renderer-backgrounding",
     ],
   },
 };
@@ -63,31 +63,31 @@ const UNIT_EXTRACTION_REGEX = /\(([^)]+)\)/;
 async function extractNutritionData(page: Page): Promise<Nutritions | null> {
   try {
     // Look for the nutrition table on the detail page
-    const nutritionTable = page.locator('.table-list table');
+    const nutritionTable = page.locator(".table-list table");
 
     if ((await nutritionTable.count()) === 0) {
-      logger.warn('No nutrition table found on page');
+      logger.warn("No nutrition table found on page");
       return null;
     }
 
     // Extract both headers and values using batch evaluation for better performance
     const nutritionData = await page.evaluate(() => {
-      const table = document.querySelector('.table-list table');
+      const table = document.querySelector(".table-list table");
       if (!table) {
         return { tableHeaders: [], tableRows: [] };
       }
 
       // Get headers from thead
-      const headerCells = table.querySelectorAll('thead tr th');
+      const headerCells = table.querySelectorAll("thead tr th");
       const tableHeaders = Array.from(headerCells).map(
-        (cell) => cell.textContent?.trim().replace(/\s+/g, ' ') || ''
+        (cell) => cell.textContent?.trim().replace(/\s+/g, " ") || ""
       );
 
       // Get all rows from tbody
-      const bodyRows = table.querySelectorAll('tbody tr');
+      const bodyRows = table.querySelectorAll("tbody tr");
       const tableRows = Array.from(bodyRows).map((row) => {
-        const cells = row.querySelectorAll('td');
-        return Array.from(cells).map((cell) => cell.textContent?.trim() || '');
+        const cells = row.querySelectorAll("td");
+        return Array.from(cells).map((cell) => cell.textContent?.trim() || "");
       });
 
       return { tableHeaders, tableRows };
@@ -96,13 +96,13 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
     const { tableHeaders: headers, tableRows: allRows } = nutritionData;
 
     if (headers.length === 0 || allRows.length === 0) {
-      logger.warn('No nutrition data found in table');
+      logger.warn("No nutrition data found in table");
       return null;
     }
 
-    logger.info(`Gongcha nutrition headers: ${headers.join(', ')}`);
+    logger.info(`Gongcha nutrition headers: ${headers.join(", ")}`);
     logger.info(
-      `Gongcha nutrition all rows: ${allRows.map((row) => `[${row.join(', ')}]`).join(' | ')}`
+      `Gongcha nutrition all rows: ${allRows.map((row) => `[${row.join(", ")}]`).join(" | ")}`
     );
 
     // Convert table to object format by finding the best row with most complete nutrition data
@@ -118,7 +118,7 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
       const rowData: { [key: string]: string | number } = {};
 
       // Handle the first column(s) which might be category info like "Cold L" or "Hot J"
-      let categoryInfo = '';
+      let categoryInfo = "";
       let dataStartIndex = 0;
 
       // Find where the actual numeric nutrition data starts
@@ -127,7 +127,7 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
           dataStartIndex = i;
           break;
         }
-        categoryInfo += (categoryInfo ? ' ' : '') + row[i];
+        categoryInfo += (categoryInfo ? " " : "") + row[i];
       }
 
       // Add category info
@@ -156,7 +156,7 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
       // Score this row based on how many numeric nutrition values it has
       let score = 0;
       for (const [_key, value] of Object.entries(rowData)) {
-        if (typeof value === 'number' && value > 0) {
+        if (typeof value === "number" && value > 0) {
           score++;
         }
       }
@@ -171,7 +171,7 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
     }
 
     if (Object.keys(bestNutritionData).length === 0) {
-      logger.warn('No valid nutrition data found in any row');
+      logger.warn("No valid nutrition data found in any row");
       return null;
     }
 
@@ -185,7 +185,7 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
 
     // Parse nutrition values
     const parseValue = (text: string | null): number | null => {
-      if (!text || text.trim() === '' || text.trim() === '-') {
+      if (!text || text.trim() === "" || text.trim() === "-") {
         return null;
       }
       const parsed = Number.parseFloat(text.trim());
@@ -194,23 +194,23 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
 
     // Map headers to nutrition fields based on Korean text
     // Handle both possible serving size units
-    let servingSizeText = '';
-    let servingSizeUnit = '';
+    let servingSizeText = "";
+    let servingSizeUnit = "";
 
     // Try different variations of serving size headers (with/without spaces)
     const servingSizeHeaders = [
-      '1회 제공량(g)',
-      '1회 제공량 (g)',
-      '1회 제공량(ml)',
-      '1회 제공량 (ml)',
+      "1회 제공량(g)",
+      "1회 제공량 (g)",
+      "1회 제공량(ml)",
+      "1회 제공량 (ml)",
     ];
 
     for (const header of servingSizeHeaders) {
       if (nutritionMap.has(header)) {
-        servingSizeText = nutritionMap.get(header) || '';
+        servingSizeText = nutritionMap.get(header) || "";
         // Extract unit from header
         const unitMatch = header.match(UNIT_EXTRACTION_REGEX);
-        servingSizeUnit = unitMatch ? unitMatch[1] : 'g';
+        servingSizeUnit = unitMatch ? unitMatch[1] : "g";
         break;
       }
     }
@@ -218,11 +218,11 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
     // If still not found, try pattern matching
     if (!servingSizeText) {
       for (const [header, value] of nutritionMap) {
-        if (header.includes('1회 제공량')) {
+        if (header.includes("1회 제공량")) {
           servingSizeText = value;
           // Extract unit from header like '1회 제공량(g)' or '1회 제공량(ml)'
           const unitMatch = header.match(UNIT_EXTRACTION_REGEX);
-          servingSizeUnit = unitMatch ? unitMatch[1] : 'g';
+          servingSizeUnit = unitMatch ? unitMatch[1] : "g";
           break;
         }
       }
@@ -252,7 +252,7 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
             if (value && NUMERIC_REGEX.test(value)) {
               servingSizeText = value;
               const unitMatch = header.match(UNIT_EXTRACTION_REGEX);
-              servingSizeUnit = unitMatch ? unitMatch[1] : 'ml';
+              servingSizeUnit = unitMatch ? unitMatch[1] : "ml";
 
               // Update nutritionMap to this row's values
               nutritionMap.clear();
@@ -276,17 +276,17 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
 
     // Map other nutrition fields with various possible formats (with/without spaces)
     const caloriesText =
-      nutritionMap.get('열량(kcal)') || nutritionMap.get('열량 (kcal)') || '';
+      nutritionMap.get("열량(kcal)") || nutritionMap.get("열량 (kcal)") || "";
     const sodiumText =
-      nutritionMap.get('나트륨(mg)') || nutritionMap.get('나트륨 (mg)') || '';
+      nutritionMap.get("나트륨(mg)") || nutritionMap.get("나트륨 (mg)") || "";
     const sugarText =
-      nutritionMap.get('당류(g)') || nutritionMap.get('당류 (g)') || '';
+      nutritionMap.get("당류(g)") || nutritionMap.get("당류 (g)") || "";
     const saturatedFatText =
-      nutritionMap.get('포화지방(g)') || nutritionMap.get('포화지방 (g)') || '';
+      nutritionMap.get("포화지방(g)") || nutritionMap.get("포화지방 (g)") || "";
     const proteinText =
-      nutritionMap.get('단백질(g)') || nutritionMap.get('단백질 (g)') || '';
+      nutritionMap.get("단백질(g)") || nutritionMap.get("단백질 (g)") || "";
     const caffeineText =
-      nutritionMap.get('카페인(mg)') || nutritionMap.get('카페인 (mg)') || '';
+      nutritionMap.get("카페인(mg)") || nutritionMap.get("카페인 (mg)") || "";
 
     const servingSize = parseValue(servingSizeText);
     const calories = parseValue(caloriesText);
@@ -302,48 +302,48 @@ async function extractNutritionData(page: Page): Promise<Nutritions | null> {
 
     const nutritions: Nutritions = {
       servingSize: servingSize ?? undefined,
-      servingSizeUnit: servingSize !== null ? servingSizeUnit : undefined,
+      servingSizeUnit: servingSize === null ? undefined : servingSizeUnit,
       calories: calories ?? undefined,
-      caloriesUnit: calories !== null ? 'kcal' : undefined,
+      caloriesUnit: calories === null ? undefined : "kcal",
       carbohydrates: undefined, // Gongcha doesn't provide carbohydrates data
       carbohydratesUnit: undefined,
       sugar: sugar ?? undefined,
-      sugarUnit: sugar !== null ? 'g' : undefined,
+      sugarUnit: sugar === null ? undefined : "g",
       protein: protein ?? undefined,
-      proteinUnit: protein !== null ? 'g' : undefined,
+      proteinUnit: protein === null ? undefined : "g",
       fat: undefined, // Gongcha doesn't provide total fat data
       fatUnit: undefined,
       transFat: undefined, // Gongcha doesn't provide trans fat data
       transFatUnit: undefined,
       saturatedFat: saturatedFat ?? undefined,
-      saturatedFatUnit: saturatedFat !== null ? 'g' : undefined,
+      saturatedFatUnit: saturatedFat === null ? undefined : "g",
       natrium: sodium ?? undefined,
-      natriumUnit: sodium !== null ? 'mg' : undefined,
+      natriumUnit: sodium === null ? undefined : "mg",
       cholesterol: undefined, // Gongcha doesn't provide cholesterol data
       cholesterolUnit: undefined,
       caffeine: caffeine ?? undefined,
-      caffeineUnit: caffeine !== null ? 'mg' : undefined,
+      caffeineUnit: caffeine === null ? undefined : "mg",
     };
 
     // Only return nutrition data if at least one nutrition field has a value
     const hasNutritionData = Object.entries(nutritions).some(
-      ([key, value]) => !key.endsWith('Unit') && value !== null
+      ([key, value]) => !key.endsWith("Unit") && value !== null
     );
 
     return hasNutritionData ? nutritions : null;
   } catch (error) {
-    logger.error('Error extracting nutrition data from Gongcha page:', error);
+    logger.error("Error extracting nutrition data from Gongcha page:", error);
     return null;
   }
 }
 
 async function extractBasicProductInfo(container: Locator) {
-  const imageElement = container.locator('img').first();
-  const imageSrc = await imageElement.getAttribute('src').catch(() => '');
+  const imageElement = container.locator("img").first();
+  const imageSrc = await imageElement.getAttribute("src").catch(() => "");
 
   // Get product name from container text content
-  const containerText = (await container.textContent().catch(() => '')) || '';
-  const productName = containerText.replace(/\s+/g, ' ').trim();
+  const containerText = (await container.textContent().catch(() => "")) || "";
+  const productName = containerText.replace(/\s+/g, " ").trim();
 
   if (!productName) {
     return null;
@@ -358,7 +358,7 @@ async function navigateToProductDetail(
   productLink: Locator,
   productName: string
 ): Promise<void> {
-  const href = await productLink.getAttribute('href').catch(() => '');
+  const href = await productLink.getAttribute("href").catch(() => "");
   logger.info(
     `Extracting description and nutrition for: ${productName} (href: ${href})`
   );
@@ -383,37 +383,37 @@ function isValidProductDescription(text: string): boolean {
   const trimmed = text.trim();
   return (
     trimmed.length > 20 &&
-    !trimmed.includes('Follow us') &&
-    !trimmed.includes('Menu') &&
-    !trimmed.includes('공차') &&
-    (trimmed.includes('티') ||
-      trimmed.includes('스무디') ||
-      trimmed.includes('밀크'))
+    !trimmed.includes("Follow us") &&
+    !trimmed.includes("Menu") &&
+    !trimmed.includes("공차") &&
+    (trimmed.includes("티") ||
+      trimmed.includes("스무디") ||
+      trimmed.includes("밀크"))
   );
 }
 
 // Helper function to extract description from main element
 async function extractMainDescription(page: Page): Promise<string> {
-  const descElement = page.locator('.text-a .t2').first();
+  const descElement = page.locator(".text-a .t2").first();
   if ((await descElement.count()) > 0) {
-    const description = (await descElement.textContent()) || '';
+    const description = (await descElement.textContent()) || "";
     return description.trim();
   }
-  return '';
+  return "";
 }
 
 // Helper function to extract description from fallback elements
 async function extractFallbackDescription(page: Page): Promise<string> {
-  const descElements = page.locator('p');
+  const descElements = page.locator("p");
   const descCount = await descElements.count();
 
   for (let i = 0; i < descCount; i++) {
-    const text = (await descElements.nth(i).textContent()) || '';
+    const text = (await descElements.nth(i).textContent()) || "";
     if (isValidProductDescription(text)) {
       return text.trim();
     }
   }
-  return '';
+  return "";
 }
 
 // Helper function to extract complete product description
@@ -444,19 +444,19 @@ async function extractDescriptionAndNutritionFromDetailPage(
       logger.warn(`No description found for ${productName}`);
     }
 
-    return { description: description || '', nutritions };
+    return { description: description || "", nutritions };
   } catch (error) {
     logger.error(`Navigation failed for ${productName}: ${error}`);
-    return { description: '', nutritions: null };
+    return { description: "", nutritions: null };
   }
 }
 
 function generateExternalId(imageSrc: string): string {
   if (imageSrc) {
     const idFromImage = imageSrc
-      .split('/')
+      .split("/")
       .pop()
-      ?.replace(FILE_EXTENSION_REGEX, '');
+      ?.replace(FILE_EXTENSION_REGEX, "");
     if (idFromImage) {
       return idFromImage;
     }
@@ -472,7 +472,7 @@ async function extractProductFromContainer(
   try {
     const basicInfo = await extractBasicProductInfo(container);
     if (!basicInfo) {
-      logger.warn('Could not extract product name from container');
+      logger.warn("Could not extract product name from container");
       return null;
     }
 
@@ -483,7 +483,7 @@ async function extractProductFromContainer(
     const currentUrl = page.url();
 
     // Get the product detail URL before navigation
-    const productHref = await productLink.getAttribute('href').catch(() => '');
+    const productHref = await productLink.getAttribute("href").catch(() => "");
     const productDetailUrl = productHref
       ? new URL(productHref, SITE_CONFIG.baseUrl).href
       : currentUrl;
@@ -499,7 +499,7 @@ async function extractProductFromContainer(
     await page.goto(currentUrl);
     await page.waitForTimeout(500); // Reduced wait time
 
-    const externalId = generateExternalId(imageSrc || '');
+    const externalId = generateExternalId(imageSrc || "");
 
     const product: Product = {
       name: productName,
@@ -509,7 +509,7 @@ async function extractProductFromContainer(
       externalId,
       externalImageUrl: imageSrc
         ? new URL(imageSrc, SITE_CONFIG.baseUrl).href
-        : '',
+        : "",
       externalUrl: productDetailUrl,
       price: null,
       category: categoryName,
@@ -531,9 +531,9 @@ async function extractCategoryName(page: Page): Promise<string> {
   try {
     // First try to get the active tab name (subcategory)
     const activeTabText = await page
-      .locator('.tabWrap ul li.active a')
+      .locator(".tabWrap ul li.active a")
       .textContent()
-      .catch(() => '');
+      .catch(() => "");
 
     if (activeTabText?.trim()) {
       const categoryName = activeTabText.trim();
@@ -544,7 +544,7 @@ async function extractCategoryName(page: Page): Promise<string> {
     logger.warn(`Could not extract category name from page: ${error}`);
   }
 
-  return 'New 시즌 메뉴'; // Default fallback
+  return "New 시즌 메뉴"; // Default fallback
 }
 
 async function extractProductsFromPage(
@@ -558,7 +558,7 @@ async function extractProductsFromPage(
 
   // Find product containers - look for list items that contain product detail links
   const productContainers = await page
-    .locator('li')
+    .locator("li")
     .filter({
       has: page.locator('a[href*="detail"]'),
     })
@@ -596,7 +596,7 @@ async function handleStartPage(
   crawlerInstance: PlaywrightCrawler
 ): Promise<void> {
   logger.info(
-    'Processing Gongcha start page - extracting all subcategory URLs and processing current page products'
+    "Processing Gongcha start page - extracting all subcategory URLs and processing current page products"
   );
 
   await waitForLoad(page);
@@ -632,7 +632,7 @@ async function handleStartPage(
     const categoryUrls = extractCategoryUrlsFromPage(page);
 
     if (categoryUrls.length === 0) {
-      logger.error('No category URLs found');
+      logger.error("No category URLs found");
       return;
     }
 
@@ -640,11 +640,11 @@ async function handleStartPage(
 
     // Add all subcategory URLs to the request queue, except the current one since we already processed it
     for (const url of categoryUrls) {
-      if (url !== currentUrl) {
-        await crawlerInstance.addRequests([{ url, label: 'category' }]);
-        logger.info(`Added subcategory URL to queue: ${url}`);
-      } else {
+      if (url === currentUrl) {
         logger.info(`Skipping current URL (already processed): ${url}`);
+      } else {
+        await crawlerInstance.addRequests([{ url, label: "category" }]);
+        logger.info(`Added subcategory URL to queue: ${url}`);
       }
     }
 
@@ -660,7 +660,7 @@ async function handleCategoryPage(
   page: Page,
   crawlerInstance: PlaywrightCrawler
 ): Promise<void> {
-  logger.info('Processing Gongcha subcategory page');
+  logger.info("Processing Gongcha subcategory page");
 
   await waitForLoad(page);
   // Skip debug screenshot for better performance
@@ -702,20 +702,20 @@ function extractAllCategoryUrls(): { url: string; name: string }[] {
   // Pre-defined list of all subcategories based on the site structure
   const allCategories = [
     // 음료 subcategories
-    { categoryCode: '001001', name: 'New 시즌 메뉴', mainCategory: '음료' },
-    { categoryCode: '001002', name: '베스트셀러', mainCategory: '음료' },
-    { categoryCode: '001006', name: '밀크티', mainCategory: '음료' },
-    { categoryCode: '001010', name: '스무디', mainCategory: '음료' },
-    { categoryCode: '001003', name: '오리지널 티', mainCategory: '음료' },
-    { categoryCode: '001015', name: '프룻티&모어', mainCategory: '음료' },
-    { categoryCode: '001011', name: '커피', mainCategory: '음료' },
+    { categoryCode: "001001", name: "New 시즌 메뉴", mainCategory: "음료" },
+    { categoryCode: "001002", name: "베스트셀러", mainCategory: "음료" },
+    { categoryCode: "001006", name: "밀크티", mainCategory: "음료" },
+    { categoryCode: "001010", name: "스무디", mainCategory: "음료" },
+    { categoryCode: "001003", name: "오리지널 티", mainCategory: "음료" },
+    { categoryCode: "001015", name: "프룻티&모어", mainCategory: "음료" },
+    { categoryCode: "001011", name: "커피", mainCategory: "음료" },
     // 푸드 subcategories
-    { categoryCode: '002001', name: '베이커리', mainCategory: '푸드' },
-    { categoryCode: '002004', name: '스낵', mainCategory: '푸드' },
-    { categoryCode: '002006', name: '아이스크림', mainCategory: '푸드' },
+    { categoryCode: "002001", name: "베이커리", mainCategory: "푸드" },
+    { categoryCode: "002004", name: "스낵", mainCategory: "푸드" },
+    { categoryCode: "002006", name: "아이스크림", mainCategory: "푸드" },
     // MD상품 subcategories
-    { categoryCode: '003001', name: '비식품', mainCategory: 'MD상품' },
-    { categoryCode: '003002', name: '식품', mainCategory: 'MD상품' },
+    { categoryCode: "003001", name: "비식품", mainCategory: "MD상품" },
+    { categoryCode: "003002", name: "식품", mainCategory: "MD상품" },
   ];
 
   return allCategories.map((cat) => ({
@@ -726,7 +726,7 @@ function extractAllCategoryUrls(): { url: string; name: string }[] {
 
 function extractCategoryUrlsFromPage(_page: Page): string[] {
   try {
-    logger.info('Using pre-defined subcategory URLs...');
+    logger.info("Using pre-defined subcategory URLs...");
 
     const allCategories = extractAllCategoryUrls();
     const categoryUrls = allCategories.map((cat) => cat.url);
@@ -754,11 +754,11 @@ export const createGongchaCrawler = () =>
     },
     async requestHandler({ page, request, crawler: crawlerInstance }) {
       const currentUrl = page.url();
-      const label = request.label || 'start';
+      const label = request.label || "start";
 
       logger.info(`Processing page with label: ${label}, URL: ${currentUrl}`);
 
-      if (label === 'category') {
+      if (label === "category") {
         await handleCategoryPage(page, crawlerInstance);
       } else {
         // This is the start page - extract category URLs
@@ -773,7 +773,7 @@ export const createGongchaCrawler = () =>
 
 export const runGongchaCrawler = async () => {
   try {
-    logger.info('🚀 Starting Gongcha crawler with all subcategories');
+    logger.info("🚀 Starting Gongcha crawler with all subcategories");
 
     // Step 1: Create crawler and start with the initial URL
     const crawler = createGongchaCrawler();
@@ -783,13 +783,13 @@ export const runGongchaCrawler = async () => {
     await crawler.run([SITE_CONFIG.startUrl]);
 
     const dataset = await crawler.getData();
-    await writeProductsToJson(dataset.items as Product[], 'gongcha');
+    await writeProductsToJson(dataset.items as Product[], "gongcha");
 
     logger.info(
       `✅ Successfully crawled all subcategories: ${dataset.items.length} total products`
     );
   } catch (error) {
-    logger.error('Gongcha crawler failed:', error);
+    logger.error("Gongcha crawler failed:", error);
     throw error;
   }
 };
@@ -797,7 +797,7 @@ export const runGongchaCrawler = async () => {
 // Only run if this file is executed directly (not imported)
 if (import.meta.url === `file://${process.argv[1]}`) {
   runGongchaCrawler().catch((error) => {
-    logger.error('Crawler execution failed:', error);
+    logger.error("Crawler execution failed:", error);
     process.exit(1);
   });
 }
