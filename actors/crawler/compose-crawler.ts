@@ -78,7 +78,12 @@ const CRAWLER_CONFIG = {
   requestHandlerTimeoutSecs: isTestMode ? 30 : 60,
   launchOptions: {
     headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+    ],
   },
 };
 

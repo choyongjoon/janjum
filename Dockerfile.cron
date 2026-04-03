@@ -13,11 +13,14 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
-# Install Playwright Chromium
+# Install Playwright Chromium only
 RUN pnpm exec playwright install chromium
 
 COPY . .
+
+# Limit Node.js heap to 400MB to leave room for Chromium
+ENV NODE_OPTIONS="--max-old-space-size=400"
 
 CMD ["bash", "scripts/cronSyncBlockedCafes.sh"]
