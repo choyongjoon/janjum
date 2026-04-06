@@ -7,7 +7,9 @@ import sharp from "sharp";
 import { api } from "../../convex/_generated/api";
 import { logger } from "../../shared/logger";
 
-const IMAGE_CONCURRENCY = 10;
+const IMAGE_CONCURRENCY = process.env.IMAGE_CONCURRENCY
+  ? Number(process.env.IMAGE_CONCURRENCY)
+  : 10;
 
 // Load environment variables from .env.local
 dotenv.config({ path: ".env.local" });

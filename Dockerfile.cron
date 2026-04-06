@@ -22,5 +22,7 @@ COPY . .
 
 # Limit Node.js heap to 400MB to leave room for Chromium
 ENV NODE_OPTIONS="--max-old-space-size=400"
+# Reduce image concurrency to avoid OOM in 512MB container
+ENV IMAGE_CONCURRENCY="2"
 
 CMD ["bash", "scripts/cronSyncBlockedCafes.sh"]
