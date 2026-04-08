@@ -52,6 +52,7 @@
     "@vitest/ui": "^4.1.0",
     "crawlee": "^3.14.0",
     "dotenv": "^17.2.1",
+    "dotenv-cli": "^11.0.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.1.5",
     "nanoid": "^5.1.5",
