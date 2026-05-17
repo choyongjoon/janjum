@@ -2,7 +2,22 @@ import { v } from "convex/values";
 import type { Nutritions } from "../shared/nutritions";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { type MutationCtx, mutation, query } from "./_generated/server";
+import {
+  type MutationCtx,
+  mutation,
+  type QueryCtx,
+  query,
+} from "./_generated/server";
+
+async function resolveImageUrl(
+  ctx: QueryCtx,
+  imageStorageId: Id<"_storage"> | undefined
+): Promise<string | undefined> {
+  if (!imageStorageId) {
+    return undefined;
+  }
+  return (await ctx.storage.getUrl(imageStorageId)) || undefined;
+}
 
 export const getByCafe = query({
   args: { cafeId: v.id("cafes") },
@@ -17,9 +32,7 @@ export const getByCafe = query({
     const productsWithImages = await Promise.all(
       products.map(async (product) => ({
         ...product,
-        imageUrl: product.imageStorageId
-          ? (await ctx.storage.getUrl(product.imageStorageId)) || undefined
-          : undefined,
+        imageUrl: await resolveImageUrl(ctx, product.imageStorageId),
       }))
     );
 
@@ -90,9 +103,7 @@ export const search = query({
         return {
           ...product,
           cafeName: cafe?.name || "",
-          imageUrl: product.imageStorageId
-            ? (await ctx.storage.getUrl(product.imageStorageId)) || undefined
-            : undefined,
+          imageUrl: await resolveImageUrl(ctx, product.imageStorageId),
         };
       })
     );
@@ -416,9 +427,7 @@ export const getRecent = query({
         return {
           ...product,
           cafeName: cafe.name,
-          imageUrl: product.imageStorageId
-            ? (await ctx.storage.getUrl(product.imageStorageId)) || undefined
-            : undefined,
+          imageUrl: await resolveImageUrl(ctx, product.imageStorageId),
         };
       })
     );

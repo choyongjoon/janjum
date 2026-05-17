@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { mutation, query } from "./_generated/server";
+import { mutation, type QueryCtx, query } from "./_generated/server";
 
 /**
  * Rating scale mapping for Korean labels
@@ -20,6 +20,56 @@ export type RatingDistribution = {
   [key in 1 | 2 | 3 | 3.5 | 4 | 4.5 | 5]: number;
 };
 
+async function resolveImageUrls(
+  ctx: QueryCtx,
+  imageStorageIds: Id<"_storage">[] | undefined
+): Promise<string[]> {
+  if (!imageStorageIds) {
+    return [];
+  }
+  return await Promise.all(
+    imageStorageIds.map(
+      async (storageId) => (await ctx.storage.getUrl(storageId)) || ""
+    )
+  );
+}
+
+function getRatingText(rating: number): string {
+  return RATING_TEXTS[rating as keyof typeof RATING_TEXTS] || "";
+}
+
+function computeRatingStats(reviews: { rating: number }[]): {
+  averageRating: number;
+  totalReviews: number;
+  ratingDistribution: RatingDistribution;
+} {
+  const ratingDistribution: RatingDistribution = {
+    1: 0,
+    2: 0,
+    3: 0,
+    3.5: 0,
+    4: 0,
+    4.5: 0,
+    5: 0,
+  };
+
+  if (reviews.length === 0) {
+    return { averageRating: 0, totalReviews: 0, ratingDistribution };
+  }
+
+  const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
+  const averageRating = Number((totalRating / reviews.length).toFixed(1));
+
+  for (const review of reviews) {
+    const rating = review.rating as keyof RatingDistribution;
+    if (rating in ratingDistribution) {
+      ratingDistribution[rating]++;
+    }
+  }
+
+  return { averageRating, totalReviews: reviews.length, ratingDistribution };
+}
+
 /**
  * Get all reviews for a product
  */
@@ -37,27 +87,13 @@ export const getByProduct = query({
       .take(limit);
 
     // Add image URLs for review photos
-    const reviewsWithImages = await Promise.all(
-      reviews.map(async (review) => {
-        let imageUrls: string[] = [];
-        if (review.imageStorageIds) {
-          imageUrls = await Promise.all(
-            review.imageStorageIds.map(async (storageId) => {
-              return (await ctx.storage.getUrl(storageId)) || "";
-            })
-          );
-        }
-
-        return {
-          ...review,
-          imageUrls,
-          ratingText:
-            RATING_TEXTS[review.rating as keyof typeof RATING_TEXTS] || "",
-        };
-      })
+    return await Promise.all(
+      reviews.map(async (review) => ({
+        ...review,
+        imageUrls: await resolveImageUrls(ctx, review.imageStorageIds),
+        ratingText: getRatingText(review.rating),
+      }))
     );
-
-    return reviewsWithImages;
   },
 });
 
@@ -73,39 +109,7 @@ export const getProductStats = query({
       .filter((q) => q.neq(q.field("isVisible"), false))
       .collect();
 
-    if (reviews.length === 0) {
-      return {
-        averageRating: 0,
-        totalReviews: 0,
-        ratingDistribution: { 1: 0, 2: 0, 3: 0, 3.5: 0, 4: 0, 4.5: 0, 5: 0 },
-      };
-    }
-
-    const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
-    const averageRating = Number((totalRating / reviews.length).toFixed(1));
-
-    // Count distribution of ratings
-    const ratingDistribution: RatingDistribution = {
-      1: 0,
-      2: 0,
-      3: 0,
-      3.5: 0,
-      4: 0,
-      4.5: 0,
-      5: 0,
-    };
-    for (const review of reviews) {
-      const rating = review.rating as keyof typeof ratingDistribution;
-      if (rating in ratingDistribution) {
-        ratingDistribution[rating]++;
-      }
-    }
-
-    return {
-      averageRating,
-      totalReviews: reviews.length,
-      ratingDistribution,
-    };
+    return computeRatingStats(reviews);
   },
 });
 
@@ -128,21 +132,10 @@ export const getUserReview = query({
       return null;
     }
 
-    // Add image URLs
-    let imageUrls: string[] = [];
-    if (review.imageStorageIds) {
-      imageUrls = await Promise.all(
-        review.imageStorageIds.map(async (storageId) => {
-          return (await ctx.storage.getUrl(storageId)) || "";
-        })
-      );
-    }
-
     return {
       ...review,
-      imageUrls,
-      ratingText:
-        RATING_TEXTS[review.rating as keyof typeof RATING_TEXTS] || "",
+      imageUrls: await resolveImageUrls(ctx, review.imageStorageIds),
+      ratingText: getRatingText(review.rating),
     };
   },
 });
@@ -258,16 +251,7 @@ export const updateProductStats = mutation({
       .filter((q) => q.neq(q.field("isVisible"), false))
       .collect();
 
-    const totalReviews = reviews.length;
-    let averageRating = 0;
-
-    if (totalReviews > 0) {
-      const totalRating = reviews.reduce(
-        (sum, review) => sum + review.rating,
-        0
-      );
-      averageRating = Number((totalRating / totalReviews).toFixed(1));
-    }
+    const { averageRating, totalReviews } = computeRatingStats(reviews);
 
     await ctx.db.patch(productId, {
       averageRating,
@@ -305,30 +289,14 @@ export const getUserReviews = query({
       .take(limit);
 
     // Get product information for each review
-    const reviewsWithProducts = await Promise.all(
-      reviews.map(async (review) => {
-        const product = await ctx.db.get(review.productId);
-
-        let imageUrls: string[] = [];
-        if (review.imageStorageIds) {
-          imageUrls = await Promise.all(
-            review.imageStorageIds.map(async (storageId) => {
-              return (await ctx.storage.getUrl(storageId)) || "";
-            })
-          );
-        }
-
-        return {
-          ...review,
-          product,
-          imageUrls,
-          ratingText:
-            RATING_TEXTS[review.rating as keyof typeof RATING_TEXTS] || "",
-        };
-      })
+    return await Promise.all(
+      reviews.map(async (review) => ({
+        ...review,
+        product: await ctx.db.get(review.productId),
+        imageUrls: await resolveImageUrls(ctx, review.imageStorageIds),
+        ratingText: getRatingText(review.rating),
+      }))
     );
-
-    return reviewsWithProducts;
   },
 });
 
@@ -344,39 +312,7 @@ export const getUserStats = query({
       .filter((q) => q.neq(q.field("isVisible"), false))
       .collect();
 
-    if (reviews.length === 0) {
-      return {
-        totalReviews: 0,
-        averageRating: 0,
-        ratingDistribution: { 1: 0, 2: 0, 3: 0, 3.5: 0, 4: 0, 4.5: 0, 5: 0 },
-      };
-    }
-
-    const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
-    const averageRating = Number((totalRating / reviews.length).toFixed(1));
-
-    // Count distribution of ratings
-    const ratingDistribution: RatingDistribution = {
-      1: 0,
-      2: 0,
-      3: 0,
-      3.5: 0,
-      4: 0,
-      4.5: 0,
-      5: 0,
-    };
-    for (const review of reviews) {
-      const rating = review.rating as keyof typeof ratingDistribution;
-      if (rating in ratingDistribution) {
-        ratingDistribution[rating]++;
-      }
-    }
-
-    return {
-      totalReviews: reviews.length,
-      averageRating,
-      ratingDistribution,
-    };
+    return computeRatingStats(reviews);
   },
 });
 
@@ -394,30 +330,14 @@ export const getRecentReviews = query({
       .take(limit);
 
     // Get product information for each review
-    const reviewsWithProducts = await Promise.all(
-      reviews.map(async (review) => {
-        const product = await ctx.db.get(review.productId);
-
-        let imageUrls: string[] = [];
-        if (review.imageStorageIds) {
-          imageUrls = await Promise.all(
-            review.imageStorageIds.map(async (storageId) => {
-              return (await ctx.storage.getUrl(storageId)) || "";
-            })
-          );
-        }
-
-        return {
-          ...review,
-          product,
-          imageUrls,
-          ratingText:
-            RATING_TEXTS[review.rating as keyof typeof RATING_TEXTS] || "",
-        };
-      })
+    return await Promise.all(
+      reviews.map(async (review) => ({
+        ...review,
+        product: await ctx.db.get(review.productId),
+        imageUrls: await resolveImageUrls(ctx, review.imageStorageIds),
+        ratingText: getRatingText(review.rating),
+      }))
     );
-
-    return reviewsWithProducts;
   },
 });
 
@@ -448,24 +368,13 @@ export const getById = query({
       .withIndex("by_id", (q) => q.eq("_id", review.userId as Id<"users">))
       .unique();
 
-    // Add image URLs
-    let imageUrls: string[] = [];
-    if (review.imageStorageIds) {
-      imageUrls = await Promise.all(
-        review.imageStorageIds.map(async (storageId) => {
-          return (await ctx.storage.getUrl(storageId)) || "";
-        })
-      );
-    }
-
     return {
       ...review,
       product,
       cafe,
       user,
-      imageUrls,
-      ratingText:
-        RATING_TEXTS[review.rating as keyof typeof RATING_TEXTS] || "",
+      imageUrls: await resolveImageUrls(ctx, review.imageStorageIds),
+      ratingText: getRatingText(review.rating),
     };
   },
 });
