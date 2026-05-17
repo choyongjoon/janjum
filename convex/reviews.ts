@@ -16,8 +16,15 @@ export const RATING_TEXTS = {
   5: "최고",
 } as const;
 
+/**
+ * Valid rating values in ascending order
+ */
+export const RATING_VALUES = [1, 2, 3, 3.5, 4, 4.5, 5] as const;
+
+export type RatingValue = (typeof RATING_VALUES)[number];
+
 export type RatingDistribution = {
-  [key in 1 | 2 | 3 | 3.5 | 4 | 4.5 | 5]: number;
+  [key in RatingValue]: number;
 };
 
 async function resolveImageUrls(
@@ -155,10 +162,9 @@ export const upsertReview = mutation({
     const now = Date.now();
 
     // Validate rating
-    const validRatings = [1, 2, 3, 3.5, 4, 4.5, 5];
-    if (!validRatings.includes(args.rating)) {
+    if (!(RATING_VALUES as readonly number[]).includes(args.rating)) {
       throw new Error(
-        "Invalid rating. Must be one of: 1, 2, 3, 3.5, 4, 4.5, 5"
+        `Invalid rating. Must be one of: ${RATING_VALUES.join(", ")}`
       );
     }
 
