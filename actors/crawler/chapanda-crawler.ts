@@ -75,11 +75,21 @@ const CRAWLER_CONFIG = {
 // DATA EXTRACTION FUNCTIONS
 // ================================================
 
-// Drop the OSS image-processing query (`?x-oss-process=...`) so we keep the
-// original, full-resolution image instead of a resized/recompressed variant.
-function cleanImageUrl(src: string): string {
-  const queryIndex = src.indexOf("?");
-  return queryIndex === -1 ? src : src.slice(0, queryIndex);
+// Normalize a product image `src`: resolve relative paths against the site
+// base URL (the schema/uploader expect absolute URLs), then drop the OSS
+// image-processing query (`?x-oss-process=...`) so we keep the original,
+// full-resolution image instead of a resized/recompressed variant.
+function normalizeImageUrl(src: string): string {
+  if (!src) {
+    return "";
+  }
+
+  const absolute = src.startsWith("http")
+    ? src
+    : new URL(src, SITE_CONFIG.baseUrl).href;
+
+  const ossQueryIndex = absolute.indexOf("?x-oss-process");
+  return ossQueryIndex === -1 ? absolute : absolute.slice(0, ossQueryIndex);
 }
 
 async function extractProductFromCell(
@@ -111,7 +121,7 @@ async function extractProductFromCell(
     nameEn: null,
     description: null,
     price: null,
-    externalImageUrl: rawSrc ? cleanImageUrl(rawSrc) : "",
+    externalImageUrl: normalizeImageUrl(rawSrc),
     category,
     externalCategory: category,
     externalId: `chapanda_${category}_${name}`,
