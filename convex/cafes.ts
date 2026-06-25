@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { verifyUploadSecret } from "./uploadSecret";
 
 export const list = query({
   args: {},
@@ -46,8 +47,10 @@ export const getById = query({
 });
 
 export const getAllWithImages = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { uploadSecret: v.optional(v.string()) },
+  handler: async (ctx, { uploadSecret }) => {
+    verifyUploadSecret(uploadSecret);
+
     const cafes = await ctx.db
       .query("cafes")
       .filter((q) => q.neq(q.field("imageStorageId"), undefined))

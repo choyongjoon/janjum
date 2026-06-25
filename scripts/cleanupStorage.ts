@@ -21,6 +21,10 @@ if (!convexUrl) {
 }
 const client = new ConvexHttpClient(convexUrl);
 
+// Admin read queries are gated by this secret in production. May be undefined
+// in local dev, in which case the server-side check is skipped.
+const UPLOAD_SECRET = process.env.CONVEX_UPLOAD_SECRET;
+
 interface StorageReference {
   field: string;
   recordId: string;
@@ -57,6 +61,7 @@ async function getAllStorageFiles(): Promise<Id<"_storage">[]> {
       } = await client.query(api.storage.getAllStorageFiles, {
         cursor: cursor || undefined,
         limit: 8000,
+        uploadSecret: UPLOAD_SECRET,
       });
 
       allStorageIds.push(...result.files);
@@ -78,7 +83,9 @@ async function getAllStorageFiles(): Promise<Id<"_storage">[]> {
 
 async function getCafeReferences(): Promise<StorageReference[]> {
   const references: StorageReference[] = [];
-  const cafes = await client.query(api.cafes.getAllWithImages);
+  const cafes = await client.query(api.cafes.getAllWithImages, {
+    uploadSecret: UPLOAD_SECRET,
+  });
   for (const cafe of cafes) {
     references.push({
       table: "cafes",
@@ -93,7 +100,9 @@ async function getCafeReferences(): Promise<StorageReference[]> {
 
 async function getProductReferences(): Promise<StorageReference[]> {
   const references: StorageReference[] = [];
-  const products = await client.query(api.products.getAllWithImages);
+  const products = await client.query(api.products.getAllWithImages, {
+    uploadSecret: UPLOAD_SECRET,
+  });
   for (const product of products) {
     references.push({
       table: "products",
@@ -108,7 +117,9 @@ async function getProductReferences(): Promise<StorageReference[]> {
 
 async function getReviewReferences(): Promise<StorageReference[]> {
   const references: StorageReference[] = [];
-  const reviews = await client.query(api.reviews.getAllWithImages);
+  const reviews = await client.query(api.reviews.getAllWithImages, {
+    uploadSecret: UPLOAD_SECRET,
+  });
   for (const review of reviews) {
     // biome-ignore lint/style/noNonNullAssertion: safe by query
     for (const storageId of review.imageStorageIds!) {
@@ -125,7 +136,9 @@ async function getReviewReferences(): Promise<StorageReference[]> {
 
 async function getUserReferences(): Promise<StorageReference[]> {
   const references: StorageReference[] = [];
-  const users = await client.query(api.users.getAllWithImages);
+  const users = await client.query(api.users.getAllWithImages, {
+    uploadSecret: UPLOAD_SECRET,
+  });
   for (const user of users) {
     references.push({
       table: "users",
@@ -182,6 +195,7 @@ async function findDanglingFiles(): Promise<DanglingFile[]> {
   try {
     const metadataResults = await client.query(api.storage.getStorageMetadata, {
       storageIds: danglingStorageIds,
+      uploadSecret: UPLOAD_SECRET,
     });
 
     for (const result of metadataResults) {
@@ -320,7 +334,9 @@ async function deleteDanglingFiles(
 async function showStorageStats() {
   try {
     logger.info("Fetching storage statistics...");
-    const stats = await client.query(api.storage.getStorageStats);
+    const stats = await client.query(api.storage.getStorageStats, {
+      uploadSecret: UPLOAD_SECRET,
+    });
 
     logger.info(`Storage Statistics:
   Total files: ${stats.totalFiles}

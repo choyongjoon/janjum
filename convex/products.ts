@@ -8,6 +8,13 @@ import {
   type QueryCtx,
   query,
 } from "./_generated/server";
+import { nutritionsValidator } from "./nutritionsValidator";
+import { verifyUploadSecret } from "./uploadSecret";
+
+// Field names derived from the validator so changes stay in one place.
+const NUTRITION_FIELDS = Object.keys(
+  nutritionsValidator.fields
+) as (keyof Nutritions)[];
 
 async function resolveImageUrl(
   ctx: QueryCtx,
@@ -68,7 +75,8 @@ export const search = query({
       return [];
     }
 
-    // Filter by cafe if specified
+    // Filter by cafe if specified. Both branches read only active products
+    // straight from an index instead of scanning the whole table.
     let products = cafeId
       ? await ctx.db
           .query("products")
@@ -78,7 +86,7 @@ export const search = query({
           .collect()
       : await ctx.db
           .query("products")
-          .filter((q) => q.eq(q.field("isActive"), true))
+          .withIndex("by_is_active_added_at", (q) => q.eq("isActive", true))
           .collect();
 
     // Filter by category if specified
@@ -125,12 +133,16 @@ export const getSuggestions = query({
       return [];
     }
 
-    const products = await ctx.db.query("products").collect();
+    // Read only active products from the index instead of scanning every
+    // product (including removed ones) on each keystroke.
+    const products = await ctx.db
+      .query("products")
+      .withIndex("by_is_active_added_at", (q) => q.eq("isActive", true))
+      .collect();
     const term = searchTerm.toLowerCase().replace(/\s+/g, "");
 
-    // Filter active products and search in name/nameEn
+    // Search in name/nameEn
     const matches = products
-      .filter((p) => p.isActive)
       .filter(
         (p) =>
           p.name.toLowerCase().replace(/\s+/g, "").includes(term) ||
@@ -181,43 +193,16 @@ function hasNutritionChanges(
   existing?: Nutritions,
   args?: Nutritions
 ): boolean {
+  // Neither side has nutrition data -> no change.
   if (!(existing || args)) {
     return false;
   }
-  if (!existing && args) {
-    return true;
-  }
-  if (existing && !args) {
-    return true;
-  }
+  // Exactly one side has data -> changed.
   if (!(existing && args)) {
-    return false;
+    return true;
   }
-
-  return (
-    existing.servingSize !== args.servingSize ||
-    existing.servingSizeUnit !== args.servingSizeUnit ||
-    existing.calories !== args.calories ||
-    existing.caloriesUnit !== args.caloriesUnit ||
-    existing.carbohydrates !== args.carbohydrates ||
-    existing.carbohydratesUnit !== args.carbohydratesUnit ||
-    existing.sugar !== args.sugar ||
-    existing.sugarUnit !== args.sugarUnit ||
-    existing.protein !== args.protein ||
-    existing.proteinUnit !== args.proteinUnit ||
-    existing.fat !== args.fat ||
-    existing.fatUnit !== args.fatUnit ||
-    existing.transFat !== args.transFat ||
-    existing.transFatUnit !== args.transFatUnit ||
-    existing.saturatedFat !== args.saturatedFat ||
-    existing.saturatedFatUnit !== args.saturatedFatUnit ||
-    existing.natrium !== args.natrium ||
-    existing.natriumUnit !== args.natriumUnit ||
-    existing.cholesterol !== args.cholesterol ||
-    existing.cholesterolUnit !== args.cholesterolUnit ||
-    existing.caffeine !== args.caffeine ||
-    existing.caffeineUnit !== args.caffeineUnit
-  );
+  // Both sides present -> compare every field.
+  return NUTRITION_FIELDS.some((field) => existing[field] !== args[field]);
 }
 
 function hasProductChanges(
@@ -331,32 +316,7 @@ export const upsertProduct = mutation({
     externalId: v.string(),
     externalUrl: v.string(),
     price: v.optional(v.number()),
-    nutritions: v.optional(
-      v.object({
-        servingSize: v.optional(v.number()),
-        servingSizeUnit: v.optional(v.string()),
-        calories: v.optional(v.number()),
-        caloriesUnit: v.optional(v.string()),
-        carbohydrates: v.optional(v.number()),
-        carbohydratesUnit: v.optional(v.string()),
-        sugar: v.optional(v.number()),
-        sugarUnit: v.optional(v.string()),
-        protein: v.optional(v.number()),
-        proteinUnit: v.optional(v.string()),
-        fat: v.optional(v.number()),
-        fatUnit: v.optional(v.string()),
-        transFat: v.optional(v.number()),
-        transFatUnit: v.optional(v.string()),
-        saturatedFat: v.optional(v.number()),
-        saturatedFatUnit: v.optional(v.string()),
-        natrium: v.optional(v.number()),
-        natriumUnit: v.optional(v.string()),
-        cholesterol: v.optional(v.number()),
-        cholesterolUnit: v.optional(v.string()),
-        caffeine: v.optional(v.number()),
-        caffeineUnit: v.optional(v.string()),
-      })
-    ),
+    nutritions: v.optional(nutritionsValidator),
     downloadImages: v.optional(v.boolean()),
     isActive: v.optional(v.boolean()), // Default to true if not specified
   },
@@ -574,8 +534,10 @@ export const updateImage = mutation({
 });
 
 export const getAllWithImages = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { uploadSecret: v.optional(v.string()) },
+  handler: async (ctx, { uploadSecret }) => {
+    verifyUploadSecret(uploadSecret);
+
     const products = await ctx.db
       .query("products")
       .filter((q) => q.neq(q.field("imageStorageId"), undefined))

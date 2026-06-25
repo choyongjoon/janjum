@@ -2,6 +2,8 @@ import { v } from "convex/values";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { mutation, type QueryCtx, query } from "./_generated/server";
+import { verifyUploadSecret } from "./uploadSecret";
+import { getCurrentUserOrThrow } from "./users";
 
 /**
  * Rating scale mapping for Korean labels
@@ -153,12 +155,15 @@ export const getUserReview = query({
 export const upsertReview = mutation({
   args: {
     productId: v.id("products"),
-    userId: v.string(),
     rating: v.number(),
     text: v.optional(v.string()),
     imageStorageIds: v.optional(v.array(v.id("_storage"))),
   },
   handler: async (ctx, args) => {
+    // Identity is derived from the authenticated session, never trusted from
+    // the client, to prevent impersonating or overwriting another user.
+    const user = await getCurrentUserOrThrow(ctx);
+    const userId = user._id;
     const now = Date.now();
 
     // Validate rating
@@ -177,7 +182,7 @@ export const upsertReview = mutation({
     const existingReview = await ctx.db
       .query("reviews")
       .withIndex("by_product", (q) => q.eq("productId", args.productId))
-      .filter((q) => q.eq(q.field("userId"), args.userId))
+      .filter((q) => q.eq(q.field("userId"), userId))
       .first();
 
     let reviewId: Id<"reviews">;
@@ -196,7 +201,7 @@ export const upsertReview = mutation({
       // Create new review
       reviewId = await ctx.db.insert("reviews", {
         productId: args.productId,
-        userId: args.userId,
+        userId,
         rating: args.rating,
         text: args.text,
         imageStorageIds: args.imageStorageIds,
@@ -221,16 +226,16 @@ export const upsertReview = mutation({
 export const deleteReview = mutation({
   args: {
     reviewId: v.id("reviews"),
-    userId: v.string(), // For authorization
   },
-  handler: async (ctx, { reviewId, userId }) => {
+  handler: async (ctx, { reviewId }) => {
+    const user = await getCurrentUserOrThrow(ctx);
     const review = await ctx.db.get(reviewId);
 
     if (!review) {
       throw new Error("Review not found");
     }
 
-    if (review.userId !== userId) {
+    if (review.userId !== user._id) {
       throw new Error("Unauthorized: Can only delete your own reviews");
     }
 
@@ -274,6 +279,8 @@ export const updateProductStats = mutation({
 export const generateUploadUrl = mutation({
   args: {},
   handler: async (ctx) => {
+    // Only authenticated users may obtain an upload URL for review photos.
+    await getCurrentUserOrThrow(ctx);
     return await ctx.storage.generateUploadUrl();
   },
 });
@@ -386,8 +393,10 @@ export const getById = query({
 });
 
 export const getAllWithImages = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { uploadSecret: v.optional(v.string()) },
+  handler: async (ctx, { uploadSecret }) => {
+    verifyUploadSecret(uploadSecret);
+
     const reviews = await ctx.db
       .query("reviews")
       .filter((q) => q.neq(q.field("imageStorageIds"), undefined))

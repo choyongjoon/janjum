@@ -9,6 +9,7 @@ import {
   type QueryCtx,
   query,
 } from "./_generated/server";
+import { verifyUploadSecret } from "./uploadSecret";
 
 // Move regex to top level for performance
 const HANDLE_REGEX = /^[a-zA-Z0-9_-]+$/;
@@ -225,8 +226,10 @@ export const generateUploadUrl = mutation({
 });
 
 export const getAllWithImages = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { uploadSecret: v.optional(v.string()) },
+  handler: async (ctx, { uploadSecret }) => {
+    verifyUploadSecret(uploadSecret);
+
     const users = await ctx.db
       .query("users")
       .filter((q) => q.neq(q.field("imageStorageId"), undefined))
@@ -263,10 +266,11 @@ export const deleteAccount = mutation({
   handler: async (ctx) => {
     const user = await getCurrentUserOrThrow(ctx);
 
-    // Delete all user's reviews first
+    // Delete all user's reviews first. Reviews store the Convex users._id in
+    // their userId field (not the Clerk externalId), so query by _id.
     const userReviews = await ctx.db
       .query("reviews")
-      .withIndex("by_user", (q) => q.eq("userId", user.externalId))
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
       .collect();
 
     for (const review of userReviews) {
