@@ -1,7 +1,7 @@
 import { createClerkClient, type UserJSON } from "@clerk/backend";
 import { type Validator, v } from "convex/values";
 import { nanoid } from "nanoid";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import {
   action,
   internalMutation,
@@ -273,6 +273,10 @@ export const deleteAccount = mutation({
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .collect();
 
+    // Products whose cached rating stats must be recomputed once this user's
+    // reviews are removed.
+    const affectedProductIds = new Set(userReviews.map((r) => r.productId));
+
     for (const review of userReviews) {
       // Delete review images from storage
       if (review.imageStorageIds) {
@@ -282,6 +286,12 @@ export const deleteAccount = mutation({
       }
       // Delete the review
       await ctx.db.delete(review._id);
+    }
+
+    // Refresh averageRating/totalReviews for each affected product so the
+    // caches don't keep counting the now-deleted reviews.
+    for (const productId of affectedProductIds) {
+      await ctx.runMutation(api.reviews.updateProductStats, { productId });
     }
 
     // Delete user's profile image from storage

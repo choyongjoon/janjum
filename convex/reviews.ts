@@ -375,11 +375,9 @@ export const getById = query({
     // Get cafe information
     const cafe = await ctx.db.get(product.cafeId);
 
-    // Get user information
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_id", (q) => q.eq("_id", review.userId as Id<"users">))
-      .unique();
+    // Get user information. review.userId stores the Convex users._id, so
+    // look it up directly (there is no `by_id` index to query through).
+    const user = await ctx.db.get(review.userId as Id<"users">);
 
     return {
       ...review,
