@@ -239,6 +239,18 @@ export const deleteReview = mutation({
       throw new Error("Unauthorized: Can only delete your own reviews");
     }
 
+    // Clean up the review's images (best-effort) before deleting it, matching
+    // the cleanup done in deleteProduct/deleteAccount.
+    if (review.imageStorageIds) {
+      for (const imageId of review.imageStorageIds) {
+        try {
+          await ctx.storage.delete(imageId);
+        } catch (_error) {
+          // Storage cleanup failure is not critical for review deletion
+        }
+      }
+    }
+
     await ctx.db.delete(reviewId);
 
     // Update product aggregation stats
