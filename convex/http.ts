@@ -4,6 +4,7 @@ import { v } from "convex/values";
 import { Webhook } from "svix";
 import { internal } from "./_generated/api";
 import { httpAction, mutation, query } from "./_generated/server";
+import { verifyUploadSecret } from "./uploadSecret";
 
 const http = httpRouter();
 
@@ -61,11 +62,7 @@ async function validateRequest(req: Request): Promise<WebhookEvent | null> {
 export const generateUploadUrl = mutation({
   args: { uploadSecret: v.optional(v.string()) },
   handler: async (ctx, { uploadSecret }) => {
-    // Verify upload secret for protected operations
-    const expectedSecret = process.env.CONVEX_UPLOAD_SECRET;
-    if (expectedSecret && uploadSecret !== expectedSecret) {
-      throw new Error("Unauthorized: Invalid upload secret");
-    }
+    verifyUploadSecret(uploadSecret);
 
     return await ctx.storage.generateUploadUrl();
   },

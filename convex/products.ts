@@ -499,11 +499,7 @@ export const updateImage = mutation({
     uploadSecret: v.optional(v.string()),
   },
   handler: async (ctx, { productId, storageId, uploadSecret }) => {
-    // Verify upload secret for protected operations
-    const expectedSecret = process.env.CONVEX_UPLOAD_SECRET;
-    if (expectedSecret && uploadSecret !== expectedSecret) {
-      throw new Error("Unauthorized: Invalid upload secret");
-    }
+    verifyUploadSecret(uploadSecret);
 
     // Get the current product to check for existing image
     const product = await ctx.db.get(productId);
@@ -554,11 +550,7 @@ export const deleteProduct = mutation({
     uploadSecret: v.optional(v.string()),
   },
   handler: async (ctx, { productId, uploadSecret }) => {
-    // Verify upload secret for protected operations
-    const expectedSecret = process.env.CONVEX_UPLOAD_SECRET;
-    if (expectedSecret && uploadSecret !== expectedSecret) {
-      throw new Error("Unauthorized: Invalid upload secret");
-    }
+    verifyUploadSecret(uploadSecret);
 
     const product = await ctx.db.get(productId);
     if (!product) {

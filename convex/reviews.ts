@@ -412,11 +412,7 @@ export const updateImages = mutation({
     uploadSecret: v.optional(v.string()),
   },
   handler: async (ctx, { reviewId, imageStorageIds, uploadSecret }) => {
-    // Verify upload secret for protected operations
-    const expectedSecret = process.env.CONVEX_UPLOAD_SECRET;
-    if (expectedSecret && uploadSecret !== expectedSecret) {
-      throw new Error("Unauthorized: Invalid upload secret");
-    }
+    verifyUploadSecret(uploadSecret);
 
     const now = Date.now();
 

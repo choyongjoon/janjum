@@ -70,10 +70,7 @@ export const create = mutation({
     uploadSecret: v.optional(v.string()),
   },
   handler: async (ctx, { name, slug, imageStorageId, rank, uploadSecret }) => {
-    const expectedSecret = process.env.CONVEX_UPLOAD_SECRET;
-    if (expectedSecret && uploadSecret !== expectedSecret) {
-      throw new Error("Unauthorized: Invalid upload secret");
-    }
+    verifyUploadSecret(uploadSecret);
 
     const existing = await ctx.db
       .query("cafes")
@@ -102,11 +99,7 @@ export const updateImage = mutation({
     uploadSecret: v.optional(v.string()),
   },
   handler: async (ctx, { cafeId, storageId, uploadSecret }) => {
-    // Verify upload secret for protected operations
-    const expectedSecret = process.env.CONVEX_UPLOAD_SECRET;
-    if (expectedSecret && uploadSecret !== expectedSecret) {
-      throw new Error("Unauthorized: Invalid upload secret");
-    }
+    verifyUploadSecret(uploadSecret);
 
     await ctx.db.patch(cafeId, {
       imageStorageId: storageId,

@@ -82,11 +82,7 @@ export const deleteStorageFile = mutation({
     uploadSecret: v.optional(v.string()),
   },
   handler: async (ctx, { storageId, uploadSecret }) => {
-    // Verify upload secret for protected operations
-    const expectedSecret = process.env.CONVEX_UPLOAD_SECRET;
-    if (expectedSecret && uploadSecret !== expectedSecret) {
-      throw new Error("Unauthorized: Invalid upload secret");
-    }
+    verifyUploadSecret(uploadSecret);
 
     try {
       await ctx.storage.delete(storageId);
@@ -110,11 +106,7 @@ export const deleteStorageFiles = mutation({
     uploadSecret: v.optional(v.string()),
   },
   handler: async (ctx, { storageIds, uploadSecret }) => {
-    // Verify upload secret for protected operations
-    const expectedSecret = process.env.CONVEX_UPLOAD_SECRET;
-    if (expectedSecret && uploadSecret !== expectedSecret) {
-      throw new Error("Unauthorized: Invalid upload secret");
-    }
+    verifyUploadSecret(uploadSecret);
 
     const results: Array<{
       success: boolean;

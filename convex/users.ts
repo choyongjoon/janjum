@@ -247,11 +247,7 @@ export const updateImage = mutation({
     uploadSecret: v.optional(v.string()),
   },
   handler: async (ctx, { userId, storageId, uploadSecret }) => {
-    // Verify upload secret for protected operations
-    const expectedSecret = process.env.CONVEX_UPLOAD_SECRET;
-    if (expectedSecret && uploadSecret !== expectedSecret) {
-      throw new Error("Unauthorized: Invalid upload secret");
-    }
+    verifyUploadSecret(uploadSecret);
 
     await ctx.db.patch(userId, {
       imageStorageId: storageId,
@@ -278,10 +274,15 @@ export const deleteAccount = mutation({
     const affectedProductIds = new Set(userReviews.map((r) => r.productId));
 
     for (const review of userReviews) {
-      // Delete review images from storage
+      // Delete review images from storage. A missing/failed file must not
+      // roll back the whole account deletion, so treat cleanup as best-effort.
       if (review.imageStorageIds) {
         for (const imageId of review.imageStorageIds) {
-          await ctx.storage.delete(imageId);
+          try {
+            await ctx.storage.delete(imageId);
+          } catch (_error) {
+            // Storage cleanup failure is not critical for account deletion
+          }
         }
       }
       // Delete the review
@@ -298,9 +299,13 @@ export const deleteAccount = mutation({
       });
     }
 
-    // Delete user's profile image from storage
+    // Delete user's profile image from storage (best-effort, see above).
     if (user.imageStorageId) {
-      await ctx.storage.delete(user.imageStorageId);
+      try {
+        await ctx.storage.delete(user.imageStorageId);
+      } catch (_error) {
+        // Storage cleanup failure is not critical for account deletion
+      }
     }
 
     // Delete the user record
