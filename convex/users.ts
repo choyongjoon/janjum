@@ -289,9 +289,13 @@ export const deleteAccount = mutation({
     }
 
     // Refresh averageRating/totalReviews for each affected product so the
-    // caches don't keep counting the now-deleted reviews.
+    // caches don't keep counting the now-deleted reviews. Scheduled (rather
+    // than runMutation) so each recompute runs after this deletion commits,
+    // matching how the codebase triggers follow-up work from a mutation.
     for (const productId of affectedProductIds) {
-      await ctx.runMutation(api.reviews.updateProductStats, { productId });
+      await ctx.scheduler.runAfter(0, api.reviews.updateProductStats, {
+        productId,
+      });
     }
 
     // Delete user's profile image from storage
