@@ -1,7 +1,7 @@
 import { createClerkClient, type UserJSON } from "@clerk/backend";
 import { type Validator, v } from "convex/values";
 import { nanoid } from "nanoid";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import {
   action,
   internalMutation,
@@ -9,6 +9,7 @@ import {
   type QueryCtx,
   query,
 } from "./_generated/server";
+import { verifyUploadSecret } from "./uploadSecret";
 
 // Move regex to top level for performance
 const HANDLE_REGEX = /^[a-zA-Z0-9_-]+$/;
@@ -225,8 +226,10 @@ export const generateUploadUrl = mutation({
 });
 
 export const getAllWithImages = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { uploadSecret: v.optional(v.string()) },
+  handler: async (ctx, { uploadSecret }) => {
+    verifyUploadSecret(uploadSecret);
+
     const users = await ctx.db
       .query("users")
       .filter((q) => q.neq(q.field("imageStorageId"), undefined))
@@ -244,11 +247,7 @@ export const updateImage = mutation({
     uploadSecret: v.optional(v.string()),
   },
   handler: async (ctx, { userId, storageId, uploadSecret }) => {
-    // Verify upload secret for protected operations
-    const expectedSecret = process.env.CONVEX_UPLOAD_SECRET;
-    if (expectedSecret && uploadSecret !== expectedSecret) {
-      throw new Error("Unauthorized: Invalid upload secret");
-    }
+    verifyUploadSecret(uploadSecret);
 
     await ctx.db.patch(userId, {
       imageStorageId: storageId,
@@ -263,26 +262,50 @@ export const deleteAccount = mutation({
   handler: async (ctx) => {
     const user = await getCurrentUserOrThrow(ctx);
 
-    // Delete all user's reviews first
+    // Delete all user's reviews first. Reviews store the Convex users._id in
+    // their userId field (not the Clerk externalId), so query by _id.
     const userReviews = await ctx.db
       .query("reviews")
-      .withIndex("by_user", (q) => q.eq("userId", user.externalId))
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
       .collect();
 
+    // Products whose cached rating stats must be recomputed once this user's
+    // reviews are removed.
+    const affectedProductIds = new Set(userReviews.map((r) => r.productId));
+
     for (const review of userReviews) {
-      // Delete review images from storage
+      // Delete review images from storage. A missing/failed file must not
+      // roll back the whole account deletion, so treat cleanup as best-effort.
       if (review.imageStorageIds) {
         for (const imageId of review.imageStorageIds) {
-          await ctx.storage.delete(imageId);
+          try {
+            await ctx.storage.delete(imageId);
+          } catch (_error) {
+            // Storage cleanup failure is not critical for account deletion
+          }
         }
       }
       // Delete the review
       await ctx.db.delete(review._id);
     }
 
-    // Delete user's profile image from storage
+    // Refresh averageRating/totalReviews for each affected product so the
+    // caches don't keep counting the now-deleted reviews. Scheduled (rather
+    // than runMutation) so each recompute runs after this deletion commits,
+    // matching how the codebase triggers follow-up work from a mutation.
+    for (const productId of affectedProductIds) {
+      await ctx.scheduler.runAfter(0, api.reviews.updateProductStats, {
+        productId,
+      });
+    }
+
+    // Delete user's profile image from storage (best-effort, see above).
     if (user.imageStorageId) {
-      await ctx.storage.delete(user.imageStorageId);
+      try {
+        await ctx.storage.delete(user.imageStorageId);
+      } catch (_error) {
+        // Storage cleanup failure is not critical for account deletion
+      }
     }
 
     // Delete the user record

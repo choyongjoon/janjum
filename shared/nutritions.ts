@@ -1,27 +1,6 @@
-export interface Nutritions {
-  caffeine?: number;
-  caffeineUnit?: string;
-  calories?: number;
-  caloriesUnit?: string;
-  carbohydrates?: number;
-  carbohydratesUnit?: string;
-  cholesterol?: number;
-  cholesterolUnit?: string;
-  fat?: number;
-  fatUnit?: string;
-  natrium?: number;
-  natriumUnit?: string;
-  protein?: number;
-  proteinUnit?: string;
-  saturatedFat?: number;
-  saturatedFatUnit?: string;
-  servingSize?: number;
-  servingSizeUnit?: string;
-  sugar?: number;
-  sugarUnit?: string;
-  transFat?: number;
-  transFatUnit?: string;
-}
+// The Nutritions type is derived from the Convex validator so the field set is
+// defined in exactly one place. See convex/nutritionsValidator.ts.
+export type { Nutritions } from "../convex/nutritionsValidator";
 
 export const dailyStandardNutritions = {
   calories: 2000,

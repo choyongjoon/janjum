@@ -1,5 +1,5 @@
 import { convexQuery, useConvexMutation } from "@convex-dev/react-query";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type { Id } from "convex/_generated/dataModel";
 import { useEffect, useState } from "react";
 import { usePostHogEvents } from "~/hooks/usePostHogEvents";
@@ -19,7 +19,6 @@ export function ReviewForm({
   onCancel,
 }: ReviewFormProps) {
   const { data: currentUser } = useQuery(convexQuery(api.users.current, {}));
-  const queryClient = useQueryClient();
   const { trackReviewSubmit } = usePostHogEvents();
   const [rating, setRating] = useState<number>(0);
   const [text, setText] = useState("");
@@ -76,7 +75,8 @@ export function ReviewForm({
   const submitReviewMutation = useMutation({
     mutationFn: useConvexMutation(api.reviews.upsertReview),
     onSuccess: () => {
-      queryClient.invalidateQueries();
+      // Convex queries are live subscriptions (convexQueryClient.connect), so
+      // the review list, stats, and product rating refresh automatically.
       onSuccess?.();
     },
   });
@@ -135,10 +135,9 @@ export function ReviewForm({
         ...newStorageIds,
       ];
 
-      // Submit review
+      // Submit review (the server derives the author from the session)
       await submitReviewMutation.mutateAsync({
         productId,
-        userId: currentUser._id,
         rating,
         text: text.trim() || undefined,
         imageStorageIds:
