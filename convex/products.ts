@@ -557,6 +557,28 @@ export const deleteProduct = mutation({
       return { success: false, error: "Product not found" };
     }
 
+    // Delete associated reviews (and their images) first. Otherwise the
+    // reviews are orphaned: getUserReviews resolves their `product` to null,
+    // and ReviewInUserPage then queries cafes.getById with an undefined
+    // cafeId, crashing the profile page.
+    const reviews = await ctx.db
+      .query("reviews")
+      .withIndex("by_product", (q) => q.eq("productId", productId))
+      .collect();
+
+    for (const review of reviews) {
+      if (review.imageStorageIds) {
+        for (const imageId of review.imageStorageIds) {
+          try {
+            await ctx.storage.delete(imageId);
+          } catch (_error) {
+            // Storage cleanup failure is not critical for product deletion
+          }
+        }
+      }
+      await ctx.db.delete(review._id);
+    }
+
     // Clean up associated image
     if (product.imageStorageId) {
       try {
@@ -569,7 +591,11 @@ export const deleteProduct = mutation({
     // Delete the product
     await ctx.db.delete(productId);
 
-    return { success: true, imageCleaned: !!product.imageStorageId };
+    return {
+      success: true,
+      imageCleaned: !!product.imageStorageId,
+      reviewsDeleted: reviews.length,
+    };
   },
 });
 
