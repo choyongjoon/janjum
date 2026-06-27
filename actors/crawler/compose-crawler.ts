@@ -91,10 +91,14 @@ const CRAWLER_CONFIG = {
 // ================================================
 
 function toAbsoluteUrl(url: string): string {
-  if (url.startsWith("/")) {
-    return `${SITE_CONFIG.baseUrl}${url}`;
+  // Resolve against the site base so any relative form (root-relative
+  // "/index.php", document-relative "index.php?...", or already-absolute
+  // URLs) normalizes correctly.
+  try {
+    return new URL(url, SITE_CONFIG.baseUrl).href;
+  } catch {
+    return url;
   }
-  return url;
 }
 
 // Maps a Korean nutrition label to the matching Nutritions field + default unit.
