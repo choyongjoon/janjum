@@ -91,6 +91,11 @@ const CRAWLER_CONFIG = {
 // ================================================
 
 function toAbsoluteUrl(url: string): string {
+  // Keep empty/whitespace-only values empty rather than resolving them to the
+  // bare base URL.
+  if (!url.trim()) {
+    return "";
+  }
   // Resolve against the site base so any relative form (root-relative
   // "/index.php", document-relative "index.php?...", or already-absolute
   // URLs) normalizes correctly.
