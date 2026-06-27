@@ -10,28 +10,39 @@ import { type Product, waitForLoad, writeProductsToJson } from "./crawlerUtils";
 
 const SITE_CONFIG = {
   baseUrl: "https://composecoffee.com",
-  startUrl: "https://composecoffee.com/menu",
-  categoryUrlTemplate: "https://composecoffee.com/menu/category/",
+  // Menu lives on a Rhymix-powered listing. Without a category_srl the listing
+  // shows a default category; we use it only to discover the category nav.
+  startUrl:
+    "https://composecoffee.com/index.php?mid=compose&act=dispCafemenuGalleryList",
 } as const;
+
+// The "추천메뉴" (recommended) category only re-lists products that already
+// appear in their real categories, so we skip it to keep category labels clean.
+const SKIP_CATEGORY_IDS = new Set(["301298"]);
 
 // ================================================
 // CSS SELECTORS
 // ================================================
 
 const SELECTORS = {
-  // Main menu page selectors
-  categoryLinks: '.dropdown-menu a[href*="/menu/category/"]',
+  // Category navigation on the listing page
+  categoryLinks: "a.cafemenu-category-btn",
 
-  // Category page selectors
-  productContainers: ".itemBox",
-  productData: {
-    id: "> div[id]",
-    name: "h3.undertitle",
-    image: ".rthumbnailimg",
+  // Product cards on a category listing page
+  productItems: "a.cafemenu-menu-item",
+
+  // Pagination on a category listing page
+  pagination: '.pagination a[href*="page="]',
+
+  // Product detail page
+  detail: {
+    title: "#detailTitle",
+    image: "#detailImage",
+    nutritionItem: ".cafemenu-nutrition-item",
+    nutritionLabel: ".cafemenu-nutrition-label",
+    nutritionValue: ".cafemenu-nutrition-value",
+    nutritionUnit: ".cafemenu-nutrition-unit",
   },
-
-  // Pagination selectors
-  pagination: 'a[href*="page="], .pagination a, .page-link',
 } as const;
 
 // ================================================
@@ -39,41 +50,29 @@ const SELECTORS = {
 // ================================================
 
 const PATTERNS = {
-  categoryId: /\/menu\/category\/(\d+)/,
-  pageNumber: /page=(\d+)/,
-} as const;
-
-// Compose-specific nutrition patterns
-const COMPOSE_NUTRITION_PATTERNS = {
-  servingSize: /용량\s*:\s*(\d+(?:\.\d+)?)\s*(ml|oz)/i,
-  calories: /열량\s*\(\s*kcal\s*\)\s*:\s*(\d+(?:\.\d+)?)/i,
-  sodium: /나트륨\s*\(\s*mg\s*\)\s*:\s*(\d+(?:\.\d+)?)/i,
-  carbohydrates: /탄수화물\s*\(\s*g\s*\)\s*:\s*(\d+(?:\.\d+)?)/i,
-  sugar: /당류\s*\(\s*g\s*\)\s*:\s*(\d+(?:\.\d+)?)/i,
-  fat: /지방\s*\(\s*g\s*\)\s*:\s*(\d+(?:\.\d+)?)/i,
-  saturatedFat: /포화지방\s*\(\s*g\s*\)\s*:\s*(\d+(?:\.\d+)?)/i,
-  protein: /단백질\s*\(\s*g\s*\)\s*:\s*(\d+(?:\.\d+)?)/i,
+  itemSrl: /item_srl=(\d+)/,
+  pageNumber: /[?&]page=(\d+)/,
+  number: /-?\d+(?:\.\d+)?/,
 } as const;
 
 // ================================================
 // CRAWLER CONFIGURATION
 // ================================================
 
-// Test mode configuration
 const isTestMode = process.env.CRAWLER_TEST_MODE === "true";
 const maxProductsInTestMode = isTestMode
   ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS || "3", 10)
   : Number.POSITIVE_INFINITY;
 const maxRequestsInTestMode = isTestMode
   ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || "10", 10)
-  : 100;
+  : 1000;
 
 const CRAWLER_CONFIG = {
   maxConcurrency: Number.parseInt(
     process.env.CRAWLER_MAX_CONCURRENCY || "3",
     10
   ),
-  maxRequestsPerCrawl: isTestMode ? maxRequestsInTestMode : 100,
+  maxRequestsPerCrawl: maxRequestsInTestMode,
   maxRequestRetries: 2,
   requestHandlerTimeoutSecs: isTestMode ? 30 : 60,
   launchOptions: {
@@ -88,279 +87,208 @@ const CRAWLER_CONFIG = {
 };
 
 // ================================================
+// HELPERS
+// ================================================
+
+function toAbsoluteUrl(url: string): string {
+  if (url.startsWith("/")) {
+    return `${SITE_CONFIG.baseUrl}${url}`;
+  }
+  return url;
+}
+
+// Maps a Korean nutrition label to the matching Nutritions field + default unit.
+const NUTRITION_FIELDS = {
+  무게: { value: "servingSize", unit: "servingSizeUnit", defaultUnit: "g" },
+  컵용량: { value: "servingSize", unit: "servingSizeUnit", defaultUnit: "ml" },
+  용량: { value: "servingSize", unit: "servingSizeUnit", defaultUnit: "ml" },
+  칼로리: { value: "calories", unit: "caloriesUnit", defaultUnit: "kcal" },
+  나트륨: { value: "natrium", unit: "natriumUnit", defaultUnit: "mg" },
+  탄수화물: {
+    value: "carbohydrates",
+    unit: "carbohydratesUnit",
+    defaultUnit: "g",
+  },
+  당류: { value: "sugar", unit: "sugarUnit", defaultUnit: "g" },
+  지방: { value: "fat", unit: "fatUnit", defaultUnit: "g" },
+  포화지방: {
+    value: "saturatedFat",
+    unit: "saturatedFatUnit",
+    defaultUnit: "g",
+  },
+  트랜스지방: { value: "transFat", unit: "transFatUnit", defaultUnit: "g" },
+  콜레스테롤: {
+    value: "cholesterol",
+    unit: "cholesterolUnit",
+    defaultUnit: "mg",
+  },
+  단백질: { value: "protein", unit: "proteinUnit", defaultUnit: "g" },
+  카페인: { value: "caffeine", unit: "caffeineUnit", defaultUnit: "mg" },
+} as const satisfies Record<
+  string,
+  { value: keyof Nutritions; unit: keyof Nutritions; defaultUnit: string }
+>;
+
+function isKnownLabel(label: string): label is keyof typeof NUTRITION_FIELDS {
+  return label in NUTRITION_FIELDS;
+}
+
+// ================================================
 // DATA EXTRACTION FUNCTIONS
 // ================================================
 
-// Helper function to extract Compose nutrition data
-function extractComposeNutrition(nutritionText: string): Nutritions | null {
-  try {
-    const nutrition: Nutritions = {};
+async function extractNutritionRow(item: Locator) {
+  const [label, valueText, unit] = await Promise.all([
+    item
+      .locator(SELECTORS.detail.nutritionLabel)
+      .textContent()
+      .then((t) => t?.trim() || ""),
+    item
+      .locator(SELECTORS.detail.nutritionValue)
+      .textContent()
+      .then((t) => t?.trim() || ""),
+    item
+      .locator(SELECTORS.detail.nutritionUnit)
+      .textContent()
+      .then((t) => t?.trim() || "")
+      .catch(() => ""),
+  ]);
+  return { label, valueText, unit };
+}
 
-    // Extract serving size
-    const servingSizeMatch = nutritionText.match(
-      COMPOSE_NUTRITION_PATTERNS.servingSize
-    );
-    if (servingSizeMatch) {
-      let servingSize = Number.parseFloat(servingSizeMatch[1]);
-      let unit = servingSizeMatch[2].toLowerCase();
-
-      // Convert oz to ml if needed
-      if (unit === "oz") {
-        servingSize *= 29.5735; // 1 oz = 29.5735 ml
-        unit = "ml";
-      }
-
-      nutrition.servingSize = servingSize;
-      nutrition.servingSizeUnit = unit;
-    }
-
-    // Extract calories
-    const caloriesMatch = nutritionText.match(
-      COMPOSE_NUTRITION_PATTERNS.calories
-    );
-    if (caloriesMatch) {
-      nutrition.calories = Number.parseFloat(caloriesMatch[1]);
-      nutrition.caloriesUnit = "kcal";
-    }
-
-    // Extract sodium
-    const sodiumMatch = nutritionText.match(COMPOSE_NUTRITION_PATTERNS.sodium);
-    if (sodiumMatch) {
-      nutrition.natrium = Number.parseFloat(sodiumMatch[1]);
-      nutrition.natriumUnit = "mg";
-    }
-
-    // Extract carbohydrates
-    const carbohydratesMatch = nutritionText.match(
-      COMPOSE_NUTRITION_PATTERNS.carbohydrates
-    );
-    if (carbohydratesMatch) {
-      nutrition.carbohydrates = Number.parseFloat(carbohydratesMatch[1]);
-      nutrition.carbohydratesUnit = "g";
-    }
-
-    // Extract sugar
-    const sugarMatch = nutritionText.match(COMPOSE_NUTRITION_PATTERNS.sugar);
-    if (sugarMatch) {
-      nutrition.sugar = Number.parseFloat(sugarMatch[1]);
-      nutrition.sugarUnit = "g";
-    }
-
-    // Extract fat
-    const fatMatch = nutritionText.match(COMPOSE_NUTRITION_PATTERNS.fat);
-    if (fatMatch) {
-      nutrition.fat = Number.parseFloat(fatMatch[1]);
-      nutrition.fatUnit = "g";
-    }
-
-    // Extract saturated fat
-    const saturatedFatMatch = nutritionText.match(
-      COMPOSE_NUTRITION_PATTERNS.saturatedFat
-    );
-    if (saturatedFatMatch) {
-      nutrition.saturatedFat = Number.parseFloat(saturatedFatMatch[1]);
-      nutrition.saturatedFatUnit = "g";
-    }
-
-    // Extract protein
-    const proteinMatch = nutritionText.match(
-      COMPOSE_NUTRITION_PATTERNS.protein
-    );
-    if (proteinMatch) {
-      nutrition.protein = Number.parseFloat(proteinMatch[1]);
-      nutrition.proteinUnit = "g";
-    }
-
-    // Return nutrition data if we found any values
-    return Object.keys(nutrition).length > 0 ? nutrition : null;
-  } catch (error) {
-    logger.debug(`Error extracting Compose nutrition: ${error}`);
+async function extractDetailNutrition(page: Page): Promise<Nutritions | null> {
+  const items = page.locator(SELECTORS.detail.nutritionItem);
+  const count = await items.count();
+  if (count === 0) {
     return null;
   }
-}
 
-async function extractProductData(container: Locator) {
-  try {
-    const [productId, name, imageUrl, nutritionInfo] = await Promise.all([
-      container
-        .locator(SELECTORS.productData.id)
-        .getAttribute("id")
-        .then((id) => id || ""),
-      container
-        .locator(SELECTORS.productData.name)
-        .textContent()
-        .then((text) => text?.trim() || ""),
-      container
-        .locator(SELECTORS.productData.image)
-        .getAttribute("src")
-        .then((src) => {
-          let url = src || "";
-          if (url.startsWith("/")) {
-            url = `${SITE_CONFIG.baseUrl}${url}`;
-          }
-          return url;
-        }),
-      container
-        .locator("ul.info.g-0")
-        .textContent()
-        .then((text) => text?.trim() || "")
-        .catch(() => ""),
-    ]);
-
-    if (name && name.length > 0) {
-      // Extract nutrition data using the custom Compose parser
-      let nutritions: Nutritions | null = null;
-      if (nutritionInfo) {
-        nutritions = extractComposeNutrition(nutritionInfo);
-        if (nutritions) {
-          logger.info(`✅ Found nutrition data for: ${name}`);
-        }
-      }
-
-      return {
-        name,
-        nameEn: null,
-        description: null,
-        price: null,
-        imageUrl,
-        id: productId,
-        nutritions,
-      };
-    }
-  } catch {
-    // Skip products that fail to extract
-  }
-  return null;
-}
-
-async function extractPageProducts(page: Page) {
-  const products: Array<{
-    name: string;
-    nameEn: string | null;
-    description: string | null;
-    price: number | null;
-    imageUrl: string;
-    id: string;
-    nutritions?: Nutritions | null;
-  }> = [];
-
-  // Get all product containers
-  const productContainers = page.locator(SELECTORS.productContainers);
-  const containerCount = await productContainers.count();
-
-  // Process all containers in parallel
-  const productPromises = Array.from({ length: containerCount }, async (_, i) =>
-    extractProductData(productContainers.nth(i))
+  const rows = await Promise.all(
+    Array.from({ length: count }, (_, i) => extractNutritionRow(items.nth(i)))
   );
 
-  const productResults = await Promise.all(productPromises);
-  products.push(...productResults.filter((p) => p !== null));
+  const nutrition: Nutritions = {};
+  for (const { label, valueText, unit } of rows) {
+    if (!isKnownLabel(label)) {
+      continue;
+    }
+    const match = valueText.match(PATTERNS.number);
+    if (!match) {
+      continue;
+    }
+    const field = NUTRITION_FIELDS[label];
+    nutrition[field.value] = Number.parseFloat(match[0]);
+    nutrition[field.unit] = unit || field.defaultUnit;
+  }
 
-  // Check for pagination
-  const paginationElements = page.locator(SELECTORS.pagination);
-  const paginationCount = await paginationElements.count();
+  return Object.keys(nutrition).length > 0 ? nutrition : null;
+}
+
+async function extractCategories(page: Page) {
+  const links = page.locator(SELECTORS.categoryLinks);
+  const count = await links.count();
+
+  const results = await Promise.all(
+    Array.from({ length: count }, async (_, i) => {
+      const link = links.nth(i);
+      const [href, dataCategory, text] = await Promise.all([
+        link.getAttribute("href"),
+        link.getAttribute("data-category"),
+        link.textContent().then((t) => t?.trim() || ""),
+      ]);
+      if (href && dataCategory && text) {
+        return { url: toAbsoluteUrl(href), id: dataCategory, name: text };
+      }
+      return null;
+    })
+  );
+
+  // De-duplicate by category id while dropping skipped categories.
+  const seen = new Set<string>();
+  const categories: Array<{ url: string; id: string; name: string }> = [];
+  for (const category of results) {
+    if (
+      category &&
+      !SKIP_CATEGORY_IDS.has(category.id) &&
+      !seen.has(category.id)
+    ) {
+      seen.add(category.id);
+      categories.push(category);
+    }
+  }
+  return categories;
+}
+
+async function extractMaxPage(page: Page): Promise<number> {
+  const links = page.locator(SELECTORS.pagination);
+  const count = await links.count();
+  if (count === 0) {
+    return 1;
+  }
+
+  const hrefs = await Promise.all(
+    Array.from({ length: count }, (_, i) => links.nth(i).getAttribute("href"))
+  );
+
   let maxPage = 1;
-
-  if (paginationCount > 0) {
-    const hrefPromises = Array.from({ length: paginationCount }, (_, i) =>
-      paginationElements.nth(i).getAttribute("href")
-    );
-    const hrefs = await Promise.all(hrefPromises);
-
-    for (const href of hrefs) {
-      const match = href?.match(PATTERNS.pageNumber);
-      if (match) {
-        const pageNum = Number.parseInt(match[1], 10);
-        if (pageNum > maxPage) {
-          maxPage = pageNum;
-        }
+  for (const href of hrefs) {
+    const match = href?.match(PATTERNS.pageNumber);
+    if (match) {
+      const pageNum = Number.parseInt(match[1], 10);
+      if (pageNum > maxPage) {
+        maxPage = pageNum;
       }
     }
   }
-
-  // Get current page from URL
-  const url = page.url();
-  const urlParams = new URLSearchParams(new URL(url).search);
-  const currentPage = urlParams.get("page") || "1";
-
-  return {
-    products,
-    maxPage,
-    currentPage,
-    pageUrl: url,
-  };
+  return maxPage;
 }
 
-async function extractCategoryData(page: Page) {
-  const categoryLinks = page.locator(SELECTORS.categoryLinks);
-  const linkCount = await categoryLinks.count();
-  const categories: Array<{ url: string; name: string; id: string }> = [];
+async function extractProductLinks(page: Page) {
+  const items = page.locator(SELECTORS.productItems);
+  const count = await items.count();
 
-  if (linkCount > 0) {
-    const linkPromises = Array.from({ length: linkCount }, async (_, i) => {
-      const link = categoryLinks.nth(i);
-      const [href, text] = await Promise.all([
-        link.getAttribute("href"),
-        link.textContent().then((t) => t?.trim() || ""),
-      ]);
-
-      if (href && text) {
-        const match = href.match(PATTERNS.categoryId);
-        if (match) {
-          return {
-            url: href.startsWith("/") ? `${SITE_CONFIG.baseUrl}${href}` : href,
-            name: text,
-            id: match[1],
-          };
-        }
+  const results = await Promise.all(
+    Array.from({ length: count }, async (_, i) => {
+      const href = await items.nth(i).getAttribute("href");
+      if (!href) {
+        return null;
       }
-      return null;
-    });
+      const match = href.match(PATTERNS.itemSrl);
+      if (!match) {
+        return null;
+      }
+      return { url: toAbsoluteUrl(href), itemSrl: match[1] };
+    })
+  );
 
-    const linkResults = await Promise.all(linkPromises);
-    categories.push(...linkResults.filter((c) => c !== null));
-  }
-
-  return {
-    categories,
-    pageTitle: await page.title(),
-    pageUrl: page.url(),
-  };
+  return results.filter((link) => link !== null);
 }
 
 // ================================================
 // PAGE HANDLERS
 // ================================================
 
-async function handleMainMenuPage(
+async function handleListingDiscovery(
   page: Page,
   crawlerInstance: PlaywrightCrawler
 ) {
-  logger.info("Processing main menu page to discover categories");
-
+  logger.info("Processing menu listing to discover categories");
   await waitForLoad(page);
-  // Debug screenshot removed for performance
-  // await takeDebugScreenshot(page, 'compose-main-menu');
 
-  const categoryData = await extractCategoryData(page);
+  const categories = await extractCategories(page);
+  logger.info(`Found ${categories.length} categories`);
 
-  logger.info(`Found ${categoryData.categories.length} categories`);
-
-  // Enqueue all category pages
-  const categoryRequests = categoryData.categories.map((category) => ({
+  const requests = categories.map((category) => ({
     url: category.url,
     userData: {
+      isCategoryPage: true,
       categoryId: category.id,
       categoryName: category.name,
-      isCategoryPage: true,
       page: 1,
     },
   }));
-  await crawlerInstance.addRequests(categoryRequests);
-
-  logger.info(
-    `Enqueued ${categoryData.categories.length} category pages for processing`
-  );
+  await crawlerInstance.addRequests(requests);
+  logger.info(`Enqueued ${categories.length} category pages for processing`);
 }
 
 async function handleCategoryPage(
@@ -368,89 +296,105 @@ async function handleCategoryPage(
   request: Request,
   crawlerInstance: PlaywrightCrawler
 ) {
-  const categoryId = request.userData.categoryId;
-  const categoryName = request.userData.categoryName;
+  const { categoryId, categoryName } = request.userData;
   const currentPage = request.userData.page || 1;
-  const url = request.url;
 
   logger.info(
     `Processing category: ${categoryName} (ID: ${categoryId}, Page: ${currentPage})`
   );
 
-  // Take a screenshot for debugging (only for first category)
-  if (categoryId === "207002" && currentPage === 1) {
-    // Debug screenshot removed for performance
-    // await takeDebugScreenshot(page, `compose-category-${categoryId}`);
+  await waitForLoad(page);
+
+  let productLinks = await extractProductLinks(page);
+  if (isTestMode) {
+    productLinks = productLinks.slice(0, maxProductsInTestMode);
   }
+
+  logger.info(
+    `Found ${productLinks.length} products on page ${currentPage} of ${categoryName}`
+  );
+
+  const detailRequests = productLinks.map((link) => ({
+    url: link.url,
+    userData: {
+      isDetailPage: true,
+      itemSrl: link.itemSrl,
+      categoryName,
+    },
+  }));
+  await crawlerInstance.addRequests(detailRequests);
+
+  // Enqueue remaining pages from page 1 only (skip in test mode).
+  if (currentPage === 1 && !isTestMode) {
+    const maxPage = await extractMaxPage(page);
+    if (maxPage > 1) {
+      const baseUrl = request.url.split("?")[0];
+      const search = new URL(request.url).search;
+      const pageRequests = Array.from({ length: maxPage - 1 }, (_, index) => {
+        const pageNum = index + 2;
+        const params = new URLSearchParams(search);
+        params.set("page", String(pageNum));
+        return {
+          url: `${baseUrl}?${params.toString()}`,
+          userData: {
+            isCategoryPage: true,
+            categoryId,
+            categoryName,
+            page: pageNum,
+          },
+        };
+      });
+      await crawlerInstance.addRequests(pageRequests);
+      logger.info(`Enqueued pages 2-${maxPage} for category: ${categoryName}`);
+    }
+  }
+}
+
+async function handleDetailPage(
+  page: Page,
+  request: Request,
+  crawlerInstance: PlaywrightCrawler
+) {
+  const { itemSrl, categoryName } = request.userData;
 
   try {
     await waitForLoad(page);
 
-    const pageData = await extractPageProducts(page);
+    const [name, imageSrc, nutritions] = await Promise.all([
+      page
+        .locator(SELECTORS.detail.title)
+        .textContent()
+        .then((t) => t?.trim() || ""),
+      page
+        .locator(SELECTORS.detail.image)
+        .getAttribute("src")
+        .then((src) => (src ? toAbsoluteUrl(src) : ""))
+        .catch(() => ""),
+      extractDetailNutrition(page),
+    ]);
 
-    logger.info(
-      `Found ${pageData.products.length} products on page ${currentPage}`
-    );
+    if (!name) {
+      logger.warn(`No product name found at ${request.url}`);
+      return;
+    }
 
-    // Save products from this page
-    let products = pageData.products.map((productData) => ({
-      name: productData.name,
-      nameEn: productData.nameEn,
-      description: productData.description,
-      price: productData.price,
-      externalImageUrl: productData.imageUrl,
-      category: "Drinks" as const,
+    const product: Product = {
+      name,
+      nameEn: null,
+      description: null,
+      price: null,
+      externalImageUrl: imageSrc,
+      category: "Drinks",
       externalCategory: categoryName,
-      externalId: `compose_${categoryId}_${productData.name}`,
-      externalUrl: url,
-      nutritions: productData.nutritions || null,
-    }));
+      externalId: `compose_${itemSrl}`,
+      externalUrl: request.url,
+      nutritions,
+    };
 
-    // Limit products in test mode
-    if (isTestMode) {
-      products = products.slice(0, maxProductsInTestMode);
-      logger.info(`🧪 Test mode: limiting to ${products.length} products`);
-    }
-
-    await Promise.all(
-      products.map(async (product) => {
-        await crawlerInstance.pushData(product);
-        logger.info(
-          `✅ Extracted: ${product.name} - Category: ${categoryName}`
-        );
-      })
-    );
-
-    // Handle pagination - enqueue next pages (skip in test mode)
-    if (currentPage === 1 && pageData.maxPage > 1 && !isTestMode) {
-      const paginationRequests: Array<{
-        url: string;
-        userData: {
-          categoryId: string;
-          categoryName: string;
-          isCategoryPage: boolean;
-          page: number;
-        };
-      }> = [];
-      for (let pageNum = 2; pageNum <= pageData.maxPage; pageNum++) {
-        const nextPageUrl = `${url.split("?")[0]}?page=${pageNum}`;
-        paginationRequests.push({
-          url: nextPageUrl,
-          userData: {
-            categoryId,
-            categoryName,
-            isCategoryPage: true,
-            page: pageNum,
-          },
-        });
-      }
-      await crawlerInstance.addRequests(paginationRequests);
-      logger.info(
-        `Enqueued pages 2-${pageData.maxPage} for category: ${categoryName}`
-      );
-    }
+    await crawlerInstance.pushData(product);
+    logger.info(`✅ Extracted: ${name} - Category: ${categoryName}`);
   } catch (error) {
-    logger.error(`❌ Error processing category ${categoryName}: ${error}`);
+    logger.error(`❌ Error processing product ${itemSrl}: ${error}`);
   }
 }
 
@@ -464,18 +408,17 @@ export const createComposeCrawler = () =>
       launchOptions: CRAWLER_CONFIG.launchOptions,
     },
     async requestHandler({ page, request, crawler: crawlerInstance }) {
-      const url = request.url;
-
-      // Handle main menu page - discover categories
-      if (url.includes("/menu") && !url.includes("category")) {
-        await handleMainMenuPage(page, crawlerInstance);
+      if (request.userData?.isDetailPage) {
+        await handleDetailPage(page, request, crawlerInstance);
         return;
       }
 
-      // Handle category pages - extract products and pagination
       if (request.userData?.isCategoryPage) {
         await handleCategoryPage(page, request, crawlerInstance);
+        return;
       }
+
+      await handleListingDiscovery(page, crawlerInstance);
     },
     maxConcurrency: CRAWLER_CONFIG.maxConcurrency,
     maxRequestsPerCrawl: CRAWLER_CONFIG.maxRequestsPerCrawl,
