@@ -106,41 +106,68 @@ function toAbsoluteUrl(url: string): string {
   }
 }
 
-// Maps a Korean nutrition label to the matching Nutritions field + default unit.
-const NUTRITION_FIELDS = {
-  무게: { value: "servingSize", unit: "servingSizeUnit", defaultUnit: "g" },
-  컵용량: { value: "servingSize", unit: "servingSizeUnit", defaultUnit: "ml" },
-  용량: { value: "servingSize", unit: "servingSizeUnit", defaultUnit: "ml" },
-  칼로리: { value: "calories", unit: "caloriesUnit", defaultUnit: "kcal" },
-  나트륨: { value: "natrium", unit: "natriumUnit", defaultUnit: "mg" },
-  탄수화물: {
-    value: "carbohydrates",
-    unit: "carbohydratesUnit",
-    defaultUnit: "g",
-  },
-  당류: { value: "sugar", unit: "sugarUnit", defaultUnit: "g" },
-  지방: { value: "fat", unit: "fatUnit", defaultUnit: "g" },
-  포화지방: {
-    value: "saturatedFat",
-    unit: "saturatedFatUnit",
-    defaultUnit: "g",
-  },
-  트랜스지방: { value: "transFat", unit: "transFatUnit", defaultUnit: "g" },
-  콜레스테롤: {
-    value: "cholesterol",
-    unit: "cholesterolUnit",
-    defaultUnit: "mg",
-  },
-  단백질: { value: "protein", unit: "proteinUnit", defaultUnit: "g" },
-  카페인: { value: "caffeine", unit: "caffeineUnit", defaultUnit: "mg" },
-} as const satisfies Record<
-  string,
-  { value: keyof Nutritions; unit: keyof Nutritions; defaultUnit: string }
->;
+type NutritionSetter = (
+  nutrition: Nutritions,
+  value: number,
+  unit: string
+) => void;
 
-function isKnownLabel(label: string): label is keyof typeof NUTRITION_FIELDS {
-  return label in NUTRITION_FIELDS;
-}
+// Maps a Korean nutrition label to a setter that writes the matching
+// Nutritions fields, falling back to a default unit when the page omits one.
+const NUTRITION_SETTERS: Record<string, NutritionSetter> = {
+  무게: (n, value, unit) => {
+    n.servingSize = value;
+    n.servingSizeUnit = unit || "g";
+  },
+  컵용량: (n, value, unit) => {
+    n.servingSize = value;
+    n.servingSizeUnit = unit || "ml";
+  },
+  용량: (n, value, unit) => {
+    n.servingSize = value;
+    n.servingSizeUnit = unit || "ml";
+  },
+  칼로리: (n, value, unit) => {
+    n.calories = value;
+    n.caloriesUnit = unit || "kcal";
+  },
+  나트륨: (n, value, unit) => {
+    n.natrium = value;
+    n.natriumUnit = unit || "mg";
+  },
+  탄수화물: (n, value, unit) => {
+    n.carbohydrates = value;
+    n.carbohydratesUnit = unit || "g";
+  },
+  당류: (n, value, unit) => {
+    n.sugar = value;
+    n.sugarUnit = unit || "g";
+  },
+  지방: (n, value, unit) => {
+    n.fat = value;
+    n.fatUnit = unit || "g";
+  },
+  포화지방: (n, value, unit) => {
+    n.saturatedFat = value;
+    n.saturatedFatUnit = unit || "g";
+  },
+  트랜스지방: (n, value, unit) => {
+    n.transFat = value;
+    n.transFatUnit = unit || "g";
+  },
+  콜레스테롤: (n, value, unit) => {
+    n.cholesterol = value;
+    n.cholesterolUnit = unit || "mg";
+  },
+  단백질: (n, value, unit) => {
+    n.protein = value;
+    n.proteinUnit = unit || "g";
+  },
+  카페인: (n, value, unit) => {
+    n.caffeine = value;
+    n.caffeineUnit = unit || "mg";
+  },
+};
 
 // ================================================
 // DATA EXTRACTION FUNCTIONS
@@ -178,16 +205,15 @@ async function extractDetailNutrition(page: Page): Promise<Nutritions | null> {
 
   const nutrition: Nutritions = {};
   for (const { label, valueText, unit } of rows) {
-    if (!isKnownLabel(label)) {
+    const setter = NUTRITION_SETTERS[label];
+    if (!setter) {
       continue;
     }
     const match = valueText.match(PATTERNS.number);
     if (!match) {
       continue;
     }
-    const field = NUTRITION_FIELDS[label];
-    nutrition[field.value] = Number.parseFloat(match[0]);
-    nutrition[field.unit] = unit || field.defaultUnit;
+    setter(nutrition, Number.parseFloat(match[0]), unit);
   }
 
   return Object.keys(nutrition).length > 0 ? nutrition : null;
