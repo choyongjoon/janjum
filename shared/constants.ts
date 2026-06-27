@@ -55,4 +55,8 @@ export const AVAILABLE_CAFES = {
     name: "엔제리너스",
     slug: "angelinus",
   },
+  chapanda: {
+    name: "차백도",
+    slug: "chapanda",
+  },
 } as const;

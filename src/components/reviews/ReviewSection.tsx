@@ -1,5 +1,5 @@
 import { convexQuery, useConvexMutation } from "@convex-dev/react-query";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type { Id } from "convex/_generated/dataModel";
 import { useState } from "react";
 import { showToast } from "~/utils/toast";
@@ -14,7 +14,6 @@ interface ReviewSectionProps {
 
 export function ReviewSection({ productId }: ReviewSectionProps) {
   const { data: currentUser } = useQuery(convexQuery(api.users.current, {}));
-  const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [_editingReview, setEditingReview] = useState(false);
   const [showSignInModal, setShowSignInModal] = useState(false);
@@ -40,12 +39,10 @@ export function ReviewSection({ productId }: ReviewSectionProps) {
     enabled: !!currentUser?._id,
   });
 
-  // Delete review mutation
+  // Delete review mutation. Convex queries are live subscriptions, so the
+  // review list and stats update automatically after deletion.
   const deleteReviewMutation = useMutation({
     mutationFn: useConvexMutation(api.reviews.deleteReview),
-    onSuccess: () => {
-      queryClient.invalidateQueries();
-    },
   });
 
   const handleWriteReview = () => {
@@ -88,7 +85,6 @@ export function ReviewSection({ productId }: ReviewSectionProps) {
     try {
       await deleteReviewMutation.mutateAsync({
         reviewId: showDeleteConfirm,
-        userId: currentUser._id,
       });
     } catch {
       showToast("후기 삭제에 실패했습니다. 다시 시도해주세요.", "error");

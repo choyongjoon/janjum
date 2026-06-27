@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
+import { verifyUploadSecret } from "./uploadSecret";
 
 /**
  * Get storage files from the system with pagination
@@ -10,8 +11,11 @@ export const getAllStorageFiles = query({
   args: {
     cursor: v.optional(v.string()),
     limit: v.optional(v.number()),
+    uploadSecret: v.optional(v.string()),
   },
-  handler: async (ctx, { cursor, limit = 8000 }) => {
+  handler: async (ctx, { cursor, limit = 8000, uploadSecret }) => {
+    verifyUploadSecret(uploadSecret);
+
     // Ensure we don't exceed Convex limits
     const safeLimit = Math.min(limit, 8000);
 
@@ -41,8 +45,13 @@ export const getAllStorageFiles = query({
  * Get metadata for multiple storage files
  */
 export const getStorageMetadata = query({
-  args: { storageIds: v.array(v.id("_storage")) },
-  handler: async (ctx, { storageIds }) => {
+  args: {
+    storageIds: v.array(v.id("_storage")),
+    uploadSecret: v.optional(v.string()),
+  },
+  handler: async (ctx, { storageIds, uploadSecret }) => {
+    verifyUploadSecret(uploadSecret);
+
     const metadataPromises = storageIds.map(async (storageId) => {
       try {
         const metadata = await ctx.db.system.get(storageId);
@@ -73,11 +82,7 @@ export const deleteStorageFile = mutation({
     uploadSecret: v.optional(v.string()),
   },
   handler: async (ctx, { storageId, uploadSecret }) => {
-    // Verify upload secret for protected operations
-    const expectedSecret = process.env.CONVEX_UPLOAD_SECRET;
-    if (expectedSecret && uploadSecret !== expectedSecret) {
-      throw new Error("Unauthorized: Invalid upload secret");
-    }
+    verifyUploadSecret(uploadSecret);
 
     try {
       await ctx.storage.delete(storageId);
@@ -101,11 +106,7 @@ export const deleteStorageFiles = mutation({
     uploadSecret: v.optional(v.string()),
   },
   handler: async (ctx, { storageIds, uploadSecret }) => {
-    // Verify upload secret for protected operations
-    const expectedSecret = process.env.CONVEX_UPLOAD_SECRET;
-    if (expectedSecret && uploadSecret !== expectedSecret) {
-      throw new Error("Unauthorized: Invalid upload secret");
-    }
+    verifyUploadSecret(uploadSecret);
 
     const results: Array<{
       success: boolean;
@@ -142,8 +143,10 @@ export const deleteStorageFiles = mutation({
  * Get statistics about storage usage
  */
 export const getStorageStats = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { uploadSecret: v.optional(v.string()) },
+  handler: async (ctx, { uploadSecret }) => {
+    verifyUploadSecret(uploadSecret);
+
     const storageFiles = await ctx.db.system.query("_storage").collect();
 
     let totalSize = 0;

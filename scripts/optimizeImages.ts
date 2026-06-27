@@ -203,7 +203,9 @@ class ImageOptimizer {
 
     try {
       // Get all products with images
-      const products = await convex.query(api.products.getAllWithImages, {});
+      const products = await convex.query(api.products.getAllWithImages, {
+        uploadSecret: UPLOAD_SECRET,
+      });
 
       logger.info(`Found ${products.length} products with images to process`);
 
@@ -246,7 +248,9 @@ class ImageOptimizer {
 
     try {
       // Get all cafes with images
-      const cafes = await convex.query(api.cafes.getAllWithImages, {});
+      const cafes = await convex.query(api.cafes.getAllWithImages, {
+        uploadSecret: UPLOAD_SECRET,
+      });
 
       logger.info(`Found ${cafes.length} cafes with images to process`);
 
@@ -287,7 +291,9 @@ class ImageOptimizer {
 
     try {
       // Get all users with images
-      const users = await convex.query(api.users.getAllWithImages, {});
+      const users = await convex.query(api.users.getAllWithImages, {
+        uploadSecret: UPLOAD_SECRET,
+      });
 
       logger.info(`Found ${users.length} users with images to process`);
 
@@ -328,7 +334,9 @@ class ImageOptimizer {
 
     try {
       // Get all reviews with images
-      const reviews = await convex.query(api.reviews.getAllWithImages, {});
+      const reviews = await convex.query(api.reviews.getAllWithImages, {
+        uploadSecret: UPLOAD_SECRET,
+      });
 
       logger.info(`Found ${reviews.length} reviews with images to process`);
 
