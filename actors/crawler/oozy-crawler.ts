@@ -1,5 +1,5 @@
 import { PlaywrightCrawler, type Request } from "crawlee";
-import type { Locator, Page } from "playwright";
+import type { Locator, Page, Route } from "playwright";
 import { logger } from "../../shared/logger";
 import { type Product, waitForLoad, writeProductsToJson } from "./crawlerUtils";
 
@@ -46,10 +46,14 @@ const maxRequestsInTestMode = isTestMode
   ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || "10", 10)
   : 50;
 
+// The cron sync (scripts/cronSyncBlockedCafes.sh) runs this crawler inside a
+// 512Mi container. Each oozy page is an imweb image gallery, so keep the
+// default concurrency low to avoid running out of memory. Override with
+// CRAWLER_MAX_CONCURRENCY in less constrained environments.
 const CRAWLER_CONFIG = {
   maxConcurrency: isTestMode
     ? 2
-    : Number.parseInt(process.env.CRAWLER_MAX_CONCURRENCY || "5", 10),
+    : Number.parseInt(process.env.CRAWLER_MAX_CONCURRENCY || "2", 10),
   maxRequestsPerCrawl: isTestMode ? maxRequestsInTestMode : 100,
   maxRequestRetries: 2,
   requestHandlerTimeoutSecs: isTestMode ? 20 : 40,
@@ -70,6 +74,23 @@ const CRAWLER_CONFIG = {
 
 const IMWEB_ID_REGEX = /\/([a-f0-9]{13})\.\w+$/;
 const DATA_ORG_ID_REGEX = /([a-f0-9]{13})\.\w+$/;
+
+// ================================================
+// RESOURCE BLOCKING (memory optimization)
+// ================================================
+
+// The crawler only reads image URLs from DOM attributes (data-src / src), never
+// the decoded image bytes. Aborting image, media, and font downloads keeps the
+// browser's memory footprint low so the crawl fits within the 512Mi cron
+// container. The DOM attributes remain intact even when the request is aborted.
+const BLOCKED_RESOURCE_TYPES = new Set(["image", "media", "font"]);
+
+function blockHeavyResources(route: Route): Promise<void> {
+  if (BLOCKED_RESOURCE_TYPES.has(route.request().resourceType())) {
+    return route.abort();
+  }
+  return route.continue();
+}
 
 // ================================================
 // DATA EXTRACTION FUNCTIONS
@@ -266,6 +287,11 @@ export const createOozyCrawler = () =>
     launchContext: {
       launchOptions: CRAWLER_CONFIG.launchOptions,
     },
+    preNavigationHooks: [
+      async ({ page }) => {
+        await page.route("**/*", blockHeavyResources);
+      },
+    ],
     async requestHandler({ page, request, crawler: crawlerInstance }) {
       if (request.userData?.isMenuPage) {
         await handleMenuPage(page, request, crawlerInstance);
