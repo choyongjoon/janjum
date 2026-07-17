@@ -16,6 +16,7 @@ import type { ConvexReactClient } from "convex/react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
 import type * as React from "react";
 import { lazy, Suspense } from "react";
+import { LazyPostHogProvider } from "~/components/analytics/LazyPostHogProvider";
 
 const TanStackRouterDevtools = import.meta.env.DEV
   ? lazy(() =>
@@ -25,7 +26,6 @@ const TanStackRouterDevtools = import.meta.env.DEV
     )
   : () => null;
 
-import { LazyPostHogProvider } from "~/components/analytics/LazyPostHogProvider";
 import { NewUserRedirect } from "~/components/auth/NewUserRedirect";
 import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary.js";
 import { Footer } from "~/components/Footer";

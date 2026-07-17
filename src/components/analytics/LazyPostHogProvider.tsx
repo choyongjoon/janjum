@@ -15,25 +15,30 @@ const PostHogContext = createContext<PostHog | null>(null);
 const IDLE_TIMEOUT_MS = 5000;
 const FALLBACK_DELAY_MS = 2000;
 
-async function initPostHog(): Promise<PostHog | null> {
-  const apiKey = import.meta.env.VITE_PUBLIC_POSTHOG_KEY;
-  if (!apiKey) {
-    return null;
-  }
+// Module-level memoization guards against double init (e.g. React strict
+// mode / provider remounts) without relying on posthog-js internals.
+let posthogInitPromise: Promise<PostHog | null> | null = null;
 
-  const { default: posthog } = await import("posthog-js");
+function initPostHog(): Promise<PostHog | null> {
+  posthogInitPromise ??= (async () => {
+    const apiKey = import.meta.env.VITE_PUBLIC_POSTHOG_KEY;
+    if (!apiKey) {
+      return null;
+    }
 
-  // Guard against double init (e.g. React strict mode / HMR remounts)
-  if (!posthog.__loaded) {
+    const { default: posthog } = await import("posthog-js");
+
     posthog.init(apiKey, {
       api_host: import.meta.env.VITE_PUBLIC_POSTHOG_HOST,
       defaults: "2025-05-24",
       capture_exceptions: true,
       debug: import.meta.env.MODE === "development",
     });
-  }
 
-  return posthog;
+    return posthog;
+  })();
+
+  return posthogInitPromise;
 }
 
 export function LazyPostHogProvider({
