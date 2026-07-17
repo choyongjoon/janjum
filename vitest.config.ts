@@ -5,6 +5,7 @@ export default defineConfig({
     environment: "node",
     include: [
       "actors/**/*.{test,spec}.{js,ts}",
+      "convex/**/*.{test,spec}.{js,ts}",
       "src/**/*.{test,spec}.{js,ts}",
     ],
     coverage: {

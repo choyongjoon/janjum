@@ -9,6 +9,7 @@ import {
   query,
 } from "./_generated/server";
 import { nutritionsValidator } from "./nutritionsValidator";
+import { normalizeProductName } from "./productMatching";
 import { verifyUploadSecret } from "./uploadSecret";
 
 // Field names derived from the validator so changes stay in one place.
@@ -276,6 +277,34 @@ async function handleExistingProduct(
   return { action: "unchanged", id: existing._id };
 }
 
+/**
+ * When a cafe changes its `externalId` scheme (e.g. a CMS rebuild), a returning
+ * menu item is no longer found by `externalId` and would be recreated as brand
+ * new — resetting its `addedAt` and orphaning its reviews/shortId. Before
+ * creating, look for a previously soft-removed product in the same cafe whose
+ * name matches. Only reuse when the match is unambiguous (exactly one), so a
+ * genuinely new drink is never merged into an unrelated old record.
+ */
+async function findRevivableProduct(
+  ctx: MutationCtx,
+  cafeId: Id<"cafes">,
+  name: string
+): Promise<ExistingProduct | null> {
+  const removed = await ctx.db
+    .query("products")
+    .withIndex("by_cafe_active", (q) =>
+      q.eq("cafeId", cafeId).eq("isActive", false)
+    )
+    .collect();
+
+  const targetKey = normalizeProductName(name);
+  const matches = removed.filter(
+    (product) => normalizeProductName(product.name) === targetKey
+  );
+
+  return matches.length === 1 ? matches[0] : null;
+}
+
 async function createNewProduct(
   ctx: MutationCtx,
   args: UpsertProductArgs,
@@ -330,6 +359,14 @@ export const upsertProduct = mutation({
 
     if (existing) {
       return await handleExistingProduct(ctx, args, existing, now);
+    }
+
+    // No match by externalId: the item may be a returning product whose
+    // externalId changed. Revive the soft-removed record (preserving addedAt,
+    // shortId and reviews) instead of creating a duplicate that looks new.
+    const revivable = await findRevivableProduct(ctx, args.cafeId, args.name);
+    if (revivable) {
+      return await handleExistingProduct(ctx, args, revivable, now);
     }
 
     return await createNewProduct(ctx, args, now);
@@ -658,6 +695,76 @@ export const markAsRemoved = mutation({
       removedProducts,
       reactivated: reactivatedProducts.length,
       reactivatedProducts,
+    };
+  },
+});
+
+/**
+ * One-time repair for a cafe whose menu was re-imported under a new
+ * `externalId` scheme, which recreated every item with a fresh `addedAt` and
+ * flooded the "new products" list. Backdates the re-imported items to the cafe
+ * creation time so they leave the 30-day new window. Idempotent: items already
+ * older than the target are skipped. Run with `dryRun: true` first to preview.
+ */
+export const backdateReimportedProducts = mutation({
+  args: {
+    cafeSlug: v.string(),
+    // Only affect products added on/before this timestamp (ms). Use it to scope
+    // the fix to the mass-import batch and spare genuinely newer arrivals.
+    importedBefore: v.optional(v.number()),
+    // Timestamp (ms) to backdate matched products to. Defaults to the cafe
+    // creation time; override if that is not comfortably older than 30 days.
+    targetAddedAt: v.optional(v.number()),
+    dryRun: v.optional(v.boolean()),
+    uploadSecret: v.optional(v.string()),
+  },
+  handler: async (
+    ctx,
+    { cafeSlug, importedBefore, targetAddedAt, dryRun, uploadSecret }
+  ) => {
+    verifyUploadSecret(uploadSecret);
+
+    const cafe = await ctx.db
+      .query("cafes")
+      .withIndex("by_slug", (q) => q.eq("slug", cafeSlug))
+      .first();
+    if (!cafe) {
+      throw new Error(`Cafe not found for slug: ${cafeSlug}`);
+    }
+
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const target = targetAddedAt ?? cafe._creationTime;
+    const cutoff = importedBefore ?? Date.now();
+
+    const active = await ctx.db
+      .query("products")
+      .withIndex("by_cafe_active", (q) =>
+        q.eq("cafeId", cafe._id).eq("isActive", true)
+      )
+      .collect();
+
+    // Products currently inside the 30-day "new" window that were (re)created
+    // after the cafe already existed — i.e. the re-import batch, not genuine
+    // launch-day imports (those are already near the cafe creation time).
+    const toBackdate = active.filter(
+      (p) =>
+        p.addedAt >= thirtyDaysAgo && p.addedAt <= cutoff && p.addedAt > target
+    );
+
+    if (!dryRun) {
+      await Promise.all(
+        toBackdate.map((p) => ctx.db.patch(p._id, { addedAt: target }))
+      );
+    }
+
+    return {
+      cafe: cafe.name,
+      dryRun: dryRun ?? false,
+      target,
+      count: toBackdate.length,
+      sample: toBackdate
+        .slice(0, 10)
+        .map((p) => ({ name: p.name, from: p.addedAt })),
     };
   },
 });
