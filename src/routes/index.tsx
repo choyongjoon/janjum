@@ -1,7 +1,9 @@
 import { convexQuery } from "@convex-dev/react-query";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import { BrandCafeListSection } from "~/components/BrandCafeListSection";
+import { SearchIcon } from "~/components/icons/SearchIcon";
 import {
   NewProductsSection,
   recentProductsQueryOptions,
@@ -32,16 +34,40 @@ export const Route = createFileRoute("/")({
 
 function Home() {
   const { data: cafes } = useSuspenseQuery(convexQuery(api.cafes.list, {}));
+  const navigate = useNavigate();
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    navigate({
+      to: "/search",
+      search: { searchTerm: searchTerm.trim() },
+    });
+  };
 
   return (
     <div className="min-h-screen bg-base-200">
       {/* Hero Section */}
-      <div className="hero bg-gradient-to-b from-primary to-secondary py-8 text-primary-content">
-        <div className="hero-content text-center">
-          <div className="max-w-md">
-            <h1 className="mb-5 font-bold font-sunflower text-5xl">잔점</h1>
-            <p className="mb-5 text-lg">카페 음료의 모든 것을 한곳에서!</p>
+      <div className="hero bg-gradient-to-b from-primary to-secondary py-6 text-primary-content">
+        <div className="hero-content w-full max-w-md flex-col gap-4 text-center">
+          <div>
+            <h1 className="font-bold font-sunflower text-4xl">잔점</h1>
+            <p className="mt-2">카페 음료의 모든 것을 한곳에서!</p>
           </div>
+          <form className="join w-full" onSubmit={handleSearchSubmit}>
+            <input
+              aria-label="음료명 검색"
+              className="input join-item flex-1 text-base-content"
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="음료명을 검색해보세요"
+              type="search"
+              value={searchTerm}
+            />
+            <button className="btn btn-neutral join-item" type="submit">
+              <SearchIcon size="sm" />
+              검색
+            </button>
+          </form>
         </div>
       </div>
 
