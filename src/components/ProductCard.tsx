@@ -1,40 +1,39 @@
-import { convexQuery } from "@convex-dev/react-query";
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
+import type { ComponentProps } from "react";
 
-import { api } from "../../convex/_generated/api";
 import type { Doc } from "../../convex/_generated/dataModel";
 import { RatingSummary } from "../components/RatingSummary";
+
+type ReviewStats = ComponentProps<typeof RatingSummary>["reviewStats"];
+
+const defaultReviewStats: ReviewStats = {
+  averageRating: 0,
+  totalReviews: 0,
+  ratingDistribution: {
+    1: 0,
+    2: 0,
+    3: 0,
+    4: 0,
+    5: 0,
+    3.5: 0,
+    4.5: 0,
+  },
+};
 
 export function ProductCard({
   product,
   priority = false,
+  reviewStats,
 }: {
   product: Doc<"products"> & {
     cafeName?: string;
     imageUrl?: string;
   };
   priority?: boolean;
+  // Provided by the list container via a single batched stats query
+  // (useProductReviewStats) instead of one query per card.
+  reviewStats?: ReviewStats;
 }) {
-  const { data: reviewStats } = useQuery({
-    ...convexQuery(api.reviews.getProductStats, { productId: product._id }),
-    enabled: !!product._id,
-  });
-
-  const defaultReviewStats = {
-    averageRating: 0,
-    totalReviews: 0,
-    ratingDistribution: {
-      1: 0,
-      2: 0,
-      3: 0,
-      4: 0,
-      5: 0,
-      3.5: 0,
-      4.5: 0,
-    },
-  };
-
   const { isActive } = product;
 
   return (
@@ -68,7 +67,7 @@ export function ProductCard({
             {product.name}
           </h3>
         </div>
-        <RatingSummary reviewStats={reviewStats || defaultReviewStats} />
+        <RatingSummary reviewStats={reviewStats ?? defaultReviewStats} />
         <div className="flex items-center justify-between">
           <div className="space-y-1">
             {product.price && (

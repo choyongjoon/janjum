@@ -1,15 +1,21 @@
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQueries } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { recentProductsAllQueryOptions } from "~/components/NewProductsSection";
+import { useState } from "react";
+import {
+  NEW_PRODUCTS_PAGE_SIZE,
+  recentProductsPageQueryOptions,
+} from "~/components/NewProductsSection";
 import { ProductCard } from "~/components/ProductCard";
+import { useProductReviewStats } from "~/hooks/useProductReviewStats";
 import type { Doc } from "../../convex/_generated/dataModel";
 import { seo } from "../utils/seo";
 
 export const Route = createFileRoute("/new")({
   component: NewProductsPage,
   loader: async (opts) => {
+    // SSR only the first page; further pages load on demand via "더 보기".
     await opts.context.queryClient.ensureQueryData(
-      recentProductsAllQueryOptions
+      recentProductsPageQueryOptions(0)
     );
   },
   head: () => ({
@@ -73,27 +79,50 @@ function groupByCafe(
 }
 
 function NewProductsPage() {
-  const { data } = useSuspenseQuery(recentProductsAllQueryOptions);
-  const cafeGroups = groupByCafe(data.products);
+  const [pageCount, setPageCount] = useState(1);
+
+  const pageQueries = useQueries({
+    queries: Array.from({ length: pageCount }, (_, pageIndex) =>
+      recentProductsPageQueryOptions(pageIndex * NEW_PRODUCTS_PAGE_SIZE)
+    ),
+  });
+
+  const products = pageQueries.flatMap((page) => page.data?.products ?? []);
+  const totalCount = pageQueries.at(0)?.data?.totalCount ?? 0;
+  const hasMore = products.length < totalCount;
+  const isLoadingMore = pageQueries.some((page) => page.isPending);
+
+  const reviewStats = useProductReviewStats(
+    products.map((product) => product._id)
+  );
+  const cafeGroups = groupByCafe(products);
 
   return (
     <div className="min-h-screen bg-base-200">
       <div className="container mx-auto px-4 py-8">
-        <h1 className="mb-8 font-bold text-3xl">신상품</h1>
+        <h1 className="mb-8 font-bold text-3xl">
+          신상품{" "}
+          {totalCount > 0 && (
+            <span className="text-base-content/50 text-xl">{totalCount}</span>
+          )}
+        </h1>
 
-        {cafeGroups.length === 0 && (
+        {cafeGroups.length === 0 && !isLoadingMore && (
           <p className="text-center text-base-content/60">
             최근 30일 이내 신상품이 없습니다.
           </p>
         )}
 
-        {cafeGroups.map(({ cafeName, products }) => (
+        {cafeGroups.map(({ cafeName, products: cafeProducts }) => (
           <div className="mb-10" key={cafeName}>
             <h2 className="mb-4 font-bold text-xl">{cafeName}</h2>
             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              {products.map((product) => (
+              {cafeProducts.map((product) => (
                 <div key={product._id}>
-                  <ProductCard product={product} />
+                  <ProductCard
+                    product={product}
+                    reviewStats={reviewStats?.[product._id]}
+                  />
                   <p className="mt-1 text-base-content/50 text-xs">
                     {formatRelativeDate(product.addedAt)}
                   </p>
@@ -102,6 +131,21 @@ function NewProductsPage() {
             </div>
           </div>
         ))}
+
+        {hasMore && (
+          <div className="flex justify-center">
+            <button
+              className="btn btn-outline btn-wide"
+              disabled={isLoadingMore}
+              onClick={() => setPageCount((count) => count + 1)}
+              type="button"
+            >
+              {isLoadingMore
+                ? "불러오는 중..."
+                : `더 보기 (${totalCount - products.length}개 남음)`}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

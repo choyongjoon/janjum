@@ -2,6 +2,7 @@ import { convexQuery } from "@convex-dev/react-query";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { api } from "../../convex/_generated/api";
+import { useProductReviewStats } from "../hooks/useProductReviewStats";
 import { ProductCard } from "./ProductCard";
 
 const STALE_TIME = 60 * 60 * 1000; // 1 hour
@@ -11,13 +12,21 @@ export const recentProductsQueryOptions = {
   staleTime: STALE_TIME,
 };
 
-export const recentProductsAllQueryOptions = {
-  ...convexQuery(api.products.getRecent, {}),
+export const NEW_PRODUCTS_PAGE_SIZE = 40;
+
+export const recentProductsPageQueryOptions = (offset: number) => ({
+  ...convexQuery(api.products.getRecent, {
+    limit: NEW_PRODUCTS_PAGE_SIZE,
+    offset,
+  }),
   staleTime: STALE_TIME,
-};
+});
 
 export function NewProductsSection() {
   const { data } = useSuspenseQuery(recentProductsQueryOptions);
+  const reviewStats = useProductReviewStats(
+    data.products.map((product) => product._id)
+  );
 
   if (data.products.length === 0) {
     return null;
@@ -38,7 +47,11 @@ export function NewProductsSection() {
       </div>
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         {data.products.map((product) => (
-          <ProductCard key={product._id} product={product} />
+          <ProductCard
+            key={product._id}
+            product={product}
+            reviewStats={reviewStats?.[product._id]}
+          />
         ))}
       </div>
     </div>
