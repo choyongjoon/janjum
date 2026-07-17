@@ -11,6 +11,7 @@ import {
   OrderSelector,
 } from "~/components/cafe/OrderSelector";
 import { ProductSearchInput } from "~/components/cafe/ProductSearchInput";
+import { useProductReviewStats } from "~/hooks/useProductReviewStats";
 import { api } from "../../convex/_generated/api";
 import { ProductCard } from "../components/ProductCard";
 import { getOrderedCategories } from "../utils/categories";
@@ -62,6 +63,10 @@ function CafePage() {
   });
 
   const [searchQuery, setSearchQuery] = useState("");
+
+  const reviewStats = useProductReviewStats(
+    products?.map((product) => product._id) ?? []
+  );
 
   const availableCategories = Array.from(
     new Set(products?.map((p) => p.category).filter(Boolean) || [])
@@ -180,6 +185,7 @@ function CafePage() {
                   key={product._id}
                   priority={index < 8}
                   product={product}
+                  reviewStats={reviewStats?.[product._id]}
                 />
               ))}
         </div>

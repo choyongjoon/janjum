@@ -104,6 +104,31 @@ export const getProductStats = query({
 });
 
 /**
+ * Get review statistics for many products in a single call.
+ * Used by product list views so each card doesn't need its own query.
+ */
+export const getProductStatsBatch = query({
+  args: { productIds: v.array(v.id("products")) },
+  handler: async (ctx, { productIds }) => {
+    const entries = await Promise.all(
+      productIds.map(async (productId) => {
+        const reviews = await ctx.db
+          .query("reviews")
+          .withIndex("by_product", (q) => q.eq("productId", productId))
+          .filter((q) => q.neq(q.field("isVisible"), false))
+          .collect();
+        return [productId, computeRatingStats(reviews)] as const;
+      })
+    );
+
+    return Object.fromEntries(entries) as Record<
+      Id<"products">,
+      ReturnType<typeof computeRatingStats>
+    >;
+  },
+});
+
+/**
  * Check if user has already reviewed a product
  */
 export const getUserReview = query({

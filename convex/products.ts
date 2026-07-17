@@ -339,8 +339,9 @@ export const upsertProduct = mutation({
 export const getRecent = query({
   args: {
     limit: v.optional(v.number()),
+    offset: v.optional(v.number()),
   },
-  handler: async (ctx, { limit }) => {
+  handler: async (ctx, { limit, offset }) => {
     const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
     const oneDayMs = 24 * 60 * 60 * 1000;
 
@@ -379,7 +380,10 @@ export const getRecent = query({
     // Sort by addedAt descending (newest first)
     filtered.sort((a, b) => b.addedAt - a.addedAt);
 
-    const limited = limit ? filtered.slice(0, limit) : filtered;
+    const start = offset ?? 0;
+    const limited = limit
+      ? filtered.slice(start, start + limit)
+      : filtered.slice(start);
 
     const productsWithCafes = await Promise.all(
       limited.map(async (product) => {

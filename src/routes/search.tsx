@@ -3,6 +3,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { usePostHogEvents } from "~/hooks/usePostHogEvents";
+import { useProductReviewStats } from "~/hooks/useProductReviewStats";
 import { api } from "../../convex/_generated/api";
 import { SearchIcon } from "../components/icons/SearchIcon";
 import { ProductCard } from "../components/ProductCard";
@@ -53,6 +54,10 @@ function SearchPage() {
 
   const { data: searchResults } = useSuspenseQuery(
     convexQuery(api.products.search, searchParams)
+  );
+
+  const reviewStats = useProductReviewStats(
+    searchResults?.map((product) => product._id) ?? []
   );
 
   // Handle form submission
@@ -123,7 +128,11 @@ function SearchPage() {
             {searchResults && searchResults.length > 0 ? (
               <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
                 {searchResults.map((product) => (
-                  <ProductCard key={product._id} product={product} />
+                  <ProductCard
+                    key={product._id}
+                    product={product}
+                    reviewStats={reviewStats?.[product._id]}
+                  />
                 ))}
               </div>
             ) : (
