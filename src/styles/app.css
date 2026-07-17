@@ -1,6 +1,4 @@
-/* Optimized single font import combining all fonts with display=swap for performance */
-@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=Sunflower:wght@300&display=swap");
-
+/* Fonts are loaded via <link rel="stylesheet"> in src/routes/__root.tsx to avoid a render-blocking @import chain */
 @import "tailwindcss";
 
 @plugin "daisyui" {

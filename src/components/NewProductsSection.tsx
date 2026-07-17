@@ -38,7 +38,7 @@ export function NewProductsSection() {
       </div>
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         {data.products.map((product) => (
-          <ProductCard key={product._id} product={product} />
+          <ProductCard key={product._id} priority product={product} />
         ))}
       </div>
     </div>

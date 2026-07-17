@@ -48,6 +48,7 @@ export function ProductCard({
         <img
           alt={product.name}
           className="aspect-square w-full object-cover"
+          fetchPriority={priority ? "high" : "auto"}
           height={300}
           loading={priority ? "eager" : "lazy"}
           src={product.imageUrl || product.externalImageUrl}
