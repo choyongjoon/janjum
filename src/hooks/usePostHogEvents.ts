@@ -1,5 +1,5 @@
-import { usePostHog } from "posthog-js/react";
 import { useCallback } from "react";
+import { usePostHog } from "~/components/analytics/LazyPostHogProvider";
 
 /**
  * Custom hook for tracking key user events in PostHog

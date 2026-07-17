@@ -1,5 +1,4 @@
-import type { RatingDistribution } from "convex/reviews";
-import { RATING_VALUES } from "convex/reviews";
+import { RATING_VALUES, type RatingDistribution } from "shared/ratings";
 
 const WIDE_BAR_RATINGS: readonly number[] = [1, 2, 5];
 

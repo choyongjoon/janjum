@@ -14,7 +14,6 @@ import { createServerFn, Scripts } from "@tanstack/react-start";
 import { getWebRequest } from "@tanstack/react-start/server";
 import type { ConvexReactClient } from "convex/react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
-import { PostHogProvider } from "posthog-js/react";
 import type * as React from "react";
 import { lazy, Suspense } from "react";
 
@@ -26,6 +25,7 @@ const TanStackRouterDevtools = import.meta.env.DEV
     )
   : () => null;
 
+import { LazyPostHogProvider } from "~/components/analytics/LazyPostHogProvider";
 import { NewUserRedirect } from "~/components/auth/NewUserRedirect";
 import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary.js";
 import { Footer } from "~/components/Footer";
@@ -134,16 +134,10 @@ export const Route = createRootRouteWithContext<{
 function RootComponent() {
   const context = useRouteContext({ from: Route.id });
   return (
-    <PostHogProvider
-      apiKey={import.meta.env.VITE_PUBLIC_POSTHOG_KEY}
-      options={{
-        api_host: import.meta.env.VITE_PUBLIC_POSTHOG_HOST,
-        defaults: "2025-05-24",
-        capture_exceptions: true,
-        debug: import.meta.env.MODE === "development",
-      }}
-    >
-      <ClerkProvider>
+    <LazyPostHogProvider>
+      {/* headless: skip loading clerk-js UI bundles (the app only uses Clerk
+          hooks and control components, never the prebuilt UI) */}
+      <ClerkProvider clerkJSVariant="headless">
         <ConvexProviderWithClerk
           client={context.convexClient}
           useAuth={useAuth}
@@ -154,7 +148,7 @@ function RootComponent() {
           </RootDocument>
         </ConvexProviderWithClerk>
       </ClerkProvider>
-    </PostHogProvider>
+    </LazyPostHogProvider>
   );
 }
 
