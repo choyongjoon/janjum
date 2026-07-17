@@ -39,9 +39,13 @@ function Home() {
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const trimmedSearchTerm = searchTerm.trim();
+    if (!trimmedSearchTerm) {
+      return;
+    }
     navigate({
       to: "/search",
-      search: { searchTerm: searchTerm.trim() },
+      search: { searchTerm: trimmedSearchTerm },
     });
   };
 
