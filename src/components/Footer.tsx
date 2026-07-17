@@ -46,7 +46,7 @@ export function Footer() {
 
           {/* Copyright */}
           <div className="text-center text-base-content/60 text-xs">
-            <p>&copy; 2025 잔점. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} 잔점. All rights reserved.</p>
           </div>
         </div>
       </div>
