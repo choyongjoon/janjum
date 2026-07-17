@@ -29,22 +29,26 @@
   body {
     @apply bg-base-200;
   }
+}
 
-  /*
-   * iOS Safari auto-zooms the page when a focused form field has a font-size
-   * below 16px (daisyUI inputs default to 14px). Bump form controls to 16px so
-   * focusing the search box (or any input) no longer zooms. Targets touch
-   * devices in any orientation (`pointer: coarse` — iPhone landscape can be
-   * wider than 767px) plus narrow viewports as a safety net, leaving desktop
-   * sizing untouched. Avoids the accessibility-harmful `user-scalable=no`
-   * viewport workaround.
-   */
-  @media (pointer: coarse), (max-width: 767px) {
-    input,
-    select,
-    textarea {
-      font-size: 16px;
-    }
+/*
+ * iOS Safari auto-zooms the page when a focused form field has a font-size
+ * below 16px (daisyUI inputs default to 14px). Bump form controls to 16px so
+ * focusing the search box (or any input) no longer zooms. Targets touch devices
+ * in any orientation (`pointer: coarse` — iPhone landscape can be wider than
+ * 767px) plus narrow viewports as a safety net, leaving desktop sizing
+ * untouched. Avoids the accessibility-harmful `user-scalable=no` viewport
+ * workaround.
+ *
+ * Deliberately unlayered: daisyUI's `.input { font-size: .875rem }` outranks any
+ * `@layer` (base/components/utilities) rule with an `input` selector, so this
+ * must sit outside the cascade layers to win.
+ */
+@media (pointer: coarse), (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
   }
 }
 
