@@ -23,6 +23,7 @@ const defaultReviewStats: ReviewStats = {
 export function ProductCard({
   product,
   priority = false,
+  fetchPriority = "auto",
   reviewStats,
 }: {
   product: Doc<"products"> & {
@@ -30,6 +31,7 @@ export function ProductCard({
     imageUrl?: string;
   };
   priority?: boolean;
+  fetchPriority?: "high" | "auto";
   // Provided by the list container via a single batched stats query
   // (useProductReviewStats) instead of one query per card.
   reviewStats?: ReviewStats;
@@ -47,6 +49,7 @@ export function ProductCard({
         <img
           alt={product.name}
           className="aspect-square w-full object-cover"
+          fetchPriority={fetchPriority}
           height={300}
           loading={priority ? "eager" : "lazy"}
           src={product.imageUrl || product.externalImageUrl}

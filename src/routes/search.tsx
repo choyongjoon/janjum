@@ -117,28 +117,39 @@ function SearchPage() {
 
       {/* Search Results */}
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="font-semibold text-xl">
-            검색 결과 ({searchResults?.length || 0}개)
-          </h2>
-        </div>
+        {searchTerm?.trim() ? (
+          <>
+            <div className="mb-6 flex items-center justify-between">
+              <h2 className="font-semibold text-xl">
+                검색 결과 ({searchResults?.length || 0}개)
+              </h2>
+            </div>
 
-        {searchResults && searchResults.length > 0 ? (
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-            {searchResults.map((product) => (
-              <ProductCard
-                key={product._id}
-                product={product}
-                reviewStats={reviewStats?.[product._id]}
-              />
-            ))}
-          </div>
+            {searchResults && searchResults.length > 0 ? (
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+                {searchResults.map((product) => (
+                  <ProductCard
+                    key={product._id}
+                    product={product}
+                    reviewStats={reviewStats?.[product._id]}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="py-16 text-center">
+                <h3 className="mb-2 font-semibold text-lg">
+                  검색 결과가 없습니다
+                </h3>
+                <p className="mb-4 text-base-content/60">
+                  다른 검색어를 시도해보세요.
+                </p>
+              </div>
+            )}
+          </>
         ) : (
-          <div className="py-16 text-center">
-            <h3 className="mb-2 font-semibold text-lg">검색 결과가 없습니다</h3>
-            <p className="mb-4 text-base-content/60">
-              다른 검색어를 시도해보세요.
-            </p>
+          <div className="py-16 text-center text-base-content/60">
+            <SearchIcon className="mx-auto mb-4 h-10 w-10" />
+            <p>음료명으로 검색해보세요</p>
           </div>
         )}
       </div>

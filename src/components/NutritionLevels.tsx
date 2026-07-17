@@ -5,6 +5,15 @@ export interface NutritionLevelsProps {
   nutritions?: Nutritions | null;
 }
 
+// Literal class names so Tailwind's source scan generates them
+// (a `progress-${color}` template would be dropped from the bundle)
+const progressColorClasses: Record<string, string> = {
+  success: "progress-success",
+  warning: "progress-warning",
+  error: "progress-error",
+  neutral: "progress-neutral",
+};
+
 // Convert nutrition level to progress percentage
 function levelTextToProgressValue(levelText: string): number {
   switch (levelText) {
@@ -60,7 +69,7 @@ export function NutritionLevels({ nutritions }: NutritionLevelsProps) {
         }
 
         const progressValue = levelTextToProgressValue(level.text);
-        const progressColorClass = `progress-${level.color}`;
+        const progressColorClass = progressColorClasses[level.color] ?? "";
 
         return (
           <div className="flex items-center gap-2 text-sm" key={key}>

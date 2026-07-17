@@ -1,4 +1,4 @@
-import type { RatingDistribution } from "convex/reviews";
+import type { RatingDistribution } from "shared/ratings";
 import { RatingHistogram } from "./reviews/RatingHistogram";
 
 export function RatingSummary({
@@ -14,11 +14,21 @@ export function RatingSummary({
 }) {
   const noReview = reviewStats.totalReviews === 0;
 
+  if (noReview) {
+    return (
+      <div className={`flex h-6 items-center ${className ?? ""}`}>
+        <span className="text-base-content/50 text-sm">
+          첫 리뷰를 남겨보세요
+        </span>
+      </div>
+    );
+  }
+
   return (
-    <div className={`flex items-center gap-3 ${className}`}>
+    <div className={`flex items-center gap-3 ${className ?? ""}`}>
       <RatingHistogram ratingDistribution={reviewStats.ratingDistribution} />
       <span className="font-medium text-primary">
-        {noReview ? "?" : reviewStats.averageRating.toFixed(1)}
+        {reviewStats.averageRating.toFixed(1)}
       </span>
       <span className="text-base-content/60 text-sm">
         ({reviewStats.totalReviews})
