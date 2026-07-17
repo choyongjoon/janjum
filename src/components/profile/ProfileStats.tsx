@@ -1,4 +1,4 @@
-import type { RatingDistribution } from "convex/reviews";
+import type { RatingDistribution } from "shared/ratings";
 import { UserRatingHistogram } from "~/components/reviews/UserRatingHistogram";
 
 interface UserStats {

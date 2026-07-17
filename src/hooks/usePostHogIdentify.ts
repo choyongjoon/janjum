@@ -1,7 +1,7 @@
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { usePostHog } from "posthog-js/react";
 import { useEffect, useRef } from "react";
+import { usePostHog } from "~/components/analytics/LazyPostHogProvider";
 import { api } from "../../convex/_generated/api";
 import { usePostHogEvents } from "./usePostHogEvents";
 

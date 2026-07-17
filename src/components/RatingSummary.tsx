@@ -1,4 +1,4 @@
-import type { RatingDistribution } from "convex/reviews";
+import type { RatingDistribution } from "shared/ratings";
 import { RatingHistogram } from "./reviews/RatingHistogram";
 
 export function RatingSummary({
