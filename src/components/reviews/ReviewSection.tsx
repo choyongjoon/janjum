@@ -94,6 +94,7 @@ export function ReviewSection({ productId }: ReviewSectionProps) {
   };
 
   const hasUserReview = !!userReview;
+  const hasReviews = !!reviews && reviews.length > 0;
 
   return (
     <div className="space-y-6">
@@ -105,7 +106,7 @@ export function ReviewSection({ productId }: ReviewSectionProps) {
 
         {!showForm && (
           <div className="flex gap-2">
-            {!currentUser && (
+            {!currentUser && hasReviews && (
               <button
                 className="btn btn-primary btn-sm"
                 onClick={() => setShowSignInModal(true)}
