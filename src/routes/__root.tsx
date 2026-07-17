@@ -90,6 +90,18 @@ export const Route = createRootRouteWithContext<{
         href: "https://fonts.gstatic.com",
         crossOrigin: "anonymous",
       },
+      // Font stylesheets linked directly (not via CSS @import) so the browser
+      // discovers them in parallel with app.css instead of after it.
+      // All five Noto Sans KR weights are in use (300–700).
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap",
+      },
+      // Sunflower is only used for the "잔점" logo text, so subset to those glyphs.
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Sunflower:wght@300&text=%EC%9E%94%EC%A0%90&display=swap",
+      },
       {
         rel: "apple-touch-icon",
         sizes: "180x180",
