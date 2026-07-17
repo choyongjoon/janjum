@@ -17,7 +17,7 @@ export function CafeCard({
           alt={cafe.name}
           className="aspect-square w-full object-cover"
           height={200}
-          loading="eager"
+          loading="lazy"
           src={cafe.imageUrl}
           width={200}
         />
