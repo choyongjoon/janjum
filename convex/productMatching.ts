@@ -9,7 +9,11 @@
  * but "H-"/"I-" on the rebuilt one) and whitespace/hyphens. The temperature is
  * kept in the key so a hot and an iced variant never collapse together.
  */
-const TEMPERATURE_PREFIX = /^(hot|ice|h|i)[\s-]+/;
+// Matches only the two real schemes: the old "HOT "/"ICE " word form (word +
+// space/hyphen) and the new "H-"/"I-" single-letter form (letter + hyphen). A
+// bare single letter + space (e.g. "H 하우스") is intentionally NOT treated as a
+// temperature marker, so unrelated names aren't folded together.
+const TEMPERATURE_PREFIX = /^(hot|ice)[\s-]+|^(h|i)-+/;
 const SEPARATORS = /[\s-]/g;
 
 export function normalizeProductName(name: string): string {
@@ -19,7 +23,7 @@ export function normalizeProductName(name: string): string {
   let temperature = "";
   let rest = lowered;
   if (prefixMatch) {
-    const token = prefixMatch[1];
+    const token = prefixMatch[1] ?? prefixMatch[2];
     temperature = token === "h" || token === "hot" ? "hot" : "ice";
     rest = lowered.slice(prefixMatch[0].length);
   }

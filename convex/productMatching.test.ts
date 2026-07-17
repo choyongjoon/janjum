@@ -32,4 +32,14 @@ describe("normalizeProductName", () => {
     // No latin marker + separator, so the whole name is the base key.
     expect(normalizeProductName("한라봉주스")).toBe("한라봉주스");
   });
+
+  it("does not treat a bare single letter + space as a temperature marker", () => {
+    // "H 하우스" is neither the "HOT "/"ICE " word form nor the "H-"/"I-" form,
+    // so it must not fold to a temperature key (which could collide with an
+    // unrelated product).
+    expect(normalizeProductName("H 하우스블렌드")).toBe("h하우스블렌드");
+    expect(normalizeProductName("H 하우스블렌드")).not.toBe(
+      normalizeProductName("HOT 하우스블렌드")
+    );
+  });
 });
