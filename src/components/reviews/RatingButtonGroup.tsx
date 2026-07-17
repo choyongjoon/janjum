@@ -1,4 +1,4 @@
-import { RATING_TEXTS, RATING_VALUES } from "convex/reviews";
+import { RATING_TEXTS, RATING_VALUES } from "shared/ratings";
 
 interface RatingStarsProps {
   onRatingChange?: (rating: number) => void;

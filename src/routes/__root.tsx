@@ -14,9 +14,9 @@ import { createServerFn, Scripts } from "@tanstack/react-start";
 import { getWebRequest } from "@tanstack/react-start/server";
 import type { ConvexReactClient } from "convex/react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
-import { PostHogProvider } from "posthog-js/react";
 import type * as React from "react";
 import { lazy, Suspense } from "react";
+import { LazyPostHogProvider } from "~/components/analytics/LazyPostHogProvider";
 
 const TanStackRouterDevtools = import.meta.env.DEV
   ? lazy(() =>
@@ -90,6 +90,18 @@ export const Route = createRootRouteWithContext<{
         href: "https://fonts.gstatic.com",
         crossOrigin: "anonymous",
       },
+      // Font stylesheets linked directly (not via CSS @import) so the browser
+      // discovers them in parallel with app.css instead of after it.
+      // All five Noto Sans KR weights are in use (300–700).
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap",
+      },
+      // Sunflower is only used for the "잔점" logo text, so subset to those glyphs.
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Sunflower:wght@300&text=%EC%9E%94%EC%A0%90&display=swap",
+      },
       {
         rel: "apple-touch-icon",
         sizes: "180x180",
@@ -134,16 +146,10 @@ export const Route = createRootRouteWithContext<{
 function RootComponent() {
   const context = useRouteContext({ from: Route.id });
   return (
-    <PostHogProvider
-      apiKey={import.meta.env.VITE_PUBLIC_POSTHOG_KEY}
-      options={{
-        api_host: import.meta.env.VITE_PUBLIC_POSTHOG_HOST,
-        defaults: "2025-05-24",
-        capture_exceptions: true,
-        debug: import.meta.env.MODE === "development",
-      }}
-    >
-      <ClerkProvider>
+    <LazyPostHogProvider>
+      {/* headless: skip loading clerk-js UI bundles (the app only uses Clerk
+          hooks and control components, never the prebuilt UI) */}
+      <ClerkProvider clerkJSVariant="headless">
         <ConvexProviderWithClerk
           client={context.convexClient}
           useAuth={useAuth}
@@ -154,7 +160,7 @@ function RootComponent() {
           </RootDocument>
         </ConvexProviderWithClerk>
       </ClerkProvider>
-    </PostHogProvider>
+    </LazyPostHogProvider>
   );
 }
 
