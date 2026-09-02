@@ -13,6 +13,7 @@
     "optimize-images:prod": "dotenv -e .env.prod-upload -- tsx scripts/optimizeImages.ts",
     "cleanup-storage": "tsx scripts/cleanupStorage.ts",
     "cleanup-storage:prod": "dotenv -e .env.prod-upload -- tsx scripts/cleanupStorage.ts",
+    "restore-mega-added-at:prod": "dotenv -e .env.prod-upload -- tsx scripts/restoreMegaAddedAt.ts",
     "data-sync:prod": "scripts/dataSyncProd.sh",
     "test": "vitest",
     "test:e2e": "playwright test",

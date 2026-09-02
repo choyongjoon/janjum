@@ -726,6 +726,64 @@ export const markAsRemoved = internalMutation({
 });
 
 /**
+ * Restore per-product `addedAt` values.
+ *
+ * `backdateReimportedProducts` collapses a whole re-import batch onto a single
+ * timestamp, which is the right trade when the alternative is the batch
+ * flooding the new-products list -- but it discards the real dates. Those dates
+ * survive on the soft-removed records the re-import left behind (the id scheme
+ * changed, the old rows did not go away), so they can be read back and
+ * reapplied here.
+ *
+ * Idempotent: a product already carrying the requested timestamp is skipped.
+ * Run with `dryRun: true` first to see what would change.
+ */
+export const restoreAddedAt = mutation({
+  args: {
+    updates: v.array(
+      v.object({
+        productId: v.id("products"),
+        addedAt: v.number(),
+      })
+    ),
+    dryRun: v.optional(v.boolean()),
+    uploadSecret: v.optional(v.string()),
+  },
+  handler: async (ctx, { updates, dryRun, uploadSecret }) => {
+    verifyUploadSecret(uploadSecret);
+
+    const changed: Array<{ from: number; name: string; to: number }> = [];
+    const missing: string[] = [];
+    let alreadyCorrect = 0;
+
+    for (const { productId, addedAt } of updates) {
+      const product = await ctx.db.get(productId);
+      if (!product) {
+        missing.push(productId);
+        continue;
+      }
+      if (product.addedAt === addedAt) {
+        alreadyCorrect++;
+        continue;
+      }
+      if (!dryRun) {
+        await ctx.db.patch(productId, { addedAt });
+      }
+      changed.push({ name: product.name, from: product.addedAt, to: addedAt });
+    }
+
+    return {
+      dryRun: dryRun ?? false,
+      requested: updates.length,
+      changed: changed.length,
+      alreadyCorrect,
+      missing: missing.length,
+      sample: changed.slice(0, 10),
+    };
+  },
+});
+
+/**
  * One-time repair for a cafe whose menu was re-imported under a new
  * `externalId` scheme, which recreated every item with a fresh `addedAt` and
  * flooded the "new products" list. Backdates the re-imported items to the cafe
