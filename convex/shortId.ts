@@ -1,5 +1,4 @@
 import { customAlphabet } from "nanoid";
-import { mutation } from "./_generated/server";
 
 /**
  * Generate a URL-friendly short ID using nanoid
@@ -17,12 +16,13 @@ const NANOID_LENGTH = 8;
 const generateId = customAlphabet(NANOID_ALPHABET, NANOID_LENGTH);
 
 /**
- * Generate a short ID for a product using nanoid
+ * Generate a short ID for a product using nanoid.
+ *
+ * A plain function, not a Convex mutation: it touches no data, so exposing it
+ * as a public mutation only widened the API surface, and calling it through
+ * `ctx.runMutation` cost a nested mutation on every product insert.
  */
-export const generateShortId = mutation({
-  args: {},
-  handler: (): string => {
-    // Generate a collision-resistant, URL-friendly ID
-    return generateId();
-  },
-});
+export function generateShortId(): string {
+  // Generate a collision-resistant, URL-friendly ID
+  return generateId();
+}

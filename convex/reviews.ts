@@ -4,9 +4,14 @@ import {
   RATING_VALUES,
   type RatingDistribution,
 } from "../shared/ratings";
-import { api } from "./_generated/api";
+import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { mutation, type QueryCtx, query } from "./_generated/server";
+import {
+  internalMutation,
+  mutation,
+  type QueryCtx,
+  query,
+} from "./_generated/server";
 import { verifyUploadSecret } from "./uploadSecret";
 import { getCurrentUserOrThrow } from "./users";
 
@@ -218,7 +223,7 @@ export const upsertReview = mutation({
     }
 
     // Update product aggregation stats
-    await ctx.runMutation(api.reviews.updateProductStats, {
+    await ctx.runMutation(internal.reviews.updateProductStats, {
       productId: args.productId,
     });
 
@@ -260,7 +265,7 @@ export const deleteReview = mutation({
     await ctx.db.delete(reviewId);
 
     // Update product aggregation stats
-    await ctx.runMutation(api.reviews.updateProductStats, {
+    await ctx.runMutation(internal.reviews.updateProductStats, {
       productId: review.productId,
     });
 
@@ -271,7 +276,11 @@ export const deleteReview = mutation({
 /**
  * Update product rating aggregation statistics
  */
-export const updateProductStats = mutation({
+/**
+ * Internal: recomputes a product's cached rating aggregates. Only the review
+ * mutations and the account-deletion cleanup should trigger it.
+ */
+export const updateProductStats = internalMutation({
   args: { productId: v.id("products") },
   handler: async (ctx, { productId }) => {
     const reviews = await ctx.db

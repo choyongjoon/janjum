@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { api } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import { type ActionCtx, action } from "./_generated/server";
+import { type ActionCtx, internalAction } from "./_generated/server";
 
 interface DownloadResult {
   error?: string;
@@ -10,7 +10,12 @@ interface DownloadResult {
   success: boolean;
 }
 
-export const downloadAndStoreImageAction = action({
+/**
+ * Internal: scheduled by `products.upsertProduct` only. As a public internalAction,
+ * anyone with the deployment URL could make the deployment fetch an arbitrary
+ * URL and spend storage on the result.
+ */
+export const downloadAndStoreImageAction = internalAction({
   args: {
     imageUrl: v.string(),
     productId: v.id("products"),

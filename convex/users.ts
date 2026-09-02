@@ -1,7 +1,7 @@
 import { createClerkClient, type UserJSON } from "@clerk/backend";
 import { type Validator, v } from "convex/values";
 import { nanoid } from "nanoid";
-import { api, internal } from "./_generated/api";
+import { internal } from "./_generated/api";
 import {
   action,
   internalMutation,
@@ -294,7 +294,7 @@ export const deleteAccount = mutation({
     // than runMutation) so each recompute runs after this deletion commits,
     // matching how the codebase triggers follow-up work from a mutation.
     for (const productId of affectedProductIds) {
-      await ctx.scheduler.runAfter(0, api.reviews.updateProductStats, {
+      await ctx.scheduler.runAfter(0, internal.reviews.updateProductStats, {
         productId,
       });
     }

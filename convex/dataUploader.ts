@@ -1,7 +1,7 @@
 import type { GenericDataModel, GenericMutationCtx } from "convex/server";
 import { v } from "convex/values";
 import type { Nutritions } from "../shared/nutritions";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { mutation } from "./_generated/server";
 
@@ -64,7 +64,7 @@ async function uploadProductsToDatabase(
 ) {
   for (const product of products) {
     try {
-      const result = await ctx.runMutation(api.products.upsertProduct, {
+      const result = await ctx.runMutation(internal.products.upsertProduct, {
         ...product,
         cafeId,
         category: product.category ?? undefined,
@@ -82,6 +82,13 @@ async function uploadProductsToDatabase(
         results.updated++;
       } else if (result.action === "unchanged") {
         results.unchanged++;
+      }
+
+      // Reactivation is reported by the upsert itself -- that patch is what
+      // brings a soft-removed product back -- not by the later markAsRemoved.
+      if (result.reactivated) {
+        results.reactivated++;
+        results.reactivatedProducts?.push(result.name ?? product.name);
       }
     } catch (error) {
       results.errors.push(`Failed to upsert ${product.name}: ${error}`);
@@ -127,6 +134,7 @@ export const uploadProductsFromJson = mutation({
       skipped: 0,
       removed: 0,
       reactivated: 0,
+      reactivatedProducts: [],
       processingTime: 0,
     };
 
@@ -150,16 +158,18 @@ export const uploadProductsFromJson = mutation({
 
     // After uploading, check for removed products
     const currentExternalIds = products.map((p) => p.externalId);
-    const removalResults = await ctx.runMutation(api.products.markAsRemoved, {
-      cafeId: cafe._id,
-      currentExternalIds,
-    });
+    const removalResults = await ctx.runMutation(
+      internal.products.markAsRemoved,
+      {
+        cafeId: cafe._id,
+        currentExternalIds,
+      }
+    );
 
-    // Update results with removal information
+    // Update results with removal information. `reactivated` is already
+    // accumulated by uploadProductsToDatabase above.
     results.removed = removalResults.removed;
-    results.reactivated = removalResults.reactivated;
     results.removedProducts = removalResults.removedProducts;
-    results.reactivatedProducts = removalResults.reactivatedProducts;
 
     results.processingTime = Date.now() - startTime;
 

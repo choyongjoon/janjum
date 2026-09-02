@@ -6,6 +6,7 @@ import dotenv from "dotenv";
 import sharp from "sharp";
 import { api } from "../../convex/_generated/api";
 import { logger } from "../../shared/logger";
+import { dedupeByExternalId } from "./dedupe";
 
 const IMAGE_CONCURRENCY = process.env.IMAGE_CONCURRENCY
   ? Number(process.env.IMAGE_CONCURRENCY)
@@ -77,13 +78,15 @@ class ProductUploader {
     const downloadImages = true;
 
     const filePath = this.resolveFilePath(file);
-    const products = this.readAndValidateFile(filePath);
+    const rawProducts = this.readAndValidateFile(filePath);
 
     if (verbose) {
       this.logUploadInfo(filePath, cafeSlug, dryRun);
     }
 
-    logger.info(`Found ${products.length} products in file`);
+    logger.info(`Found ${rawProducts.length} products in file`);
+
+    const products = this.dedupeProducts(rawProducts, verbose);
 
     try {
       const result = await this.performUpload(
@@ -128,6 +131,52 @@ class ProductUploader {
     }
 
     return products;
+  }
+
+  /**
+   * Drop repeated rows before uploading. Every extra row for an externalId
+   * patches the same record again inside the upload transaction, so this is
+   * pure write amplification -- and when the rows differ, whichever came last
+   * in the file silently won.
+   */
+  private dedupeProducts(
+    products: ProductData[],
+    verbose: boolean
+  ): ProductData[] {
+    const report = dedupeByExternalId(products);
+
+    if (report.exactDuplicatesDropped > 0) {
+      logger.info(
+        `Dropped ${report.exactDuplicatesDropped} duplicate row(s) that were identical to a row already being uploaded`
+      );
+    }
+
+    if (report.conflicts.length > 0) {
+      const extras = report.conflicts.reduce(
+        (sum, c) => sum + (c.variants - 1),
+        0
+      );
+      logger.warn(
+        `${report.conflicts.length} externalId(s) map to ${report.conflicts.length + extras} different products; keeping the first of each and skipping ${extras} row(s). The crawler's externalId scheme cannot tell these apart.`
+      );
+      const shown = verbose ? report.conflicts : report.conflicts.slice(0, 5);
+      for (const conflict of shown) {
+        logger.warn(
+          `  ${conflict.externalId} -> ${conflict.variants} variants (${conflict.name})`
+        );
+      }
+      if (!verbose && report.conflicts.length > shown.length) {
+        logger.warn(
+          `  ...and ${report.conflicts.length - shown.length} more; use --verbose to see all`
+        );
+      }
+    }
+
+    if (report.products.length !== products.length) {
+      logger.info(`Uploading ${report.products.length} unique product(s)`);
+    }
+
+    return report.products;
   }
 
   private logUploadInfo(

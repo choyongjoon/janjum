@@ -1,8 +1,9 @@
 import { v } from "convex/values";
 import type { Nutritions } from "../shared/nutritions";
-import { api } from "./_generated/api";
+import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
+  internalMutation,
   type MutationCtx,
   mutation,
   type QueryCtx,
@@ -10,6 +11,7 @@ import {
 } from "./_generated/server";
 import { nutritionsValidator } from "./nutritionsValidator";
 import { normalizeProductName } from "./productMatching";
+import { generateShortId } from "./shortId";
 import { verifyUploadSecret } from "./uploadSecret";
 
 // Field names derived from the validator so changes stay in one place.
@@ -177,6 +179,15 @@ interface UpsertProductArgs {
   price?: number;
 }
 
+interface UpsertResult {
+  action: string;
+  id: string;
+  // Set when this upsert brought a soft-removed product back to life, so the
+  // caller can report an accurate "reactivated" count.
+  name?: string;
+  reactivated: boolean;
+}
+
 interface ExistingProduct {
   _id: Id<"products">;
   category?: string;
@@ -239,11 +250,15 @@ function scheduleImageDownloadIfNeeded(
     args.externalImageUrl &&
     !args.imageStorageId
   ) {
-    ctx.scheduler.runAfter(0, api.imageDownloader.downloadAndStoreImageAction, {
-      imageUrl: args.externalImageUrl,
-      productId,
-      uploadSecret: process.env.CONVEX_UPLOAD_SECRET,
-    });
+    ctx.scheduler.runAfter(
+      0,
+      internal.imageDownloader.downloadAndStoreImageAction,
+      {
+        imageUrl: args.externalImageUrl,
+        productId,
+        uploadSecret: process.env.CONVEX_UPLOAD_SECRET,
+      }
+    );
   }
 }
 
@@ -252,11 +267,15 @@ async function handleExistingProduct(
   args: UpsertProductArgs,
   existing: ExistingProduct,
   now: number
-): Promise<{ action: string; id: string }> {
+): Promise<UpsertResult> {
   const hasChanges = hasProductChanges(existing, args);
+  const isNowActive = args.isActive ?? true;
+  // A soft-removed product that shows up in the crawl again is reactivated
+  // here, by this patch -- not later in `markAsRemoved`. Report it from where
+  // it happens so the upload summary counts it.
+  const reactivated = existing.isActive === false && isNowActive;
 
   if (hasChanges) {
-    const isNowActive = args.isActive ?? true;
     const updateData = {
       ...args,
       updatedAt: now,
@@ -271,10 +290,15 @@ async function handleExistingProduct(
     const shouldDownloadImage = !existing.imageStorageId;
     scheduleImageDownloadIfNeeded(ctx, args, existing._id, shouldDownloadImage);
 
-    return { action: "updated", id: existing._id };
+    return {
+      action: "updated",
+      id: existing._id,
+      reactivated,
+      name: existing.name,
+    };
   }
 
-  return { action: "unchanged", id: existing._id };
+  return { action: "unchanged", id: existing._id, reactivated: false };
 }
 
 /**
@@ -309,11 +333,8 @@ async function createNewProduct(
   ctx: MutationCtx,
   args: UpsertProductArgs,
   now: number
-): Promise<{ action: string; id: string }> {
-  const shortId: string = await ctx.runMutation(
-    api.shortId.generateShortId,
-    {}
-  );
+): Promise<UpsertResult> {
+  const shortId = generateShortId();
 
   const insertData = {
     ...args,
@@ -329,10 +350,16 @@ async function createNewProduct(
 
   scheduleImageDownloadIfNeeded(ctx, args, id, true);
 
-  return { action: "created", id };
+  return { action: "created", id, reactivated: false };
 }
 
-export const upsertProduct = mutation({
+/**
+ * Internal: only the upload pipeline may write products. Exposed as a public
+ * mutation this would let anyone with the deployment URL insert or overwrite
+ * arbitrary products, since it carries no upload-secret check of its own --
+ * `dataUploader.uploadProductsFromJson` is what authenticates the caller.
+ */
+export const upsertProduct = internalMutation({
   args: {
     cafeId: v.id("cafes"),
     name: v.string(),
@@ -349,12 +376,18 @@ export const upsertProduct = mutation({
     downloadImages: v.optional(v.boolean()),
     isActive: v.optional(v.boolean()), // Default to true if not specified
   },
-  handler: async (ctx, args): Promise<{ action: string; id: string }> => {
+  handler: async (ctx, args): Promise<UpsertResult> => {
     const now = Date.now();
 
+    // Scope the lookup to the cafe. `externalId` is only unique *within* a
+    // cafe -- e.g. "17" is both Starbucks' 스팀 우유 and 매머드커피's 매머드 커피 --
+    // so a global `by_external_id` lookup makes the later upload steal the
+    // earlier cafe's record, flipping its cafeId and orphaning its reviews.
     const existing = await ctx.db
       .query("products")
-      .withIndex("by_external_id", (q) => q.eq("externalId", args.externalId))
+      .withIndex("by_cafe_external_id", (q) =>
+        q.eq("cafeId", args.cafeId).eq("externalId", args.externalId)
+      )
       .first();
 
     if (existing) {
@@ -640,7 +673,19 @@ export const deleteProduct = mutation({
   },
 });
 
-export const markAsRemoved = mutation({
+/**
+ * Soft-remove the cafe's active products that the latest crawl no longer lists.
+ *
+ * Internal: as a public mutation, anyone with the deployment URL could call this
+ * with an empty `currentExternalIds` and take a whole cafe's menu offline.
+ *
+ * Reactivation is deliberately NOT handled here: a returning product is found
+ * by `upsertProduct` (its externalId still matches) and reactivated by that
+ * patch, before this ever runs. The second pass this function used to do could
+ * therefore never match anything -- it scanned every removed product in the
+ * cafe only to always report zero.
+ */
+export const markAsRemoved = internalMutation({
   args: {
     cafeId: v.id("cafes"),
     currentExternalIds: v.array(v.string()),
@@ -648,20 +693,22 @@ export const markAsRemoved = mutation({
   handler: async (ctx, { cafeId, currentExternalIds }) => {
     const now = Date.now();
 
-    // Get all active products for this cafe
-    const allProducts = await ctx.db
+    // Read only the active products straight from the index; the previous
+    // `by_cafe` + filter also pulled in every soft-removed product.
+    const activeProducts = await ctx.db
       .query("products")
-      .withIndex("by_cafe", (q) => q.eq("cafeId", cafeId))
-      .filter((q) => q.eq(q.field("isActive"), true))
+      .withIndex("by_cafe_active", (q) =>
+        q.eq("cafeId", cafeId).eq("isActive", true)
+      )
       .collect();
 
+    // Set lookup instead of Array#includes inside the loop, which made this
+    // O(active x crawled) string comparisons inside the upload transaction.
+    const crawledIds = new Set(currentExternalIds);
     const removedProducts: string[] = [];
-    const reactivatedProducts: string[] = [];
 
-    // Find products that are no longer in the current crawl
-    for (const product of allProducts) {
-      if (!currentExternalIds.includes(product.externalId)) {
-        // Mark as removed
+    for (const product of activeProducts) {
+      if (!crawledIds.has(product.externalId)) {
         await ctx.db.patch(product._id, {
           isActive: false,
           removedAt: now,
@@ -671,30 +718,9 @@ export const markAsRemoved = mutation({
       }
     }
 
-    // Find products that were previously removed but are now back
-    const previouslyRemovedProducts = await ctx.db
-      .query("products")
-      .withIndex("by_cafe", (q) => q.eq("cafeId", cafeId))
-      .filter((q) => q.eq(q.field("isActive"), false))
-      .collect();
-
-    for (const product of previouslyRemovedProducts) {
-      if (currentExternalIds.includes(product.externalId)) {
-        // Reactivate the product
-        await ctx.db.patch(product._id, {
-          isActive: true,
-          removedAt: undefined,
-          updatedAt: now,
-        });
-        reactivatedProducts.push(product.name);
-      }
-    }
-
     return {
       removed: removedProducts.length,
       removedProducts,
-      reactivated: reactivatedProducts.length,
-      reactivatedProducts,
     };
   },
 });
