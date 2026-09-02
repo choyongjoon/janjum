@@ -1,8 +1,9 @@
 import { PlaywrightCrawler, type Request } from "crawlee";
-import type { Locator, Page } from "playwright";
+import type { Page } from "playwright";
 import { logger } from "../../shared/logger";
 import type { Nutritions } from "../../shared/nutritions";
 import { type Product, waitForLoad, writeProductsToJson } from "./crawlerUtils";
+import { buildMegaExternalId } from "./megaProductId";
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
@@ -160,219 +161,131 @@ function parseNutritionItems(
   }
 }
 
-// Extract nutrition data from modal after clicking product
-async function extractNutritionDataFromModal(
-  page: Page,
-  productContainer: Locator
-): Promise<Nutritions | null> {
-  try {
-    logger.debug("Attempting to click product to open modal");
-
-    // Click on the product image to open modal
-    const productImage = productContainer
-      .locator(SELECTORS.productData.image)
-      .first();
-    if ((await productImage.count()) === 0) {
-      logger.debug("No product image found to click");
-      return null;
-    }
-
-    await productImage.click();
-
-    // Wait for modal to appear
-    await page.waitForSelector('.inner_modal[style*="display: block"]', {
-      timeout: 1000,
-    });
-
-    logger.debug("Modal opened, extracting nutrition data");
-
-    const innerModal = page.locator('.inner_modal[style*="display: block"]');
-
-    // Extract serving info (size and calories)
-    const servingInfo = await innerModal
-      .locator(".cont_text .cont_text_inner")
-      .allTextContents();
-
-    // Extract nutrition items from the list
-    const nutritionItems = await innerModal
-      .locator(".cont_list ul li")
-      .allTextContents();
-
-    if (servingInfo.length === 0 && nutritionItems.length === 0) {
-      logger.debug("No nutrition information found in modal");
-      await closeModal(page);
-      return null;
-    }
-
-    const nutrition: Nutritions = {};
-    parseServingInfo(servingInfo, nutrition);
-    parseNutritionItems(nutritionItems, nutrition);
-
-    // Close the modal
-    await closeModal(page);
-
-    if (Object.keys(nutrition).length > 0) {
-      logger.debug("Successfully extracted nutrition data from modal");
-      return nutrition;
-    }
-
-    logger.debug("No nutrition information found in modal");
-    return null;
-  } catch (error) {
-    logger.debug(`Error extracting nutrition data from modal: ${error}`);
-    // Try to close modal if it's open
-    try {
-      await closeModal(page);
-    } catch (closeError) {
-      logger.debug(`Error closing modal: ${closeError}`);
-    }
-    return null;
-  }
+/**
+ * Every menu item carries its full detail panel in the DOM already, inside a
+ * hidden `.inner_modal` sibling. The crawler used to click each product open,
+ * wait for the modal, read it, then close it -- ~225 products x four Playwright
+ * round-trips, which blew past `requestHandlerTimeoutSecs` every single run.
+ * Crawlee then retried the whole page twice more, and because `pushData` keeps
+ * what earlier attempts already wrote, the output ended up with three copies of
+ * every product (675 rows for a 225-item menu).
+ *
+ * Reading the hidden panel directly makes a page one `evaluate` call, so the
+ * crawl finishes well inside its budget. It also fixes a correctness bug: the
+ * click-based version read whichever modal happened to be visible, so products
+ * occasionally picked up a neighbour's nutrition (an Americano with 5g of
+ * saturated fat).
+ */
+interface RawMegaProduct {
+  description: string | null;
+  imageUrl: string;
+  name: string;
+  nameEn: string | null;
+  nutritionItems: string[];
+  servingInfo: string[];
+  temperature: string | null;
 }
 
-// Helper function to close modal
-async function closeModal(page: Page): Promise<void> {
-  try {
-    const closeButton = page.locator(".inner_modal .close");
-    if ((await closeButton.count()) > 0) {
-      await closeButton.click();
-      await page.waitForSelector('.inner_modal[style*="display: block"]', {
-        state: "hidden",
-        timeout: 1000,
-      });
-    }
-  } catch (error) {
-    logger.debug(`Could not close modal: ${error}`);
-    // Press escape as fallback
-    try {
-      await page.keyboard.press("Escape");
-    } catch (escapeError) {
-      logger.debug(`Could not press escape: ${escapeError}`);
-    }
-  }
-}
+/**
+ * NOTE: everything inside the `$$eval` callback is serialised and run in the
+ * page, where none of the bundler's runtime exists. Do not extract named helper
+ * functions here -- tsx/esbuild instruments named functions with a `__name(...)`
+ * call, which is undefined in the browser and fails the whole crawl with
+ * "ReferenceError: __name is not defined". Inline selectors only.
+ */
+async function extractRawProducts(page: Page): Promise<RawMegaProduct[]> {
+  return await page.$$eval("ul#menu_list > li", (items) =>
+    items.map((li) => {
+      const modal = li.querySelector(".inner_modal");
 
-async function extractProductData(
-  container: Locator,
-  categoryName: string
-): Promise<Product | null> {
-  try {
-    const [name, nameEn, description, imageUrl] = await Promise.all([
-      container
-        .locator(SELECTORS.productData.name)
-        .first()
-        .textContent()
-        .then((text) => text?.trim() || ""),
-      container
-        .locator(SELECTORS.productData.nameEn)
-        .first()
-        .textContent()
-        .then((text) => text?.trim() || null)
-        .catch(() => null),
-      container
-        .locator(SELECTORS.productData.description)
-        .first()
-        .textContent()
-        .then((text) => text?.trim() || null)
-        .catch(() => null),
-      container
-        .locator(SELECTORS.productData.image)
-        .first()
-        .getAttribute("src")
-        .then((src) => {
-          if (!src) {
-            return "";
-          }
-          return src.startsWith("/") ? `${SITE_CONFIG.baseUrl}${src}` : src;
-        })
-        .catch(() => ""),
-    ]);
-
-    if (name && name.length > 0) {
       return {
-        name,
-        nameEn,
-        description,
-        price: null,
-        externalImageUrl: imageUrl,
-        category: "Drinks",
-        externalCategory: categoryName,
-        externalId: `mega_${name}`,
-        externalUrl: "", // Will be filled by caller
-        nutritions: undefined, // Will be filled when available
+        name: li.querySelector(".cont_text_title")?.textContent?.trim() || "",
+        nameEn:
+          li.querySelector(".cont_text_info div.text1")?.textContent?.trim() ||
+          null,
+        description:
+          li.querySelector(".cont_text_info div.text2")?.textContent?.trim() ||
+          null,
+        imageUrl: li.querySelector("img")?.getAttribute("src") ?? "",
+        // "HOT" / "ICE" badge on the card. Mega lists the hot and iced versions
+        // of a drink as two separate items under the same name, so this is the
+        // only thing that tells them apart.
+        temperature:
+          li.querySelector(".cont_gallery_list_label")?.textContent?.trim() ||
+          null,
+        servingInfo: modal
+          ? Array.from(
+              modal.querySelectorAll(".cont_text .cont_text_inner")
+            ).map((node) => node.textContent?.trim() || "")
+          : [],
+        nutritionItems: modal
+          ? Array.from(modal.querySelectorAll(".cont_list ul li")).map(
+              (node) => node.textContent?.trim() || ""
+            )
+          : [],
       };
-    }
-  } catch (error) {
-    logger.error("Error extracting product data:", error);
-  }
-  return null;
+    })
+  );
 }
 
-// Helper function to find product containers
-async function findMegaProductContainers(
-  page: Page
-): Promise<{ containers: Locator | null; usedSelector: string }> {
-  // Try each selector until we find products
-  for (const selector of SELECTORS.productContainers) {
-    const containers = page.locator(selector);
-    const count = await containers.count();
-    if (count > 0) {
-      logger.info(`Found ${count} products using selector: ${selector}`);
-      return { containers, usedSelector: selector };
-    }
+function toProduct(raw: RawMegaProduct, categoryName: string): Product | null {
+  if (!raw.name) {
+    return null;
   }
 
-  logger.warn("No product containers found with any selector");
-  return { containers: null, usedSelector: "none" };
+  const nutrition: Nutritions = {};
+  parseServingInfo(raw.servingInfo, nutrition);
+  parseNutritionItems(raw.nutritionItems, nutrition);
+
+  const imageUrl = raw.imageUrl.startsWith("/")
+    ? `${SITE_CONFIG.baseUrl}${raw.imageUrl}`
+    : raw.imageUrl;
+
+  return {
+    name: raw.name,
+    nameEn: raw.nameEn,
+    description: raw.description,
+    price: null,
+    externalImageUrl: imageUrl,
+    category: "Drinks",
+    externalCategory: categoryName,
+    externalId: buildMegaExternalId(raw.name, raw.temperature),
+    externalUrl: "",
+    nutritions: Object.keys(nutrition).length > 0 ? nutrition : undefined,
+  };
 }
 
 async function extractPageProducts(page: Page, categoryName = "Default") {
-  const products: Product[] = [];
+  const raw = await extractRawProducts(page);
 
-  const { containers: productContainers, usedSelector } =
-    await findMegaProductContainers(page);
-  if (!productContainers) {
-    return { products, usedSelector };
+  if (raw.length === 0) {
+    logger.warn("No product containers found with selector: ul#menu_list > li");
+    return { products: [], usedSelector: "none" };
   }
 
-  const containerCount = await productContainers.count();
-
   // Limit products in test mode
-  const maxProducts = isTestMode ? maxProductsInTestMode : containerCount;
-  const actualCount = Math.min(containerCount, maxProducts);
+  const maxProducts = isTestMode ? maxProductsInTestMode : raw.length;
+  const limited = raw.slice(0, Math.min(raw.length, maxProducts));
 
   logger.info(
-    `Processing ${actualCount} products (found ${containerCount} total)`
+    `Processing ${limited.length} products (found ${raw.length} total)`
   );
 
-  // Process containers sequentially
-  for (let i = 0; i < actualCount; i++) {
-    const container = productContainers.nth(i);
-    const product = await extractProductData(container, categoryName);
-
+  const products: Product[] = [];
+  for (const item of limited) {
+    const product = toProduct(item, categoryName);
     if (product) {
       product.externalUrl = page.url();
-
-      // Extract nutrition data by clicking product to open modal
-      try {
-        const nutritions = await extractNutritionDataFromModal(page, container);
-        if (nutritions) {
-          product.nutritions = nutritions;
-          logger.info(`✅ Found nutrition data for: ${product.name}`);
-        } else {
-          logger.debug(`No nutrition data found for: ${product.name}`);
-        }
-      } catch (error) {
-        logger.debug(
-          `Could not extract nutrition for ${product.name}: ${error}`
-        );
-      }
-
       products.push(product);
     }
   }
 
-  return { products, usedSelector };
+  const withNutrition = products.filter((p) => p.nutritions).length;
+  logger.info(
+    `Extracted ${products.length} products (${withNutrition} with nutrition data)`
+  );
+
+  return { products, usedSelector: "ul#menu_list > li" };
 }
 
 async function extractMenuCategories(page: Page) {
@@ -434,6 +347,46 @@ async function extractMenuCategories(page: Page) {
 // ================================================
 // PAGE HANDLERS
 // ================================================
+
+/**
+ * The pager is driven by JS, not navigation, so `waitForLoad` returns
+ * immediately after a click and the next `$$eval` would re-read the page we
+ * just left. (The old click-per-product extraction was slow enough to hide
+ * this.) Wait for the pager's own "current page" marker to actually move.
+ */
+async function readCurrentPageNumber(page: Page): Promise<number> {
+  const text = await page
+    .locator("#board_page .board_page_check span")
+    .first()
+    .textContent()
+    .catch(() => null);
+  return Number.parseInt(text?.trim() ?? "", 10);
+}
+
+async function waitForPageChange(
+  page: Page,
+  previousPage: number
+): Promise<boolean> {
+  try {
+    await page.waitForFunction(
+      (previous) => {
+        const marker = document.querySelector(
+          "#board_page .board_page_check span"
+        );
+        const current = Number.parseInt(marker?.textContent?.trim() ?? "", 10);
+        return Number.isFinite(current) && current !== previous;
+      },
+      previousPage,
+      { timeout: 10_000 }
+    );
+    return true;
+  } catch {
+    logger.warn(
+      `Page did not advance from ${previousPage} within 10s; stopping pagination`
+    );
+    return false;
+  }
+}
 
 async function handleMainMenuPage(
   page: Page,
@@ -506,8 +459,12 @@ async function handleMainMenuPage(
       logger.info(
         `Clicking next page button to go to page ${currentPage + 1}...`
       );
+      const pageBeforeClick = await readCurrentPageNumber(page);
       await nextButton.click();
-      await waitForLoad(page);
+
+      if (!(await waitForPageChange(page, pageBeforeClick))) {
+        break;
+      }
       currentPage++;
 
       // Safety check to prevent infinite loops
@@ -653,9 +610,38 @@ export const runMegaCrawler = async () => {
   const crawler = createMegaCrawler();
 
   try {
-    await crawler.run([SITE_CONFIG.startUrl]);
+    const stats = await crawler.run([SITE_CONFIG.startUrl]);
     const dataset = await crawler.getData();
-    await writeProductsToJson(dataset.items as Product[], "mega");
+    const items = dataset.items as Product[];
+
+    // A timed-out request is reclaimed and retried, and everything it already
+    // pushed stays in the dataset -- so a total failure still produced a
+    // plausible-looking file and the run reported success. Refuse to write a
+    // file built from failed attempts.
+    if (stats.requestsFailed > 0) {
+      throw new Error(
+        `Mega crawler had ${stats.requestsFailed} failed request(s) after retries; refusing to write ${items.length} products from incomplete attempts`
+      );
+    }
+
+    // Belt and braces: if a retry ever does slip through, never write the same
+    // externalId twice -- the uploader would just overwrite the same record.
+    const seen = new Set<string>();
+    const unique = items.filter((item) => {
+      if (seen.has(item.externalId)) {
+        return false;
+      }
+      seen.add(item.externalId);
+      return true;
+    });
+
+    if (unique.length !== items.length) {
+      logger.warn(
+        `Dropped ${items.length - unique.length} duplicate product(s) before writing`
+      );
+    }
+
+    await writeProductsToJson(unique, "mega");
   } catch (error) {
     logger.error("Mega crawler failed:", error);
     throw error;

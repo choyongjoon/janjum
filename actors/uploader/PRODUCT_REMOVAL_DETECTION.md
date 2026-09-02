@@ -15,9 +15,10 @@ The upload script now automatically detects when products are removed from cafe 
 When you run the upload script, it:
 
 1. **Uploads new/updated products** from crawler data
-2. **Compares current products** against existing database records
-3. **Marks missing products as removed** (`isActive: false`, sets `removedAt` timestamp)
-4. **Reactivates returning products** (clears `removedAt`, sets `isActive: true`)
+2. **Reactivates returning products** (clears `removedAt`, sets `isActive: true`) — this happens
+   during the upsert itself, since a returning product is still matched by its `externalId`
+3. **Compares current products** against existing database records
+4. **Marks missing products as removed** (`isActive: false`, sets `removedAt` timestamp)
 
 ### 3. **Database Schema Changes**
 ```typescript
@@ -172,7 +173,8 @@ All removal detection is now integrated directly into the upload process! The up
 
 ## Performance Notes
 
-- **Efficient queries**: Uses database indexes for fast lookups
+- **Efficient queries**: Uses the `by_cafe_active` index and a `Set` membership test, so removal
+  detection costs one indexed read of the cafe's active products
 - **Minimal overhead**: Removal detection adds ~100ms to upload time
 - **Batch processing**: Handles large product catalogs efficiently
 - **Safe operations**: All changes logged and reversible
