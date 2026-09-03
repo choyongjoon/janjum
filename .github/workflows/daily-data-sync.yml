@@ -140,6 +140,17 @@ jobs:
           path: actors/crawler/crawler-outputs/${{ matrix.cafe }}-*.json
           retention-days: 7
 
+      # Crawlers that dump the rendered page on failure make a site structure
+      # change diagnosable without re-running locally.
+      - name: Upload debug page dump
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: crawler-debug-${{ matrix.cafe }}
+          path: actors/crawler/crawler-outputs/*debug*
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Log crawl completion
         run: echo "✅ Crawl completed for ${{ matrix.cafe }}"
 
