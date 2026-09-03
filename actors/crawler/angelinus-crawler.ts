@@ -58,24 +58,47 @@ const PRODUCT_LINK_SELECTOR = [
 const PRODUCT_LIST_SELECTORS = [
   "#productList",
   ".prod-list",
+  ".mn-grid",
   '[class*="prod-list"]',
   '[class*="product-list"]',
   '[class*="menu-list"]',
   '[class*="menu-grid"]',
 ] as const;
 
-// Tried in order; the first selector that matches anything wins.
+// The brand page renders one <section class="mn-section"> per menu category,
+// each holding its own product grid and a heading. Reading these directly is
+// more reliable than clicking category tabs, and every category is already in
+// the DOM so no navigation is needed.
+const PRODUCT_SECTION_SELECTOR = "section.mn-section";
+const SECTION_TITLE_SELECTORS = [
+  ".mn-section-title",
+  ".mn-section-header h2",
+  ".mn-section-header h3",
+  "h2",
+  "h3",
+] as const;
+
+// Tried in order; the first selector that matches anything wins. Scoped to the
+// real category nav — a bare [role="tab"] also matches the footer's legal-info
+// tabs (사업자정보 / 문의처), which would tag every product with a junk category.
 const CATEGORY_TAB_SELECTORS = [
+  ".mn-nav .mn-nav-btn",
+  "li.tab-item > button.tab-link",
   "#categoryList .tab-item",
   "#categoryList li",
   '[class*="category"] [class*="tab-item"]',
   '[class*="category"] .swiper-slide',
   ".tab-wrap .tab-item",
   ".tab-list li",
-  '[role="tablist"] [role="tab"]',
 ] as const;
 
-const CATEGORY_LABEL_SELECTORS = [".tab-text", ".txt", "a", "button"] as const;
+const CATEGORY_LABEL_SELECTORS = [
+  ".tab-text",
+  ".txt",
+  ".mn-nav-btn",
+  "a",
+  "button",
+] as const;
 
 const LOAD_MORE_SELECTORS = [
   ".btn-more:visible",
@@ -335,6 +358,39 @@ async function scrapeRepCodes(page: Page): Promise<string[]> {
   return codes;
 }
 
+/** Collect product codes from a single element subtree (e.g. one category section). */
+async function collectRepCodesInLocator(scope: Locator): Promise<string[]> {
+  const values = await scope.evaluate(
+    (root, { selector, attributes }) => {
+      const out: string[] = [];
+      for (const el of Array.from(root.querySelectorAll(selector))) {
+        for (const attribute of attributes) {
+          const value = el.getAttribute(attribute);
+          if (value) {
+            out.push(value);
+          }
+        }
+      }
+      return out;
+    },
+    {
+      selector: PRODUCT_LINK_SELECTOR,
+      attributes: REP_CODE_ATTRIBUTES as readonly string[],
+    }
+  );
+
+  const codes: string[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    const code = extractRepCode(value);
+    if (code && !seen.has(code)) {
+      seen.add(code);
+      codes.push(code);
+    }
+  }
+  return codes;
+}
+
 /** Last resort: scan the raw HTML when no known product markup matches. */
 async function scrapeRepCodesFromHtml(page: Page): Promise<string[]> {
   const html = await page.content();
@@ -396,6 +452,51 @@ function addDiscovered(
   }
 }
 
+async function readSectionTitle(section: Locator): Promise<string> {
+  for (const selector of SECTION_TITLE_SELECTORS) {
+    const title = section.locator(selector).first();
+    if ((await title.count()) > 0) {
+      const text = (await title.textContent())?.trim();
+      if (text) {
+        return text;
+      }
+    }
+  }
+  return DEFAULT_CATEGORY;
+}
+
+/**
+ * Preferred discovery path: read each `section.mn-section` block, taking the
+ * category from its heading and the product codes from the grid inside it.
+ * Every category is rendered up front, so this needs no tab navigation.
+ */
+async function discoverBySections(page: Page): Promise<DiscoveredProduct[]> {
+  const sections = await page.locator(PRODUCT_SECTION_SELECTOR).all();
+  if (sections.length === 0) {
+    return [];
+  }
+
+  const discovered: DiscoveredProduct[] = [];
+  const seenCodes = new Set<string>();
+
+  for (const section of sections) {
+    const categoryName = await readSectionTitle(section);
+    const codes = await collectRepCodesInLocator(section);
+    const before = discovered.length;
+    addDiscovered(codes, categoryName, discovered, seenCodes);
+    logger.info(
+      `  Found ${codes.length} products (${discovered.length - before} new) in ${categoryName}`
+    );
+
+    if (isTestMode && discovered.length >= maxProductsInTestMode) {
+      logger.info(`Test mode: stopping at ${maxProductsInTestMode} products`);
+      break;
+    }
+  }
+
+  return discovered;
+}
+
 async function discoverByCategory(page: Page): Promise<DiscoveredProduct[]> {
   const discovered: DiscoveredProduct[] = [];
   const seenCodes = new Set<string>();
@@ -446,8 +547,16 @@ async function discoverProductsFromBrandPage(
 ): Promise<DiscoveredProduct[]> {
   await waitForLoad(page);
   await waitForProductsToRender(page);
+  await expandLoadMore(page);
 
-  let discovered = await discoverByCategory(page);
+  let discovered = await discoverBySections(page);
+
+  if (discovered.length === 0) {
+    logger.warn(
+      "No product sections matched — falling back to category tab navigation"
+    );
+    discovered = await discoverByCategory(page);
+  }
 
   if (discovered.length === 0) {
     logger.warn(
