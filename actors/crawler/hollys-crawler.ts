@@ -3,7 +3,6 @@ import { logger } from "../../shared/logger";
 import type { Nutritions } from "../../shared/nutritions";
 import { type Product, writeProductsToJson } from "./crawlerUtils";
 import { fetchText, mapWithConcurrency } from "./httpUtils";
-import { extractNutritionFromText } from "./nutritionUtils";
 
 // The mobile site is fully server-rendered, so pages are fetched and parsed
 // directly instead of rendered in a browser.
@@ -24,6 +23,11 @@ const SITE_CONFIG = {
 const PRICE_REGEX = /[\d,]+/;
 const COMMA_REGEX = /,/g;
 const NAME_SEPARATOR_REGEX = /\s*\n\s*\t*\s*/;
+const SERVING_SIZE_BASIS_REGEX = /(\d+(?:\.\d+)?)\s*(ml)\s*기준/i;
+const SERVING_SIZE_REGEX = /1회\s*제공량[^\d]*?(\d+(?:\.\d+)?)\s*(ml|g)/i;
+const TOTAL_SIZE_REGEX = /총\s*제공량\s*(\d+(?:\.\d+)?)\s*(ml|g)/i;
+const CELL_PREFIX_REGEX = /^\s*(HOT|ICED)\s*:\s*/i;
+const CELL_VALUE_REGEX = /^([\d,]+(?:\.\d+)?)/;
 
 const SELECTORS = {
   categoryLinks: ".sec_menu > ul > li > a",
@@ -34,9 +38,8 @@ const SELECTORS = {
   detailDescription: ".menuList .description, .menuList p:not(.img)",
   detailPrice: ".price, .menuPrice",
   nutritionTable: ".tableType01",
-  menuInfo: ".menu_info",
-  // Serving size ("355ml") appears in free text outside the table
-  servingSizeCandidates: "div, p, span",
+  // "제품영양정보 (1회 제공량 / Regular / 354ml 기준)" above the table
+  nutritionCaption: ".menu_info .stit",
 } as const;
 
 // ================================================
@@ -75,44 +78,81 @@ function toAbsoluteUrl(href: string): string {
   return new URL(href, SITE_CONFIG.baseUrl).href;
 }
 
-function extractNutritionData($: CheerioAPI): Nutritions | null {
-  let servingSizeInfo = "";
-  $(SELECTORS.servingSizeCandidates).each((_, element) => {
-    const text = $(element).text();
-    if (text.includes("ml") || text.includes("mL") || text.includes("ML")) {
-      servingSizeInfo += `${text} `;
-    }
-  });
+type NutrientKey =
+  | "calories"
+  | "sugar"
+  | "protein"
+  | "saturatedFat"
+  | "natrium"
+  | "caffeine";
 
-  const table = $(SELECTORS.nutritionTable);
-  if (table.length > 0) {
-    let nutritionText = "";
-    table.find("tr").each((_, row) => {
-      const cellsText = $(row).text();
-      if (cellsText) {
-        nutritionText += `${cellsText} `;
+// Row labels of the nutrition table
+const NUTRIENT_ROWS: Record<string, [NutrientKey, string]> = {
+  칼로리: ["calories", "kcal"],
+  당류: ["sugar", "g"],
+  단백질: ["protein", "g"],
+  포화지방: ["saturatedFat", "g"],
+  나트륨: ["natrium", "mg"],
+  카페인: ["caffeine", "mg"],
+};
+
+// Drinks: "1회 제공량 / Regular / 354ml 기준 ( Grande / 472ml )"
+// Food: "총 중량 120g, 1회 제공량 60g"
+function extractServingSize(
+  caption: string,
+  preferTotal: boolean
+): Pick<Nutritions, "servingSize" | "servingSizeUnit"> {
+  const match =
+    (preferTotal ? caption.match(TOTAL_SIZE_REGEX) : null) ??
+    caption.match(SERVING_SIZE_BASIS_REGEX) ??
+    caption.match(SERVING_SIZE_REGEX) ??
+    caption.match(TOTAL_SIZE_REGEX);
+  if (!match) {
+    return {};
+  }
+  return {
+    servingSize: Number.parseFloat(match[1]),
+    servingSizeUnit: match[2].toLowerCase(),
+  };
+}
+
+// Cells read "365 kcal", "32g (32%)", "HOT : 10.6g/71%" or "1,019mg (51%)".
+// Drinks list HOT first, which the product page defaults to.
+function parseCell(text: string): number | undefined {
+  const match = text.replace(CELL_PREFIX_REGEX, "").match(CELL_VALUE_REGEX);
+  return match
+    ? Number.parseFloat(match[1].replace(COMMA_REGEX, ""))
+    : undefined;
+}
+
+function extractNutritionData($: CheerioAPI): Nutritions | null {
+  const nutritions: Nutritions = {};
+  const record = nutritions as Record<string, number | string | undefined>;
+  let hasValue = false;
+
+  $(SELECTORS.nutritionTable)
+    .first()
+    .find("tr")
+    .each((_, row) => {
+      const label = $(row).find("th").text().trim();
+      const nutrient = NUTRIENT_ROWS[label];
+      const value = parseCell($(row).find("td").first().text());
+      if (nutrient && value !== undefined) {
+        const [key, unit] = nutrient;
+        record[key] = value;
+        record[`${key}Unit`] = unit;
+        hasValue = true;
       }
     });
 
-    if (nutritionText) {
-      const nutrition = extractNutritionFromText(
-        `${servingSizeInfo} ${nutritionText}`
-      );
-      if (nutrition) {
-        return nutrition;
-      }
-    }
+  const caption = $(SELECTORS.nutritionCaption).first().text();
+  // Without a table (bottled drinks, some desserts) only the product size is
+  // known, so the total amount is more useful than the per-100ml basis
+  const servingSize = extractServingSize(caption, !hasValue);
+  if (!(hasValue || servingSize.servingSize)) {
+    return null;
   }
-
-  const menuInfoText = $(SELECTORS.menuInfo).text();
-  if (menuInfoText) {
-    const nutrition = extractNutritionFromText(menuInfoText);
-    if (nutrition) {
-      return nutrition;
-    }
-  }
-
-  return null;
+  return { ...servingSize, ...nutritions };
 }
 
 function parseProductName(rawName: string): {
