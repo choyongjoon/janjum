@@ -248,7 +248,6 @@ async function fetchMenuItems(groupCode: string): Promise<MenuItem[]> {
     let page = 1;
     // Pages must be fetched in order until the total is reached
     while (true) {
-      // biome-ignore lint/performance/noAwaitInLoops: sequential pagination
       const response = await postJson<ListResponse<MenuItem>>(
         SITE_CONFIG.menuListUrl,
         { pageNum: String(page), grtCd: groupCode, midCd: mid.MID_CD }
