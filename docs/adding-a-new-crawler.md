@@ -309,7 +309,7 @@ npx ultracite format actors/crawler/newcafe-crawler.ts shared/constants.ts
 
 ## Step 6: Add to CI Workflow
 
-Edit `.github/workflows/daily-data-sync.yml`. Add the cafe slug to **4 places**:
+Edit `.github/workflows/daily-data-sync.yml`. Add the cafe slug to **2 places**:
 
 ### 1. Manual trigger dropdown
 
@@ -322,9 +322,9 @@ workflow_dispatch:
         - "newcafe"
 ```
 
-### 2-4. Matrix arrays in crawl, categorize, and upload jobs
+### 2. Matrix array in the sync job
 
-Search for `fromJSON('[` and add the slug to all three arrays:
+Search for `fromJSON('[` and add the slug to the array:
 
 ```yaml
 cafe: ${{ ... && fromJSON('["starbucks", ..., "newcafe"]') || ... }}
