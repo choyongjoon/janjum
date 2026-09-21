@@ -1,9 +1,12 @@
-import { PlaywrightCrawler, type Request } from "crawlee";
-import type { Page } from "playwright";
+import { type CheerioAPI, load } from "cheerio";
 import { logger } from "../../shared/logger";
 import type { Nutritions } from "../../shared/nutritions";
-import { type Product, waitForLoad, writeProductsToJson } from "./crawlerUtils";
+import { type Product, writeProductsToJson } from "./crawlerUtils";
+import { fetchText, mapWithConcurrency } from "./httpUtils";
 import { extractNutritionFromText } from "./nutritionUtils";
+
+// The mobile site is fully server-rendered, so pages are fetched and parsed
+// directly instead of rendered in a browser.
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
@@ -12,603 +15,213 @@ import { extractNutritionFromText } from "./nutritionUtils";
 const SITE_CONFIG = {
   baseUrl: "https://m.hollys.co.kr",
   startUrl: "https://m.hollys.co.kr/menu/menuList.do",
-  productUrlTemplate: "https://m.hollys.co.kr",
 } as const;
 
 // ================================================
 // CSS SELECTORS & REGEX PATTERNS
 // ================================================
 
-// Regex patterns for performance optimization
 const PRICE_REGEX = /[\d,]+/;
+const COMMA_REGEX = /,/g;
 const NAME_SEPARATOR_REGEX = /\s*\n\s*\t*\s*/;
 
 const SELECTORS = {
-  // Category navigation selectors
   categoryLinks: ".sec_menu > ul > li > a",
-
-  // Product listing selectors
-  productContainers: ".menu_list li",
   productLinks: ".menu_list li a",
 
-  // Product detail page selectors (based on actual HTML structure)
   detailName: "h3",
   detailImage: "p.img img",
   detailDescription: ".menuList .description, .menuList p:not(.img)",
   detailPrice: ".price, .menuPrice",
-
-  // Listing page selectors (fallback)
-  productName: ".menu_name",
-  productImage: ".menu_img img",
-  productDescription: ".menu_desc",
-  productPrice: ".menu_price",
+  nutritionTable: ".tableType01",
+  menuInfo: ".menu_info",
+  // Serving size ("355ml") appears in free text outside the table
+  servingSizeCandidates: "div, p, span",
 } as const;
 
 // ================================================
 // CRAWLER CONFIGURATION
 // ================================================
 
-// Test mode configuration
 const isTestMode = process.env.CRAWLER_TEST_MODE === "true";
-const maxProductsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS || "3", 10)
-  : Number.POSITIVE_INFINITY;
-const maxRequestsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || "10", 10)
-  : 50;
+const maxProductsInTestMode = Number.parseInt(
+  process.env.CRAWLER_MAX_PRODUCTS || "3",
+  10
+);
 
 const CRAWLER_CONFIG = {
-  maxConcurrency: isTestMode ? 2 : 3, // Enable parallel processing
-  maxRequestsPerCrawl: isTestMode ? maxRequestsInTestMode : 250, // Increased to handle all ~193 products
-  maxRequestRetries: 3,
-  requestHandlerTimeoutSecs: isTestMode ? 60 : 180, // Reduced timeout since we're parallel
-  launchOptions: {
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"] as string[],
-  },
-};
+  concurrency: 5,
+} as const;
 
 // ================================================
-// PREDEFINED CATEGORIES
+// TYPES
 // ================================================
 
-const HOLLYS_CATEGORIES = [
-  "COFFEE",
-  "라떼 · 초콜릿 · 티",
-  "할리치노 · 빙수",
-  "스무디 · 주스",
-  "스파클링",
-  "푸드",
-  "MD상품",
-  "MD식품",
-] as const;
+interface Category {
+  name: string;
+  url: string;
+}
+
+interface ProductRequest {
+  categoryName: string;
+  url: string;
+}
 
 // ================================================
 // DATA EXTRACTION FUNCTIONS
 // ================================================
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: optimize later
-async function extractNutritionData(page: Page): Promise<Nutritions | null> {
-  try {
-    // First, try to find serving size information from other parts of the page
-    let servingSizeInfo = "";
+function toAbsoluteUrl(href: string): string {
+  return new URL(href, SITE_CONFIG.baseUrl).href;
+}
 
-    // Check for serving size in description or other text elements
-    const allTextElements = await page.locator("div, p, span").all();
-    for (const element of allTextElements) {
-      const text = await element.textContent().catch(() => "");
-      if (
-        text &&
-        (text.includes("ml") || text.includes("mL") || text.includes("ML"))
-      ) {
-        logger.debug(
-          `Found potential serving size text: ${text.substring(0, 100)}...`
-        );
-        servingSizeInfo += `${text} `;
+function extractNutritionData($: CheerioAPI): Nutritions | null {
+  let servingSizeInfo = "";
+  $(SELECTORS.servingSizeCandidates).each((_, element) => {
+    const text = $(element).text();
+    if (text.includes("ml") || text.includes("mL") || text.includes("ML")) {
+      servingSizeInfo += `${text} `;
+    }
+  });
+
+  const table = $(SELECTORS.nutritionTable);
+  if (table.length > 0) {
+    let nutritionText = "";
+    table.find("tr").each((_, row) => {
+      const cellsText = $(row).text();
+      if (cellsText) {
+        nutritionText += `${cellsText} `;
+      }
+    });
+
+    if (nutritionText) {
+      const nutrition = extractNutritionFromText(
+        `${servingSizeInfo} ${nutritionText}`
+      );
+      if (nutrition) {
+        return nutrition;
       }
     }
-
-    // Try .tableType01 first (structured table)
-    const tableElement = page.locator(".tableType01");
-    const tableElementCount = await tableElement.count();
-
-    if (tableElementCount > 0) {
-      logger.info("Found .tableType01, extracting table data");
-
-      // Extract all table cells to get structured nutrition data
-      const tableRows = await tableElement.locator("tr").all();
-      let nutritionText = "";
-
-      for (const row of tableRows) {
-        const cellsText = await row.textContent().catch(() => "");
-        if (cellsText) {
-          nutritionText += `${cellsText} `;
-        }
-      }
-
-      if (nutritionText) {
-        logger.debug(`Table nutrition text: ${nutritionText}`);
-        // Combine table nutrition with serving size info if found
-        const combinedText = `${servingSizeInfo} ${nutritionText}`;
-        logger.debug(
-          `Combined nutrition text: ${combinedText.substring(0, 200)}...`
-        );
-
-        const nutrition = extractNutritionFromText(combinedText);
-        if (nutrition) {
-          logger.debug(
-            `Successfully extracted nutrition data from table with serving size: ${nutrition.servingSize}${nutrition.servingSizeUnit}`
-          );
-          return nutrition;
-        }
-      }
-    }
-
-    // Fallback to .menu_info
-    const menuInfoElement = page.locator(".menu_info");
-    const menuInfoElementCount = await menuInfoElement.count();
-
-    if (menuInfoElementCount > 0) {
-      logger.debug("Found .menu_info, extracting text data");
-      const nutritionText = await menuInfoElement.textContent().catch(() => "");
-      if (nutritionText) {
-        logger.debug(
-          `Menu info nutrition text: ${nutritionText.substring(0, 200)}...`
-        );
-        const nutrition = extractNutritionFromText(nutritionText);
-        if (nutrition) {
-          logger.debug("Successfully extracted nutrition data from menu_info");
-          return nutrition;
-        }
-      }
-    }
-
-    logger.debug("No nutrition data found in either selector");
-    return null;
-  } catch (error) {
-    logger.debug(
-      "Failed to extract nutrition data from Hollys menu item:",
-      error as Record<string, unknown>
-    );
-    return null;
   }
+
+  const menuInfoText = $(SELECTORS.menuInfo).text();
+  if (menuInfoText) {
+    const nutrition = extractNutritionFromText(menuInfoText);
+    if (nutrition) {
+      return nutrition;
+    }
+  }
+
+  return null;
 }
 
 function parseProductName(rawName: string): {
   name: string;
   nameEn: string | null;
 } {
-  if (!rawName) {
+  const cleaned = rawName.trim();
+  if (!cleaned) {
     return { name: "", nameEn: null };
   }
 
-  // Clean the raw name by removing extra whitespace
-  const cleaned = rawName.trim();
-
-  // Split by the pattern: whitespace + newline + tabs/spaces
+  // Korean and English names are separated by a line break in the <h3>
   const parts = cleaned.split(NAME_SEPARATOR_REGEX);
-
   if (parts.length >= 2) {
-    // First part is Korean name, second part is English name
     const koreanName = parts[0].trim();
     const englishName = parts[1].trim();
-
-    // Validate that we have meaningful content in both parts
     if (koreanName && englishName) {
-      return {
-        name: koreanName,
-        nameEn: englishName,
-      };
+      return { name: koreanName, nameEn: englishName };
     }
   }
 
-  // If parsing fails, return the cleaned name as Korean name
+  return { name: cleaned, nameEn: null };
+}
+
+function parsePrice(text: string | null): number | null {
+  const match = text?.match(PRICE_REGEX);
+  return match ? Number.parseInt(match[0].replace(COMMA_REGEX, ""), 10) : null;
+}
+
+function parseProductPage(
+  html: string,
+  { categoryName, url }: ProductRequest
+): Product | null {
+  const $ = load(html);
+
+  const { name, nameEn } = parseProductName(
+    $(SELECTORS.detailName).first().text()
+  );
+  if (!name) {
+    logger.warn(`⚠️ No product name found on ${url}`);
+    return null;
+  }
+
+  const imageSrc = $(SELECTORS.detailImage).first().attr("src");
+  const description =
+    $(SELECTORS.detailDescription).first().text().trim() || null;
+  const priceText = $(SELECTORS.detailPrice).first().text().trim() || null;
+
   return {
-    name: cleaned,
-    nameEn: null,
+    name,
+    nameEn,
+    description,
+    price: parsePrice(priceText),
+    externalImageUrl: imageSrc ? toAbsoluteUrl(imageSrc) : "",
+    category: null, // Set later by the categorizer
+    externalCategory: categoryName,
+    externalId: `hollys_${categoryName}_${name}`,
+    externalUrl: url,
+    nutritions: extractNutritionData($),
   };
 }
 
-async function extractCategoriesFromMenu(
-  page: Page
-): Promise<Array<{ name: string; url: string }>> {
-  try {
-    logger.info("📄 Extracting categories from menu");
+async function fetchCategories(): Promise<Category[]> {
+  const $ = load(await fetchText(SITE_CONFIG.startUrl));
+  const categories: Category[] = [];
 
-    await waitForLoad(page);
-
-    // Get category links
-    const categoryElements = await page.locator(SELECTORS.categoryLinks).all();
-    const categories: Array<{ name: string; url: string }> = [];
-
-    for (const element of categoryElements) {
-      const [text, href] = await Promise.all([
-        element.textContent(),
-        element.getAttribute("href"),
-      ]);
-
-      if (text?.trim() && href?.startsWith("/menu")) {
-        const categoryName = text.trim();
-
-        // Construct full URL for menu links
-        const fullUrl = `${SITE_CONFIG.baseUrl}${href}`;
-
-        // Include only categories with /menu links
-        categories.push({
-          name: categoryName,
-          url: fullUrl,
-        });
-        logger.info(`📋 Found menu category: ${categoryName} -> ${fullUrl}`);
-      } else if (text?.trim() && href) {
-        logger.debug(`📋 Skipping non-menu link: ${text.trim()} -> ${href}`);
-      }
+  $(SELECTORS.categoryLinks).each((_, element) => {
+    const name = $(element).text().trim();
+    const href = $(element).attr("href");
+    if (name && href?.startsWith("/menu")) {
+      categories.push({ name, url: toAbsoluteUrl(href) });
     }
+  });
 
-    return categories;
+  return categories;
+}
+
+async function fetchProductRequests(
+  category: Category
+): Promise<ProductRequest[]> {
+  try {
+    const $ = load(await fetchText(category.url));
+    const urls = $(SELECTORS.productLinks)
+      .map((_, element) => $(element).attr("href"))
+      .get()
+      .filter(Boolean)
+      .map(toAbsoluteUrl);
+
+    logger.info(`📋 ${category.name}: ${urls.length} products`);
+    const limited = isTestMode ? urls.slice(0, maxProductsInTestMode) : urls;
+    return limited.map((url) => ({ categoryName: category.name, url }));
   } catch (error) {
-    logger.error(`❌ Failed to extract categories: ${error}`);
+    logger.error(`❌ Failed to process category ${category.name}: ${error}`);
     return [];
   }
 }
 
-async function extractProductUrls(
-  page: Page,
-  categoryName: string,
-  crawlerInstance: PlaywrightCrawler
-): Promise<number> {
+async function crawlProduct(request: ProductRequest): Promise<Product | null> {
   try {
-    logger.info(`📄 Extracting product URLs from category: ${categoryName}`);
-
-    await waitForLoad(page);
-
-    // Find product links and extract URLs
-    const productLinks = await page.locator(SELECTORS.productLinks).all();
-
-    if (productLinks.length === 0) {
-      logger.warn(`⚠️ No product links found for category: ${categoryName}`);
-      return 0;
-    }
-
-    logger.info(
-      `🔍 Found ${productLinks.length} product links in ${categoryName}`
-    );
-
-    // Extract all URLs first
-    const productUrls: string[] = [];
-    for (const link of productLinks) {
-      try {
-        const href = await link.getAttribute("href");
-        if (href) {
-          const productUrl = href.startsWith("http")
-            ? href
-            : `${SITE_CONFIG.baseUrl}${href}`;
-          productUrls.push(productUrl);
-        }
-      } catch (error) {
-        logger.debug(`⚠️ Failed to extract href from product link: ${error}`);
-      }
-    }
-
-    // Limit products in test mode
-    const urlsToProcess = isTestMode
-      ? productUrls.slice(0, maxProductsInTestMode)
-      : productUrls;
-
-    if (isTestMode) {
-      logger.info(`🧪 Test mode: limiting to ${urlsToProcess.length} products`);
-    }
-
-    // Prepare product requests for parallel processing
-    const productRequests = urlsToProcess.map((productUrl) => ({
-      url: productUrl,
-      userData: {
-        isProductPage: true,
-        categoryName,
-        productUrl,
-      },
-    }));
-
-    // Add all product requests to the crawler queue for parallel processing
-    await crawlerInstance.addRequests(productRequests);
-
-    logger.info(
-      `🚀 Enqueued ${productRequests.length} products from ${categoryName} for parallel processing`
-    );
-
-    return productRequests.length;
-  } catch (extractionError) {
-    logger.error(
-      `❌ Failed to extract product URLs from ${categoryName}: ${extractionError}`
-    );
-    return 0;
-  }
-}
-
-async function extractProductDetails(
-  page: Page,
-  productUrl: string
-): Promise<{
-  name: string;
-  nameEn: string | null;
-  imageUrl: string;
-  description: string | null;
-  price: string | null;
-  nutritions: Nutritions | null;
-} | null> {
-  try {
-    // Wait for essential content first with shorter timeout
-    await page.waitForSelector(SELECTORS.detailName, { timeout: 2000 });
-
-    // Extract data using specific selectors with very short timeouts
-    const [rawName, imageUrl, description, price, nutritions] =
-      await Promise.all([
-        page
-          .locator(SELECTORS.detailName)
-          .first()
-          .textContent({ timeout: 1000 })
-          .then((text) => text || "")
-          .catch(() => ""),
-
-        page
-          .locator(SELECTORS.detailImage)
-          .first()
-          .getAttribute("src", { timeout: 1000 })
-          .then((src) => {
-            if (!src) {
-              return "";
-            }
-            if (src.startsWith("http")) {
-              return src;
-            }
-            if (src.startsWith("/")) {
-              return `${SITE_CONFIG.baseUrl}${src}`;
-            }
-            return `${SITE_CONFIG.baseUrl}/${src}`;
-          })
-          .catch(() => ""),
-
-        page
-          .locator(SELECTORS.detailDescription)
-          .first()
-          .textContent({ timeout: 1000 })
-          .then((text) => text?.trim() || null)
-          .catch(() => null),
-
-        page
-          .locator(SELECTORS.detailPrice)
-          .first()
-          .textContent({ timeout: 1000 })
-          .then((text) => text?.trim() || null)
-          .catch(() => null),
-
-        extractNutritionData(page),
-      ]);
-
-    // Parse the name to separate Korean and English parts
-    const { name, nameEn } = parseProductName(rawName);
-
-    if (name) {
-      return { name, nameEn, imageUrl, description, price, nutritions };
-    }
-
-    logger.debug(`⚠️ No product name found on ${productUrl}`);
-    return null;
-  } catch (error) {
-    logger.debug(
-      `⚠️ Failed to extract product details from ${productUrl}: ${error}`
-    );
-    return null;
-  }
-}
-
-async function handleProductPage(
-  page: Page,
-  request: Request,
-  crawlerInstance: PlaywrightCrawler
-) {
-  const { categoryName, productUrl } = request.userData;
-  const startTime = Date.now();
-
-  logger.info(`🔗 Processing product: ${productUrl}`);
-
-  try {
-    await waitForLoad(page);
-
-    // Extract product details from detail page
-    const extractStart = Date.now();
-    const productData = await extractProductDetails(page, productUrl);
-    const extractEnd = Date.now();
-
-    if (productData) {
-      // Create and push product to dataset
-      const product = createBasicProduct(productData, categoryName, productUrl);
-      await crawlerInstance.pushData(product);
-
-      const totalTime = Date.now() - startTime;
+    const product = parseProductPage(await fetchText(request.url), request);
+    if (product) {
       logger.info(
-        `✅ Extracted: ${productData.name}${productData.nameEn ? ` | ${productData.nameEn}` : ""}${productData.price ? ` (${productData.price})` : ""}${productData.nutritions ? " with nutrition data" : ""} [${totalTime}ms, extraction: ${extractEnd - extractStart}ms]`
-      );
-    } else {
-      logger.warn(`⚠️ Failed to extract data from: ${productUrl}`);
-    }
-  } catch (productError) {
-    logger.error(`❌ Failed to process product ${productUrl}: ${productError}`);
-  }
-}
-
-function createBasicProduct(
-  productInfo: {
-    name: string;
-    nameEn: string | null;
-    imageUrl: string;
-    description: string | null;
-    price: string | null;
-    nutritions: Nutritions | null;
-  },
-  categoryName: string,
-  pageUrl: string
-): Product {
-  const externalId = `hollys_${categoryName}_${productInfo.name}`;
-
-  // Parse price if available
-  let price: number | null = null;
-  if (productInfo.price) {
-    const priceMatch = productInfo.price.match(PRICE_REGEX);
-    if (priceMatch) {
-      price = Number.parseInt(priceMatch[0].replace(/,/g, ""), 10);
-    }
-  }
-
-  return {
-    name: productInfo.name,
-    nameEn: productInfo.nameEn,
-    description: productInfo.description,
-    price,
-    externalImageUrl: productInfo.imageUrl,
-    category: null, // Category will be set later
-    externalCategory: categoryName,
-    externalId,
-    externalUrl: pageUrl,
-    nutritions: productInfo.nutritions,
-  };
-}
-
-// ================================================
-// PAGE HANDLERS
-// ================================================
-
-async function processDiscoveredCategory(
-  page: Page,
-  category: { name: string; url: string },
-  index: number,
-  total: number,
-  crawlerInstance: PlaywrightCrawler
-): Promise<void> {
-  logger.info(
-    `🔖 Processing category ${index + 1}/${total}: ${category.name} -> ${category.url}`
-  );
-
-  logger.info(`🌐 Navigating to: ${category.url}`);
-  await page.goto(category.url, {
-    waitUntil: "domcontentloaded",
-    timeout: 20_000,
-  });
-  await waitForLoad(page);
-  logger.info(`✅ Successfully loaded category page: ${category.name}`);
-
-  logger.info(`🔍 Starting product URL extraction for: ${category.name}`);
-  const productCount = await extractProductUrls(
-    page,
-    category.name,
-    crawlerInstance
-  );
-  logger.info(
-    `🚀 Enqueued ${productCount} products from ${category.name} for parallel processing`
-  );
-
-  logger.info(`✅ Completed category ${index + 1}/${total}: ${category.name}`);
-}
-
-async function addDelayBetweenCategories(
-  index: number,
-  total: number,
-  nextCategoryName?: string
-): Promise<void> {
-  if (index < total - 1 && nextCategoryName) {
-    logger.info(
-      `⏳ Waiting 3 seconds before processing next category (${nextCategoryName})...`
-    );
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-    logger.info(`🔄 Starting next category: ${nextCategoryName}`);
-  } else if (index === total - 1) {
-    logger.info("🎉 All categories completed!");
-  }
-}
-
-async function processDiscoveredCategories(
-  page: Page,
-  categories: { name: string; url: string }[],
-  crawlerInstance: PlaywrightCrawler
-): Promise<void> {
-  const categoriesToProcess = isTestMode ? categories.slice(0, 1) : categories;
-
-  if (isTestMode) {
-    logger.info(
-      `🧪 Test mode: limiting to ${categoriesToProcess.length} categories`
-    );
-  }
-
-  for (let i = 0; i < categoriesToProcess.length; i++) {
-    const category = categoriesToProcess[i];
-    try {
-      await processDiscoveredCategory(
-        page,
-        category,
-        i,
-        categoriesToProcess.length,
-        crawlerInstance
-      );
-
-      await addDelayBetweenCategories(
-        i,
-        categoriesToProcess.length,
-        categoriesToProcess[i + 1]?.name
-      );
-    } catch (categoryError) {
-      logger.error(
-        `❌ Failed to process category ${category.name}: ${categoryError}`
-      );
-      logger.info("🔄 Continuing with next category...");
-    }
-  }
-}
-
-async function processPredefinedCategories(
-  page: Page,
-  crawlerInstance: PlaywrightCrawler
-): Promise<void> {
-  logger.info(
-    "🔖 No categories found from navigation, using predefined categories"
-  );
-
-  const categoriesToProcess = isTestMode
-    ? HOLLYS_CATEGORIES.slice(0, 1)
-    : HOLLYS_CATEGORIES;
-
-  for (const categoryName of categoriesToProcess) {
-    try {
-      logger.info(`🔖 Processing predefined category: ${categoryName}`);
-
-      const productCount = await extractProductUrls(
-        page,
-        categoryName,
-        crawlerInstance
-      );
-      logger.info(`🚀 Enqueued ${productCount} products from ${categoryName}`);
-    } catch (categoryError) {
-      logger.error(
-        `❌ Failed to process predefined category ${categoryName}: ${categoryError}`
+        `✅ Extracted: ${product.name}${product.nameEn ? ` | ${product.nameEn}` : ""}${product.nutritions ? " with nutrition data" : ""}`
       );
     }
-  }
-}
-
-async function handleMainMenuPage(
-  page: Page,
-  crawlerInstance: PlaywrightCrawler
-) {
-  logger.info("Processing Hollys menu page");
-
-  await waitForLoad(page);
-  // Debug screenshot removed for performance
-  // await takeDebugScreenshot(page, 'hollys-main-menu');
-
-  const categories = await extractCategoriesFromMenu(page);
-
-  if (categories.length > 0) {
-    await processDiscoveredCategories(page, categories, crawlerInstance);
-  } else {
-    await processPredefinedCategories(page, crawlerInstance);
+    return product;
+  } catch (error) {
+    logger.error(`❌ Failed to process product ${request.url}: ${error}`);
+    return null;
   }
 }
 
@@ -616,41 +229,43 @@ async function handleMainMenuPage(
 // CRAWLER EXPORT
 // ================================================
 
-export const createHollysCrawler = () =>
-  new PlaywrightCrawler({
-    launchContext: {
-      launchOptions: CRAWLER_CONFIG.launchOptions,
-    },
-    async requestHandler({ page, request, crawler: crawlerInstance }) {
-      const url = request.url;
-
-      // Route requests based on URL pattern and userData
-      if (url.includes("menuList.do") && !request.userData?.isProductPage) {
-        // This is a category page
-        await handleMainMenuPage(page, crawlerInstance);
-      } else if (
-        url.includes("menuView.do") ||
-        request.userData?.isProductPage
-      ) {
-        // This is a product detail page
-        await handleProductPage(page, request, crawlerInstance);
-      } else {
-        logger.warn(`⚠️ Unknown page type: ${url}`);
-      }
-    },
-    maxConcurrency: CRAWLER_CONFIG.maxConcurrency,
-    maxRequestsPerCrawl: CRAWLER_CONFIG.maxRequestsPerCrawl,
-    maxRequestRetries: CRAWLER_CONFIG.maxRequestRetries,
-    requestHandlerTimeoutSecs: CRAWLER_CONFIG.requestHandlerTimeoutSecs,
-  });
-
 export const runHollysCrawler = async () => {
-  const crawler = createHollysCrawler();
-
   try {
-    await crawler.run([SITE_CONFIG.startUrl]);
-    const dataset = await crawler.getData();
-    await writeProductsToJson(dataset.items as Product[], "hollys");
+    const allCategories = await fetchCategories();
+    if (allCategories.length === 0) {
+      throw new Error("No menu categories found");
+    }
+    const categories = isTestMode ? allCategories.slice(0, 1) : allCategories;
+
+    const requestsByCategory = await Promise.all(
+      categories.map(fetchProductRequests)
+    );
+
+    // A product listed in several categories keeps the first one, in menu
+    // order, so its externalId stays stable.
+    const seen = new Set<string>();
+    const requests = requestsByCategory.flat().filter(({ url }) => {
+      if (seen.has(url)) {
+        return false;
+      }
+      seen.add(url);
+      return true;
+    });
+    logger.info(`Found ${requests.length} products to crawl`);
+
+    const results = await mapWithConcurrency(
+      requests,
+      CRAWLER_CONFIG.concurrency,
+      crawlProduct
+    );
+    const products = results.filter((p): p is Product => p !== null);
+
+    const failedCount = requests.length - products.length;
+    if (failedCount > 0) {
+      logger.warn(`⚠️ ${failedCount} products could not be extracted`);
+    }
+
+    await writeProductsToJson(products, "hollys");
   } catch (error) {
     logger.error("Hollys crawler failed:", error);
     throw error;
