@@ -28,56 +28,19 @@ on:
         default: "all"
 
 jobs:
-  # Job 0: Setup dependencies and browsers (shared across all jobs)
-  setup:
+  # One job per cafe runs crawl → categorize → upload back to back. Job minutes
+  # are rounded up per job, so separate categorize/upload jobs (~20s each) cost
+  # a full minute apiece plus a repeated checkout and install.
+  sync:
     runs-on: ubuntu-latest
-    name: Setup Dependencies & Browsers
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: "pnpm"
-          cache-dependency-path: "pnpm-lock.yaml"
-
-      - name: Install dependencies
-        run: pnpm install
-
-      - name: Cache node_modules
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-
-  # Job 1: Crawl data for each cafe
-  crawl:
-    runs-on: ubuntu-latest
-    needs: [setup]
+    timeout-minutes: 30 # Slowest crawler (starbucks) takes ~11 min
     strategy:
       matrix:
         cafe: ${{ (github.event.inputs.target_cafe == 'all' || github.event.inputs.target_cafe == '' || !github.event.inputs.target_cafe) && fromJSON('["starbucks", "mega", "paik", "ediya", "coffeebean", "hollys", "paulbassett", "mammoth", "gongcha", "theventi", "angelinus"]') || fromJSON(format('["{0}"]', github.event.inputs.target_cafe)) }}
       fail-fast: false # Don't cancel other jobs if one fails
       max-parallel: 4 # Limit concurrent crawlers to avoid rate limiting
 
-    name: Crawl ${{ matrix.cafe }}
+    name: Sync ${{ matrix.cafe }}
 
     steps:
       - name: Checkout repository
@@ -95,22 +58,15 @@ jobs:
           cache: "pnpm"
           cache-dependency-path: "pnpm-lock.yaml"
 
-      - name: Restore node_modules cache
-        uses: actions/cache/restore@v4
-        id: node_modules_cache
-        with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: Restore Playwright browsers cache
-        uses: actions/cache/restore@v4
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
         id: playwright_cache
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-
-      - name: Install dependencies
-        run: pnpm install
 
       - name: Install Playwright browsers
         if: steps.playwright_cache.outputs.cache-hit != 'true'
@@ -119,7 +75,7 @@ jobs:
       - name: Create crawler outputs directory
         run: mkdir -p actors/crawler/crawler-outputs
 
-      - name: Run crawler for ${{ matrix.cafe }}
+      - name: Crawl ${{ matrix.cafe }}
         run: |
           pnpm run crawl ${{ matrix.cafe }} || {
             echo "❌ Crawler failed for ${{ matrix.cafe }}"
@@ -133,11 +89,26 @@ jobs:
           NODE_ENV: production
           CI: true
 
+      - name: Categorize ${{ matrix.cafe }}
+        run: pnpm run categorize ${{ matrix.cafe }}
+        env:
+          NODE_ENV: production
+
+      - name: Upload ${{ matrix.cafe }} to database
+        run: pnpm run upload ${{ matrix.cafe }}
+        env:
+          VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL }}
+          CONVEX_UPLOAD_SECRET: ${{ secrets.CONVEX_UPLOAD_SECRET }}
+
+      # Keep whatever output exists so a failed categorize/upload can be
+      # inspected or re-uploaded locally.
       - name: Upload crawler output
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: crawler-output-${{ matrix.cafe }}
           path: actors/crawler/crawler-outputs/${{ matrix.cafe }}-*.json
+          if-no-files-found: ignore
           retention-days: 7
 
       # Crawlers that dump the rendered page on failure make a site structure
@@ -151,201 +122,55 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Log crawl completion
-        run: echo "✅ Crawl completed for ${{ matrix.cafe }}"
-
-  # Job 2: Categorize products (runs after crawl completes)
-  categorize:
+  # Summarize and surface failures. Scheduled runs failed silently for weeks
+  # before, so failures are tracked in a single open issue.
+  summary:
     runs-on: ubuntu-latest
-    needs: [crawl]
+    needs: [sync]
     if: ${{ always() }}
-    strategy:
-      matrix:
-        cafe: ${{ (github.event.inputs.target_cafe == 'all' || github.event.inputs.target_cafe == '' || !github.event.inputs.target_cafe) && fromJSON('["starbucks", "mega", "paik", "ediya", "coffeebean", "hollys", "paulbassett", "mammoth", "gongcha", "theventi", "angelinus"]') || fromJSON(format('["{0}"]', github.event.inputs.target_cafe)) }}
-      fail-fast: false # Don't cancel other jobs if one fails
-      max-parallel: 4 # Limit concurrent categorization jobs
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      issues: write
 
-    name: Categorize ${{ matrix.cafe }}
+    name: Summary
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: "pnpm"
-          cache-dependency-path: "pnpm-lock.yaml"
-
-      - name: Restore node_modules cache
-        uses: actions/cache/restore@v4
-        id: node_modules_cache
-        with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-
-      - name: Install dependencies
-        run: pnpm install
-
-      - name: Create crawler outputs directory
-        run: mkdir -p actors/crawler/crawler-outputs
-
-      - name: Download crawler output for ${{ matrix.cafe }}
-        uses: actions/download-artifact@v4
-        continue-on-error: true
-        id: download_artifact
-        with:
-          name: crawler-output-${{ matrix.cafe }}
-          path: actors/crawler/crawler-outputs
-
-      - name: Check for cafe data
-        id: check_data
-        run: |
-          if [[ "${{ steps.download_artifact.outcome }}" == "success" ]] && ls actors/crawler/crawler-outputs/${{ matrix.cafe }}-*.json 1> /dev/null 2>&1; then
-            echo "has_data=true" >> $GITHUB_OUTPUT
-            echo "✅ Found data files for ${{ matrix.cafe }}"
-          else
-            echo "has_data=false" >> $GITHUB_OUTPUT
-            echo "⚠️ No data files found for ${{ matrix.cafe }} - crawl may have failed"
-          fi
-
-      - name: Run categorization for ${{ matrix.cafe }}
-        if: steps.check_data.outputs.has_data == 'true'
-        run: pnpm run categorize ${{ matrix.cafe }}
+      - name: Generate summary and report failures
         env:
-          NODE_ENV: production
-
-      - name: Upload categorized output for ${{ matrix.cafe }}
-        if: steps.check_data.outputs.has_data == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: categorized-output-${{ matrix.cafe }}
-          path: actors/crawler/crawler-outputs/${{ matrix.cafe }}-*.json
-          retention-days: 7
-
-      - name: Log categorization completion
-        if: steps.check_data.outputs.has_data == 'true'
-        run: echo "✅ Categorization completed for ${{ matrix.cafe }}"
-
-      - name: Log skip message
-        if: steps.check_data.outputs.has_data == 'false'
-        run: echo "⏭️ Skipped categorization for ${{ matrix.cafe }} (no data)"
-
-  # Job 3: Upload to database (runs after categorize completes)
-  upload:
-    runs-on: ubuntu-latest
-    needs: [categorize]
-    if: ${{ always() }}
-    strategy:
-      matrix:
-        cafe: ${{ (github.event.inputs.target_cafe == 'all' || github.event.inputs.target_cafe == '' || !github.event.inputs.target_cafe) && fromJSON('["starbucks", "mega", "paik", "ediya", "coffeebean", "hollys", "paulbassett", "mammoth", "gongcha", "theventi", "angelinus"]') || fromJSON(format('["{0}"]', github.event.inputs.target_cafe)) }}
-      fail-fast: false # Don't cancel other jobs if one fails
-      max-parallel: 2 # Limit concurrent uploads to avoid database overload
-
-    name: Upload ${{ matrix.cafe }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: "pnpm"
-          cache-dependency-path: "pnpm-lock.yaml"
-
-      - name: Restore node_modules cache
-        uses: actions/cache/restore@v4
-        id: node_modules_cache
-        with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-
-      - name: Install dependencies
-        run: pnpm install
-
-      - name: Create crawler outputs directory
-        run: mkdir -p actors/crawler/crawler-outputs
-
-      - name: Download categorized output for ${{ matrix.cafe }}
-        uses: actions/download-artifact@v4
-        continue-on-error: true
-        id: download_artifact
-        with:
-          name: categorized-output-${{ matrix.cafe }}
-          path: actors/crawler/crawler-outputs
-
-      - name: Check for cafe data
-        id: check_data
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SYNC_RESULT: ${{ needs.sync.result }}
+          TARGET: ${{ github.event.inputs.target_cafe || 'all' }}
         run: |
-          if [[ "${{ steps.download_artifact.outcome }}" == "success" ]] && ls actors/crawler/crawler-outputs/${{ matrix.cafe }}-*.json 1> /dev/null 2>&1; then
-            echo "has_data=true" >> $GITHUB_OUTPUT
-            echo "✅ Found data files for ${{ matrix.cafe }}"
+          failed=$(gh api "repos/$GH_REPO/actions/runs/$GITHUB_RUN_ID/jobs" --paginate \
+            --jq '.jobs[] | select(.name | startswith("Sync ")) | select(.conclusion == "failure" or .conclusion == "timed_out") | .name | sub("^Sync "; "")')
+
+          {
+            echo "## Daily Data Sync Summary"
+            echo ""
+            echo "- Sync: $SYNC_RESULT"
+            echo "- Target: $TARGET"
+            echo "- Timestamp: $(date -u)"
+            echo ""
+            if [[ -n "$failed" ]]; then
+              echo "❌ Failed cafes:"
+              echo "$failed" | sed 's/^/- /'
+            elif [[ "$SYNC_RESULT" == "success" ]]; then
+              echo "✅ All cafes synced successfully!"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ -z "$failed" ]]; then
+            exit 0
+          fi
+
+          title="Daily Data Sync failures"
+          body=$(printf 'Run: %s\n\nFailed cafes:\n%s\n' "$RUN_URL" "$(echo "$failed" | sed 's/^/- /')")
+          issue=$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number')
+          if [[ -n "$issue" ]]; then
+            gh issue comment "$issue" --body "$body"
           else
-            echo "has_data=false" >> $GITHUB_OUTPUT
-            echo "⚠️ No data files found for ${{ matrix.cafe }} - crawl or categorization may have failed"
-          fi
-
-      - name: Run upload for ${{ matrix.cafe }}
-        if: steps.check_data.outputs.has_data == 'true'
-        run: pnpm run upload ${{ matrix.cafe }}
-        env:
-          VITE_CONVEX_URL: ${{ secrets.VITE_CONVEX_URL }}
-          CONVEX_UPLOAD_SECRET: ${{ secrets.CONVEX_UPLOAD_SECRET }}
-
-      - name: Log upload completion
-        if: steps.check_data.outputs.has_data == 'true'
-        run: echo "✅ Upload completed for ${{ matrix.cafe }}"
-
-      - name: Log skip message
-        if: steps.check_data.outputs.has_data == 'false'
-        run: echo "⏭️ Skipped upload for ${{ matrix.cafe }} (no data - crawl or categorization may have failed)"
-
-  # Job 4: Cleanup and notification
-  cleanup:
-    runs-on: ubuntu-latest
-    needs: [crawl, categorize, upload]
-    if: ${{ always() }}
-
-    name: Cleanup & Summary
-
-    steps:
-      - name: Generate summary
-        run: |
-          echo "## Daily Data Sync Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Workflow Status:**" >> $GITHUB_STEP_SUMMARY
-          echo "- Crawl: ${{ needs.crawl.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Categorize: ${{ needs.categorize.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Upload: ${{ needs.upload.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Target:** ${{ github.event.inputs.target_cafe || 'all' }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Timestamp:** $(date -u)" >> $GITHUB_STEP_SUMMARY
-
-          if [[ "${{ needs.crawl.result }}" == "failure" ]]; then
-            echo "❌ Some crawl jobs failed" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          if [[ "${{ needs.categorize.result }}" == "failure" ]]; then
-            echo "❌ Categorization failed" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          if [[ "${{ needs.upload.result }}" == "failure" ]]; then
-            echo "❌ Some upload jobs failed" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          if [[ "${{ needs.crawl.result }}" == "success" && "${{ needs.categorize.result }}" == "success" && "${{ needs.upload.result }}" == "success" ]]; then
-            echo "✅ All jobs completed successfully!" >> $GITHUB_STEP_SUMMARY
+            gh issue create --title "$title" --label bug --body "$body"
           fi
