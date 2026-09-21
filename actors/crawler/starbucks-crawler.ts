@@ -1,6 +1,7 @@
 import { logger } from "../../shared/logger";
 import type { Nutritions } from "../../shared/nutritions";
 import { type Product, writeProductsToJson } from "./crawlerUtils";
+import { fetchText, mapWithConcurrency } from "./httpUtils";
 import { parseNutritionValueFromText } from "./nutritionUtils";
 
 // The site renders everything from JSON: the drink list is built from
@@ -55,12 +56,6 @@ const BOTTLE_SKU = "9200000003661";
 const BOTTLE_ML = 500;
 const TRENTA_ML = 887;
 
-const HEADERS = {
-  "User-Agent":
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-  "Accept-Language": "ko-KR,ko;q=0.9",
-} as const;
-
 // ================================================
 // REGEX PATTERNS
 // ================================================
@@ -85,9 +80,6 @@ const maxProductsInTestMode = Number.parseInt(
 
 const CRAWLER_CONFIG = {
   concurrency: 5,
-  maxRetries: 2,
-  retryDelayMs: 1000,
-  requestTimeoutMs: 20_000,
 } as const;
 
 // ================================================
@@ -121,55 +113,6 @@ interface ViewData {
 interface FileData {
   FILE_PATH?: string;
   IMG_UPLOAD_PATH?: string;
-}
-
-// ================================================
-// HTTP HELPERS
-// ================================================
-
-async function fetchText(url: string, init?: RequestInit): Promise<string> {
-  let lastError: unknown;
-  for (let attempt = 0; attempt <= CRAWLER_CONFIG.maxRetries; attempt++) {
-    try {
-      const response = await fetch(url, {
-        ...init,
-        headers: { ...HEADERS, ...init?.headers },
-        signal: AbortSignal.timeout(CRAWLER_CONFIG.requestTimeoutMs),
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      return await response.text();
-    } catch (error) {
-      lastError = error;
-      if (attempt < CRAWLER_CONFIG.maxRetries) {
-        await new Promise((resolve) =>
-          setTimeout(resolve, CRAWLER_CONFIG.retryDelayMs * (attempt + 1))
-        );
-      }
-    }
-  }
-  throw new Error(`Failed to fetch ${url}: ${lastError}`);
-}
-
-async function mapWithConcurrency<T, R>(
-  items: readonly T[],
-  concurrency: number,
-  fn: (item: T) => Promise<R>
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let cursor = 0;
-  const worker = async (): Promise<void> => {
-    const index = cursor;
-    cursor += 1;
-    if (index >= items.length) {
-      return;
-    }
-    results[index] = await fn(items[index]);
-    await worker();
-  };
-  await Promise.all(Array.from({ length: concurrency }, worker));
-  return results;
 }
 
 // ================================================

@@ -330,6 +330,10 @@ Search for `fromJSON('[` and add the slug to the array:
 cafe: ${{ ... && fromJSON('["starbucks", ..., "newcafe"]') || ... }}
 ```
 
+If the crawler fetches pages over plain HTTP (see `httpUtils.ts`, used by the
+Starbucks, Hollys and Gongcha crawlers), also add the slug to the list in the
+"Check if crawler needs a browser" step so CI skips installing Playwright.
+
 ## Step 7: Format and Commit
 
 ```bash
