@@ -22,6 +22,7 @@ on:
           - "hollys"
           - "paulbassett"
           - "mammoth"
+          - "mammothexpress"
           - "gongcha"
           # - "oozy" # blocked in CI, synced via Render cron
           - "theventi"
@@ -36,7 +37,7 @@ jobs:
     timeout-minutes: 30 # Slowest crawler (starbucks) takes ~11 min
     strategy:
       matrix:
-        cafe: ${{ (github.event.inputs.target_cafe == 'all' || github.event.inputs.target_cafe == '' || !github.event.inputs.target_cafe) && fromJSON('["starbucks", "mega", "paik", "ediya", "coffeebean", "hollys", "paulbassett", "mammoth", "gongcha", "theventi", "angelinus"]') || fromJSON(format('["{0}"]', github.event.inputs.target_cafe)) }}
+        cafe: ${{ (github.event.inputs.target_cafe == 'all' || github.event.inputs.target_cafe == '' || !github.event.inputs.target_cafe) && fromJSON('["starbucks", "mega", "paik", "ediya", "coffeebean", "hollys", "paulbassett", "mammoth", "mammothexpress", "gongcha", "theventi", "angelinus"]') || fromJSON(format('["{0}"]', github.event.inputs.target_cafe)) }}
       fail-fast: false # Don't cancel other jobs if one fails
       max-parallel: 4 # Limit concurrent crawlers to avoid rate limiting
 

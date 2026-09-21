@@ -39,6 +39,10 @@ export const AVAILABLE_CAFES = {
     name: "매머드커피",
     slug: "mammoth",
   },
+  mammothexpress: {
+    name: "매머드 익스프레스",
+    slug: "mammothexpress",
+  },
   gongcha: {
     name: "공차",
     slug: "gongcha",

@@ -36,6 +36,7 @@ const CAFE_WEBSITES: Partial<Record<CafeKey, string>> = {
   hollys: "https://www.hollys.co.kr",
   paulbassett: "https://www.paulbassett.co.kr",
   mammoth: "https://mmthcoffee.com",
+  mammothexpress: "https://mmthcoffee.com/sub/menu/list.html",
   gongcha: "https://www.gong-cha.co.kr",
   oozy: "https://oozycoffee.com",
   angelinus: "https://www.lotteeatz.com/brand/angel",
