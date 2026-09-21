@@ -61,10 +61,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # These crawlers fetch pages over plain HTTP and don't need a browser
+      # Crawlers that fetch pages over plain HTTP don't need a browser
       - name: Check if crawler needs a browser
         id: browser
-        run: echo "needed=${{ !contains(fromJSON('["starbucks", "hollys", "gongcha"]'), matrix.cafe) }}" >> "$GITHUB_OUTPUT"
+        run: |
+          if grep -q "playwright\|PlaywrightCrawler" "actors/crawler/${{ matrix.cafe }}-crawler.ts"; then
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Cache Playwright browsers
         if: steps.browser.outputs.needed == 'true'
