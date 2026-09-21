@@ -852,3 +852,89 @@ export const backdateReimportedProducts = mutation({
     };
   },
 });
+
+/**
+ * One-time move of products to another cafe when a brand that shared a
+ * cafe's crawl is split into its own cafe (매머드 익스프레스 out of
+ * 매머드커피). Re-uploading them under the new cafe would create fresh
+ * records -- new shortIds, reviews left behind on soft-removed rows, and a
+ * flood of "new" products -- so the existing records are re-parented instead,
+ * keeping their id, shortId, addedAt and reviews.
+ *
+ * Matches by `externalId`, which must be unique across both cafes for the
+ * moved items. Idempotent: items already in the target cafe are skipped. Run
+ * with `dryRun: true` first to preview.
+ */
+export const moveProductsToCafe = mutation({
+  args: {
+    fromCafeSlug: v.string(),
+    toCafeSlug: v.string(),
+    externalIds: v.array(v.string()),
+    dryRun: v.optional(v.boolean()),
+    uploadSecret: v.optional(v.string()),
+  },
+  handler: async (
+    ctx,
+    { fromCafeSlug, toCafeSlug, externalIds, dryRun, uploadSecret }
+  ) => {
+    verifyUploadSecret(uploadSecret);
+
+    const getCafe = async (slug: string) => {
+      const cafe = await ctx.db
+        .query("cafes")
+        .withIndex("by_slug", (q) => q.eq("slug", slug))
+        .unique();
+      if (!cafe) {
+        throw new Error(`Cafe not found: ${slug}`);
+      }
+      return cafe;
+    };
+    const fromCafe = await getCafe(fromCafeSlug);
+    const toCafe = await getCafe(toCafeSlug);
+
+    const moved: string[] = [];
+    const missing: string[] = [];
+    let alreadyMoved = 0;
+
+    for (const externalId of externalIds) {
+      const inTarget = await ctx.db
+        .query("products")
+        .withIndex("by_cafe_external_id", (q) =>
+          q.eq("cafeId", toCafe._id).eq("externalId", externalId)
+        )
+        .first();
+      if (inTarget) {
+        alreadyMoved++;
+        continue;
+      }
+
+      const product = await ctx.db
+        .query("products")
+        .withIndex("by_cafe_external_id", (q) =>
+          q.eq("cafeId", fromCafe._id).eq("externalId", externalId)
+        )
+        .first();
+      if (!product) {
+        missing.push(externalId);
+        continue;
+      }
+
+      if (!dryRun) {
+        await ctx.db.patch(product._id, {
+          cafeId: toCafe._id,
+          updatedAt: Date.now(),
+        });
+      }
+      moved.push(product.name);
+    }
+
+    return {
+      dryRun: dryRun ?? false,
+      requested: externalIds.length,
+      moved: moved.length,
+      alreadyMoved,
+      missing,
+      sample: moved.slice(0, 10),
+    };
+  },
+});
