@@ -1,8 +1,11 @@
-import { PlaywrightCrawler, type Request } from "crawlee";
-import type { Page } from "playwright";
+import { type CheerioAPI, load } from "cheerio";
 import { logger } from "../../shared/logger";
 import type { Nutritions } from "../../shared/nutritions";
-import { type Product, waitForLoad, writeProductsToJson } from "./crawlerUtils";
+import { type Product, writeProductsToJson } from "./crawlerUtils";
+import { fetchText, mapWithConcurrency } from "./httpUtils";
+
+// Listing and detail pages are server-rendered, so they are fetched and
+// parsed directly instead of rendered in a browser.
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
@@ -12,20 +15,21 @@ const SITE_CONFIG = {
   baseUrl: "https://www.theventi.co.kr",
   menuBaseUrl: "https://www.theventi.co.kr/new2022/menu/all.html",
   detailBaseUrl: "https://www.theventi.co.kr/new2022/menu/all-view.new.html",
-  menuCategories: {
-    커피: 2,
-    디카페인: 3,
-    "아이스 블렌디드": 4,
-    "주스/에이드": 5,
-    "버블티/티": 6,
-    베버리지: 7,
-    "사이드메뉴/RTD": 8,
-  },
 } as const;
 
-// ================================================
-// CSS SELECTORS
-// ================================================
+// Tabs in listing order. 신메뉴 comes last: most new items also appear in a
+// regular tab, which keeps them under their usual category, but some are
+// listed only there.
+const MENU_CATEGORIES = [
+  { name: "커피", mode: 2 },
+  { name: "디카페인", mode: 3 },
+  { name: "아이스 블렌디드", mode: 4 },
+  { name: "주스/에이드", mode: 5 },
+  { name: "버블티/티", mode: 6 },
+  { name: "베버리지", mode: 7 },
+  { name: "사이드메뉴/RTD", mode: 8 },
+  { name: "신메뉴", mode: 1 },
+] as const;
 
 const SELECTORS = {
   productLink: 'a[href*="all-view.new.html"]',
@@ -39,124 +43,36 @@ const SELECTORS = {
 // REGEX PATTERNS
 // ================================================
 
-const SERVING_SIZE_REGEX = /(\d+)\s*(ml|g)/i;
-const NUMERIC_REGEX = /[\d.]+/;
-const UID_PATTERN = "uid=(\\d+)";
+const SERVING_SIZE_REGEX = /([\d,]+(?:\.\d+)?)\s*(ml|g)/i;
+const NUMERIC_REGEX = /[\d,]*\.?\d+/;
+const UID_REGEX = /uid=(\d+)/;
+const WHITESPACE_REGEX = /\s+/g;
+const COMMA_REGEX = /,/g;
+
+// Descriptions shorter than this are placeholders
+const MIN_DESCRIPTION_LENGTH = 6;
 
 // ================================================
 // CRAWLER CONFIGURATION
 // ================================================
 
 const isTestMode = process.env.CRAWLER_TEST_MODE === "true";
-const maxProductsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_PRODUCTS || "3", 10)
-  : Number.POSITIVE_INFINITY;
-const maxRequestsInTestMode = isTestMode
-  ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || "10", 10)
-  : 50;
+const maxProductsInTestMode = Number.parseInt(
+  process.env.CRAWLER_MAX_PRODUCTS || "3",
+  10
+);
 
 const CRAWLER_CONFIG = {
-  maxConcurrency: isTestMode ? 1 : 3,
-  maxRequestsPerCrawl: isTestMode ? maxRequestsInTestMode : 300,
-  maxRequestRetries: 2,
-  requestHandlerTimeoutSecs: isTestMode ? 30 : 120,
-  launchOptions: {
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  },
-};
+  concurrency: 5,
+} as const;
 
 // ================================================
-// GLOBAL STATE
+// TYPES
 // ================================================
 
-const seenUids = new Set<string>();
-
-// ================================================
-// DATA EXTRACTION FUNCTIONS
-// ================================================
-
-function parseNumericValue(text: string): number | undefined {
-  const match = text.match(NUMERIC_REGEX);
-  return match ? Number.parseFloat(match[0]) : undefined;
-}
-
-async function extractProductLinksFromListing(
-  page: Page
-): Promise<Array<{ uid: string; name: string }>> {
-  await waitForLoad(page);
-  await page
-    .waitForSelector(SELECTORS.productLink, { timeout: 15_000 })
-    .catch(() => {
-      logger.warn("Timed out waiting for product links, proceeding anyway");
-    });
-
-  return page.evaluate(
-    ({ selector, uidPattern }) => {
-      const links = document.querySelectorAll(selector);
-      const uidRegex = new RegExp(uidPattern);
-      const uniqueProducts = new Map<string, { uid: string; name: string }>();
-
-      for (const link of links) {
-        const href = link.getAttribute("href");
-        const match = href?.match(uidRegex);
-        if (match) {
-          const uid = match[1];
-          if (!uniqueProducts.has(uid)) {
-            uniqueProducts.set(uid, {
-              uid,
-              name: link.textContent?.trim() || "",
-            });
-          }
-        }
-      }
-
-      return [...uniqueProducts.values()];
-    },
-    { selector: SELECTORS.productLink, uidPattern: UID_PATTERN }
-  );
-}
-
-function extractNutritionTableData(
-  page: Page
-): Promise<{ headers: string[]; values: string[] } | null> {
-  return page.evaluate((tableSelector: string) => {
-    const table = document.querySelector(tableSelector);
-    if (!table) {
-      return null;
-    }
-
-    const headers: string[] = [];
-    const values: string[] = [];
-
-    for (const th of table.querySelectorAll("thead th")) {
-      headers.push(th.textContent?.trim() || "");
-    }
-    for (const td of table.querySelectorAll("tbody td")) {
-      values.push(td.textContent?.trim() || "");
-    }
-
-    if (headers.length > 3 && values.length > 0) {
-      return { headers, values };
-    }
-
-    return null;
-  }, SELECTORS.nutritionTable);
-}
-
-async function extractNutritionFromDetailPage(
-  page: Page
-): Promise<Nutritions | null> {
-  try {
-    const nutritionData = await extractNutritionTableData(page);
-    if (!nutritionData) {
-      return null;
-    }
-    return mapNutritionData(nutritionData.headers, nutritionData.values);
-  } catch (error) {
-    logger.debug(`Failed to extract nutrition: ${error}`);
-    return null;
-  }
+interface ListedProduct {
+  categoryName: string;
+  uid: string;
 }
 
 type NutritionFieldKey =
@@ -167,11 +83,11 @@ type NutritionFieldKey =
   | "natrium"
   | "caffeine";
 
-const NUTRITION_FIELD_MAP: Array<{
+const NUTRITION_FIELD_MAP: {
   keyword: string;
   field: NutritionFieldKey;
   unit: string;
-}> = [
+}[] = [
   { keyword: "열량", field: "calories", unit: "kcal" },
   { keyword: "kcal", field: "calories", unit: "kcal" },
   { keyword: "당류", field: "sugar", unit: "g" },
@@ -181,21 +97,34 @@ const NUTRITION_FIELD_MAP: Array<{
   { keyword: "카페인", field: "caffeine", unit: "mg" },
 ];
 
-function applyServingSize(nutrition: Nutritions, value: string): boolean {
-  const sizeMatch = value.match(SERVING_SIZE_REGEX);
-  if (sizeMatch) {
-    nutrition.servingSize = Number.parseFloat(sizeMatch[1]);
-    nutrition.servingSizeUnit = sizeMatch[2].toLowerCase();
-    return true;
-  }
-  return false;
+// ================================================
+// DATA EXTRACTION FUNCTIONS
+// ================================================
+
+function parseNumber(text: string): number | undefined {
+  const match = text.match(NUMERIC_REGEX);
+  return match
+    ? Number.parseFloat(match[0].replace(COMMA_REGEX, ""))
+    : undefined;
 }
 
-function mapNutritionData(
-  headers: string[],
-  values: string[]
-): Nutritions | null {
-  const nutrition: Nutritions = {};
+// Header "1회 제공량" holds "라지(600ml) 점보(960ml)" or "120 g"; other cells
+// hold "18 (18%)" or "고카페인 266"
+function extractNutritionData($: CheerioAPI): Nutritions | null {
+  const table = $(SELECTORS.nutritionTable).first();
+  const headers = table
+    .find("thead th")
+    .map((_, cell) => $(cell).text().trim())
+    .get();
+  const values = table
+    .find("tbody td")
+    .map((_, cell) => $(cell).text().trim())
+    .get();
+  if (headers.length <= 3 || values.length === 0) {
+    return null;
+  }
+
+  const nutritions: Nutritions = {};
   let hasData = false;
 
   for (const [index, header] of headers.entries()) {
@@ -205,211 +134,144 @@ function mapNutritionData(
     }
 
     if (header.includes("제공량")) {
-      hasData = applyServingSize(nutrition, value) || hasData;
+      const size = value.match(SERVING_SIZE_REGEX);
+      if (size) {
+        nutritions.servingSize = Number.parseFloat(
+          size[1].replace(COMMA_REGEX, "")
+        );
+        nutritions.servingSizeUnit = size[2].toLowerCase();
+        hasData = true;
+      }
       continue;
     }
 
     const mapping = NUTRITION_FIELD_MAP.find((m) => header.includes(m.keyword));
     if (mapping) {
-      nutrition[mapping.field] = parseNumericValue(value);
-      const unitKey = `${mapping.field}Unit` as keyof Nutritions;
-      (nutrition as Record<string, unknown>)[unitKey] = mapping.unit;
+      nutritions[mapping.field] = parseNumber(value);
+      (nutritions as Record<string, unknown>)[`${mapping.field}Unit`] =
+        mapping.unit;
       hasData = true;
     }
   }
 
-  return hasData ? nutrition : null;
+  return hasData ? nutritions : null;
 }
 
-async function extractProductDetailFromPage(page: Page): Promise<{
+async function fetchCategoryProducts(category: {
   name: string;
-  imageUrl: string;
-  description: string | null;
-  nutritions: Nutritions | null;
-} | null> {
-  await waitForLoad(page);
-  await page.waitForTimeout(1000);
-
-  // Product name is in p.tit — last <span> child that isn't .tag
-  const name = await page
-    .evaluate((selector: string) => {
-      const tit = document.querySelector(selector);
-      if (!tit) {
-        return "";
+  mode: number;
+}): Promise<ListedProduct[]> {
+  try {
+    const $ = load(
+      await fetchText(`${SITE_CONFIG.menuBaseUrl}?mode=${category.mode}`)
+    );
+    const uids = new Set<string>();
+    $(SELECTORS.productLink).each((_, link) => {
+      const uid = $(link).attr("href")?.match(UID_REGEX)?.[1];
+      if (uid) {
+        uids.add(uid);
       }
-      const spans = [...tit.querySelectorAll("span:not(.tag)")];
-      const lastSpan = spans.at(-1);
-      return lastSpan?.textContent?.trim() || tit.textContent?.trim() || "";
-    }, SELECTORS.detailName)
-    .catch(() => "");
+    });
 
-  if (!name) {
+    logger.info(`📋 ${category.name}: ${uids.size} products`);
+    const listed = [...uids].map((uid) => ({
+      categoryName: category.name,
+      uid,
+    }));
+    return isTestMode ? listed.slice(0, maxProductsInTestMode) : listed;
+  } catch (error) {
+    logger.error(`❌ Failed to process category ${category.name}: ${error}`);
+    return [];
+  }
+}
+
+async function crawlProduct({
+  categoryName,
+  uid,
+}: ListedProduct): Promise<Product | null> {
+  const externalUrl = `${SITE_CONFIG.detailBaseUrl}?uid=${uid}`;
+  try {
+    const $ = load(await fetchText(externalUrl));
+
+    // The title holds tag badges before the name: <span class="tag">NEW</span>
+    const title = $(SELECTORS.detailName).first();
+    const name =
+      title.find("span:not(.tag)").last().text().trim() || title.text().trim();
+    if (!name) {
+      logger.warn(`⚠️ No product name found for uid=${uid}`);
+      return null;
+    }
+
+    const src = $(SELECTORS.detailImage).first().attr("src") ?? "";
+    const description = $(SELECTORS.detailDescription)
+      .first()
+      .text()
+      .trim()
+      .replace(WHITESPACE_REGEX, " ");
+    const nutritions = extractNutritionData($);
+
+    logger.info(
+      `✅ Extracted: ${name} (uid=${uid})${nutritions ? " with nutrition" : ""}`
+    );
+
+    return {
+      name,
+      nameEn: null,
+      description:
+        description.length >= MIN_DESCRIPTION_LENGTH ? description : null,
+      price: null,
+      externalImageUrl: src.startsWith("http")
+        ? src
+        : `${SITE_CONFIG.baseUrl}${src.startsWith("/") ? "" : "/"}${src}`,
+      category: null,
+      externalCategory: categoryName,
+      externalId: `theventi_${uid}`,
+      externalUrl,
+      nutritions,
+    };
+  } catch (error) {
+    logger.error(`❌ Failed to process uid=${uid}: ${error}`);
     return null;
   }
-
-  const imageUrl = await page
-    .locator(SELECTORS.detailImage)
-    .first()
-    .getAttribute("src", { timeout: 3000 })
-    .then((src) => {
-      if (!src) {
-        return "";
-      }
-      return src.startsWith("http")
-        ? src
-        : `${SITE_CONFIG.baseUrl}${src.startsWith("/") ? "" : "/"}${src}`;
-    })
-    .catch(() => "");
-
-  const description = await page
-    .locator(SELECTORS.detailDescription)
-    .first()
-    .textContent({ timeout: 3000 })
-    .then((text) => {
-      const cleaned = text?.trim().replace(/\s+/g, " ") || null;
-      return cleaned && cleaned.length > 5 ? cleaned : null;
-    })
-    .catch(() => null);
-
-  const nutritions = await extractNutritionFromDetailPage(page);
-
-  return { name, imageUrl, description, nutritions };
-}
-
-// ================================================
-// PAGE HANDLERS
-// ================================================
-
-async function handleListingPage(
-  page: Page,
-  request: Request,
-  crawlerInstance: PlaywrightCrawler
-) {
-  const categoryName = request.userData?.categoryName as string;
-  logger.info(`Processing listing page: ${categoryName}`);
-
-  const productLinks = await extractProductLinksFromListing(page);
-  logger.info(
-    `Found ${productLinks.length} products in ${categoryName} (before dedup)`
-  );
-
-  const newProducts = productLinks.filter(({ uid }) => !seenUids.has(uid));
-  for (const { uid } of newProducts) {
-    seenUids.add(uid);
-  }
-
-  logger.info(
-    `${newProducts.length} new products after dedup (${productLinks.length - newProducts.length} skipped)`
-  );
-
-  const productsToProcess = isTestMode
-    ? newProducts.slice(0, maxProductsInTestMode)
-    : newProducts;
-
-  if (isTestMode && productsToProcess.length < newProducts.length) {
-    logger.info(`Test mode: limiting to ${productsToProcess.length} products`);
-  }
-
-  const detailRequests = productsToProcess.map(({ uid, name }) => ({
-    url: `${SITE_CONFIG.detailBaseUrl}?uid=${uid}`,
-    userData: {
-      isDetailPage: true,
-      categoryName,
-      uid,
-      productName: name,
-    },
-  }));
-
-  await crawlerInstance.addRequests(detailRequests);
-  logger.info(
-    `Enqueued ${detailRequests.length} detail pages from ${categoryName}`
-  );
-}
-
-async function handleDetailPage(
-  page: Page,
-  request: Request,
-  crawlerInstance: PlaywrightCrawler
-) {
-  const { categoryName, uid } = request.userData;
-  const detailUrl = request.url;
-
-  const detail = await extractProductDetailFromPage(page);
-
-  if (!detail) {
-    logger.warn(`Failed to extract product detail from ${detailUrl}`);
-    return;
-  }
-
-  const product: Product = {
-    name: detail.name,
-    nameEn: null,
-    description: detail.description,
-    price: null,
-    externalImageUrl: detail.imageUrl,
-    category: null,
-    externalCategory: categoryName,
-    externalId: `theventi_${uid}`,
-    externalUrl: detailUrl,
-    nutritions: detail.nutritions,
-  };
-
-  await crawlerInstance.pushData(product);
-  logger.info(
-    `Extracted: ${detail.name} (uid=${uid})${detail.nutritions ? " with nutrition" : ""}`
-  );
 }
 
 // ================================================
 // CRAWLER EXPORT
 // ================================================
 
-export const createTheventiCrawler = () =>
-  new PlaywrightCrawler({
-    launchContext: {
-      launchOptions: CRAWLER_CONFIG.launchOptions,
-    },
-    async requestHandler({ page, request, crawler: crawlerInstance }) {
-      if (request.userData?.isDetailPage) {
-        await handleDetailPage(page, request, crawlerInstance);
-      } else {
-        await handleListingPage(page, request, crawlerInstance);
-      }
-    },
-    maxConcurrency: CRAWLER_CONFIG.maxConcurrency,
-    maxRequestsPerCrawl: CRAWLER_CONFIG.maxRequestsPerCrawl,
-    maxRequestRetries: CRAWLER_CONFIG.maxRequestRetries,
-    requestHandlerTimeoutSecs: CRAWLER_CONFIG.requestHandlerTimeoutSecs,
-  });
-
 export const runTheventiCrawler = async () => {
-  const crawler = createTheventiCrawler();
-
-  const startUrls = Object.entries(SITE_CONFIG.menuCategories).map(
-    ([categoryName, mode]) => ({
-      url: `${SITE_CONFIG.menuBaseUrl}?mode=${mode}`,
-      userData: { categoryName, isDetailPage: false },
-    })
-  );
-
-  const urlsToProcess = isTestMode ? startUrls.slice(0, 2) : startUrls;
-
-  if (isTestMode) {
-    logger.info(
-      `Test mode: processing ${urlsToProcess.length}/${startUrls.length} categories`
-    );
-  }
-
   try {
-    await crawler.run(urlsToProcess);
-    const dataset = await crawler.getData();
-    await writeProductsToJson(dataset.items as Product[], "theventi");
+    const perCategory = await Promise.all(
+      MENU_CATEGORIES.map(fetchCategoryProducts)
+    );
+
+    // A product listed in several tabs keeps the first one
+    const seen = new Set<string>();
+    const listed = perCategory.flat().filter(({ uid }) => {
+      if (seen.has(uid)) {
+        return false;
+      }
+      seen.add(uid);
+      return true;
+    });
+    logger.info(`Found ${listed.length} products to crawl`);
+
+    const results = await mapWithConcurrency(
+      listed,
+      CRAWLER_CONFIG.concurrency,
+      crawlProduct
+    );
+    await writeProductsToJson(
+      results.filter((p): p is Product => p !== null),
+      "theventi"
+    );
   } catch (error) {
-    logger.error("TheVenti crawler failed:", error);
+    logger.error("The Venti crawler failed:", error);
     throw error;
   }
 };
 
+// Only run if this file is executed directly (not imported)
 if (import.meta.url === `file://${process.argv[1]}`) {
   runTheventiCrawler().catch((error) => {
     logger.error("Crawler execution failed:", error);
