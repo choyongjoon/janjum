@@ -330,6 +330,9 @@ Search for `fromJSON('[` and add the slug to the array:
 cafe: ${{ ... && fromJSON('["starbucks", ..., "newcafe"]') || ... }}
 ```
 
+Crawlers that fetch pages over plain HTTP (see `httpUtils.ts`) don't import
+Playwright, and CI skips installing the browser for them automatically.
+
 ## Step 7: Format and Commit
 
 ```bash

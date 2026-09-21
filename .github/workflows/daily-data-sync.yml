@@ -61,7 +61,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Crawlers that fetch pages over plain HTTP don't need a browser
+      - name: Check if crawler needs a browser
+        id: browser
+        run: |
+          if grep -q "playwright\|PlaywrightCrawler" "actors/crawler/${{ matrix.cafe }}-crawler.ts"; then
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Cache Playwright browsers
+        if: steps.browser.outputs.needed == 'true'
         uses: actions/cache@v4
         id: playwright_cache
         with:
@@ -69,7 +80,7 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install Playwright browsers
-        if: steps.playwright_cache.outputs.cache-hit != 'true'
+        if: steps.browser.outputs.needed == 'true' && steps.playwright_cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Create crawler outputs directory
