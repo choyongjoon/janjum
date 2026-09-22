@@ -45,15 +45,15 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: 10
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: "pnpm"
@@ -74,7 +74,7 @@ jobs:
 
       - name: Cache Playwright browsers
         if: steps.browser.outputs.needed == 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         id: playwright_cache
         with:
           path: ~/.cache/ms-playwright
@@ -116,7 +116,7 @@ jobs:
       # inspected or re-uploaded locally.
       - name: Upload crawler output
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: crawler-output-${{ matrix.cafe }}
           path: actors/crawler/crawler-outputs/${{ matrix.cafe }}-*.json
@@ -127,7 +127,7 @@ jobs:
       # change diagnosable without re-running locally.
       - name: Upload debug page dump
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: crawler-debug-${{ matrix.cafe }}
           path: actors/crawler/crawler-outputs/*debug*
