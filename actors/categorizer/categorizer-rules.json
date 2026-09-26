@@ -207,7 +207,8 @@
           "쉐이크",
           "프라페",
           "빽스치노",
-          "할리치노"
+          "할리치노",
+          "탐앤치노"
         ]
       },
       "targetCategory": "블렌디드",
@@ -635,6 +636,54 @@
       "confidence": "high",
       "createdBy": "system",
       "createdAt": 1739750400000,
+      "usageCount": 0
+    },
+    {
+      "id": "direct-single-origin",
+      "type": "direct",
+      "condition": {
+        "externalCategory": "싱글오리진"
+      },
+      "targetCategory": "커피",
+      "confidence": "high",
+      "createdBy": "system",
+      "createdAt": 1790380800000,
+      "usageCount": 0
+    },
+    {
+      "id": "direct-tomnccino-coffee",
+      "type": "direct",
+      "condition": {
+        "externalCategory": "탐앤치노 커피"
+      },
+      "targetCategory": "블렌디드",
+      "confidence": "high",
+      "createdBy": "system",
+      "createdAt": 1790380800000,
+      "usageCount": 0
+    },
+    {
+      "id": "direct-tomnccino-non-coffee",
+      "type": "direct",
+      "condition": {
+        "externalCategory": "탐앤치노 논커피"
+      },
+      "targetCategory": "블렌디드",
+      "confidence": "high",
+      "createdBy": "system",
+      "createdAt": 1790380800000,
+      "usageCount": 0
+    },
+    {
+      "id": "direct-bingsu-ice-cream",
+      "type": "direct",
+      "condition": {
+        "externalCategory": "빙수 & 아이스크림"
+      },
+      "targetCategory": "아이스크림",
+      "confidence": "high",
+      "createdBy": "system",
+      "createdAt": 1790380800000,
       "usageCount": 0
     },
     {
