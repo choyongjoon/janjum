@@ -63,4 +63,8 @@ export const AVAILABLE_CAFES = {
     name: "차백도",
     slug: "chapanda",
   },
+  tomntoms: {
+    name: "탐앤탐스",
+    slug: "tomntoms",
+  },
 } as const;

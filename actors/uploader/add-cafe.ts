@@ -41,6 +41,7 @@ const CAFE_WEBSITES: Partial<Record<CafeKey, string>> = {
   oozy: "https://oozycoffee.com",
   angelinus: "https://www.lotteeatz.com/brand/angel",
   chapanda: "https://kr.chapanda.com",
+  tomntoms: "https://www.tomntoms.com",
 };
 
 function parseArgs(): ParsedArgs {
