@@ -48,7 +48,7 @@
     "@clerk/backend": "^2.6.2",
     "@playwright/test": "^1.54.2",
     "@storybook/react-vite": "10.3.0-alpha.16",
-    "@types/node": "^22.5.4",
+    "@types/node": "^22.20.4",
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",
     "@vitejs/plugin-react": "^6.0.0",
