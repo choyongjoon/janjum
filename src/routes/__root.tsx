@@ -35,7 +35,9 @@ import { usePostHogIdentify } from "~/hooks/usePostHogIdentify";
 import appCss from "~/styles/app.css?url";
 import { seo } from "~/utils/seo";
 
-const fetchClerkAuth = createServerFn({ method: "GET" }).handler(async () => {
+// POST, not GET: Vercel's firewall denies GET /_serverFn/* requests that carry
+// a `payload` query param, which broke every client-side navigation.
+const fetchClerkAuth = createServerFn({ method: "POST" }).handler(async () => {
   try {
     const auth = await getAuth(getWebRequest());
 
@@ -124,8 +126,12 @@ export const Route = createRootRouteWithContext<{
     ],
   }),
   beforeLoad: async (ctx) => {
-    const auth = await fetchClerkAuth();
-    const { userId, token } = auth;
+    // Don't let an auth lookup failure take down the whole page; fall back to
+    // signed-out and let ClerkProvider resolve the session on the client.
+    const { userId, token } = await fetchClerkAuth().catch(() => ({
+      userId: null,
+      token: null,
+    }));
 
     // During SSR only (the only time serverHttpClient exists),
     // set the Clerk auth token to make HTTP queries with.
