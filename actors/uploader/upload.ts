@@ -170,7 +170,7 @@ ${Object.entries(AVAILABLE_CAFES)
   .join("\n")}
 
 Options:
-  --dry-run         Preview changes without uploading to database
+  --dry-run         Preview changes without writing to the database or image storage
   --verbose, -v     Show detailed output during upload
   --file <path>     Use specific file instead of latest from crawler-outputs/
   --help, -h        Show this help message
