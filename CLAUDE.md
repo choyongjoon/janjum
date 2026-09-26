@@ -9,7 +9,7 @@
 
 ## Code Formatting
 
-- **Format after editing**: Run `npx ultracite format` after editing any file to maintain code quality and consistency
+- **Format after editing**: Run `npx ultracite fix` after editing any file to maintain code quality and consistency
 - This ensures linting rules are followed and code style is consistent across the project
 
 ## Logging
@@ -24,7 +24,7 @@
 ## Development Workflow
 
 1. Make code changes
-2. Run `npx ultracite format` to apply formatting and linting
+2. Run `npx ultracite fix` to apply formatting and linting
 3. Fix any reported errors or warnings
 4. Test changes before committing
 

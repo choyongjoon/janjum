@@ -7,6 +7,12 @@ import sharp from "sharp";
 import { api } from "../../convex/_generated/api";
 import { logger } from "../../shared/logger";
 import { dedupeByExternalId } from "./dedupe";
+import {
+  type PreparedImage,
+  type ProductImageDeps,
+  resolveProductImage,
+  summarizeImageOutcomes,
+} from "./product-image";
 
 const IMAGE_CONCURRENCY = process.env.IMAGE_CONCURRENCY
   ? Number(process.env.IMAGE_CONCURRENCY)
@@ -201,9 +207,11 @@ class ProductUploader {
     }
 
     // Pre-process images if downloadImages is enabled
-    // Download, optimize to WebP, and upload to storage before sending product data
+    // Download, optimize to WebP, and upload to storage before sending product data.
+    // On a dry run images are still downloaded and optimized (to catch broken
+    // URLs and report sizes) but never uploaded to storage.
     const processedProducts = downloadImages
-      ? await this.preprocessImages(products, cafeSlug)
+      ? await this.preprocessImages(products, cafeSlug, dryRun)
       : products;
 
     // Send products to server with pre-processed images (already in WebP format)
@@ -250,14 +258,17 @@ class ProductUploader {
 
   /**
    * Pre-process images for all products
-   * Downloads, converts to WebP, and uploads to storage
+   * Downloads, converts to WebP, and uploads to storage (skipped on dry run)
    * Skips products that already have images in the database
    */
   private async preprocessImages(
     products: ProductData[],
-    cafeSlug: string
+    cafeSlug: string,
+    dryRun: boolean
   ): Promise<ProductData[]> {
-    logger.info(`Pre-processing images for ${products.length} products...`);
+    logger.info(
+      `Pre-processing images for ${products.length} products${dryRun ? " (dry run: nothing will be uploaded to storage)" : ""}...`
+    );
 
     // Get existing products from database to check for images
     const existingProductsMap = await this.getExistingProductsWithImages(
@@ -265,6 +276,13 @@ class ProductUploader {
       products.map((p) => p.externalId)
     );
 
+    const deps: ProductImageDeps = {
+      prepareImage: (imageUrl, productName) =>
+        this.downloadAndOptimizeImage(imageUrl, productName),
+      uploadImage: (image) => this.uploadImageToStorage(image),
+    };
+
+    const results: Awaited<ReturnType<typeof resolveProductImage>>[] = [];
     const processedProducts: ProductData[] = [];
 
     for (let i = 0; i < products.length; i += IMAGE_CONCURRENCY) {
@@ -275,80 +293,78 @@ class ProductUploader {
 
       const batchResults = await Promise.all(
         batch.map((product) =>
-          this.processProductImage(product, existingProductsMap)
+          resolveProductImage(
+            product,
+            existingProductsMap.get(product.externalId)?.imageStorageId,
+            deps,
+            dryRun
+          )
         )
       );
-      processedProducts.push(...batchResults);
+      for (const result of batchResults) {
+        this.logImageOutcome(result.product.name, result.outcome);
+        results.push(result);
+        processedProducts.push(result.product);
+      }
     }
 
-    const successCount = processedProducts.filter(
-      (p) => p.imageStorageId
-    ).length;
-    const skippedCount = products.filter(
-      (p) => existingProductsMap.get(p.externalId)?.imageStorageId
-    ).length;
-    logger.info(
-      `Completed image pre-processing: ${successCount}/${products.length} images (${skippedCount} skipped, ${successCount - skippedCount} newly processed)`
-    );
+    const summary = summarizeImageOutcomes(results.map((r) => r.outcome));
+    const kb = (summary.bytes / 1024).toFixed(1);
+    if (dryRun) {
+      logger.info(
+        `Image dry run: ${summary.newImages} would be uploaded (${kb} KB WebP), ${summary.reused} already in storage, ${summary.failed} failed to download, ${summary.noImage} without image URL`
+      );
+    } else {
+      logger.info(
+        `Completed image pre-processing: ${summary.newImages} uploaded (${kb} KB), ${summary.reused} reused, ${summary.failed} failed, ${summary.noImage} without image URL`
+      );
+    }
 
     return processedProducts;
   }
 
-  private async processProductImage(
-    product: ProductData,
-    existingProductsMap: Map<string, { imageStorageId?: string }>
-  ): Promise<ProductData> {
-    if (!product.externalImageUrl) {
-      return product;
-    }
-
-    const existingProduct = existingProductsMap.get(product.externalId);
-    if (existingProduct?.imageStorageId) {
-      logger.info(
-        `⏭️  Skipping image for ${product.name} (already has image: ${existingProduct.imageStorageId})`
-      );
-      return {
-        ...product,
-        imageStorageId: existingProduct.imageStorageId,
-      };
-    }
-
-    try {
-      const result = await this.downloadAndOptimizeImage(
-        product.externalImageUrl,
-        product.name
-      );
-
-      if (result) {
+  private logImageOutcome(
+    productName: string,
+    outcome: Awaited<ReturnType<typeof resolveProductImage>>["outcome"]
+  ): void {
+    switch (outcome.kind) {
+      case "reused":
         logger.info(
-          `✓ Processed image for ${product.name}: ${result.storageId}`
+          `⏭️  Skipping image for ${productName} (already has image: ${outcome.storageId})`
         );
-        return {
-          ...product,
-          imageStorageId: result.storageId,
-        };
-      }
-
-      logger.warn(`✗ Failed to process image for ${product.name}`);
-      return product;
-    } catch (error) {
-      logger.error(`Error processing image for ${product.name}:`, error);
-      return product;
+        break;
+      case "uploaded":
+        logger.info(
+          `✓ Processed image for ${productName}: ${outcome.storageId}`
+        );
+        break;
+      case "would-upload":
+        logger.info(
+          `✓ Would upload image for ${productName} (${outcome.bytes} bytes)`
+        );
+        break;
+      case "failed":
+        if (outcome.error) {
+          logger.error(
+            `Error processing image for ${productName}:`,
+            outcome.error
+          );
+        } else {
+          logger.warn(`✗ Failed to process image for ${productName}`);
+        }
+        break;
+      default:
+        break;
     }
   }
 
   /**
-   * Download, optimize and upload a single image to Convex storage
+   * Download a single image and optimize it to WebP
    */
   private async downloadAndOptimizeImage(
     imageUrl: string,
     productName: string
-  ): Promise<{
-    originalSize: number;
-    optimizedSize: number;
-    storageId: string;
-    wasOptimized: boolean;
-  } | null> {
+  ): Promise<PreparedImage | null> {
     logger.info(`Downloading image for ${productName}: ${imageUrl}`);
 
     // Handle SSL certificate issues with Gongcha website
@@ -385,59 +401,31 @@ class ProductUploader {
 
       // Check if already WebP
       const metadata = await sharp(imageBuffer).metadata();
-      let finalBuffer: Buffer = imageBuffer;
-      let wasOptimized = false;
-      let finalSize = originalSize;
-
       if (metadata.format === "webp") {
         logger.info(`Image for ${productName} is already WebP format`);
-      } else {
-        // Optimize using Sharp
-        finalBuffer = Buffer.from(
-          await sharp(imageBuffer).webp({ quality: 85, effort: 6 }).toBuffer()
-        );
-        finalSize = finalBuffer.length;
-        wasOptimized = true;
-
-        const reduction = (
-          ((originalSize - finalSize) / originalSize) *
-          100
-        ).toFixed(1);
-
-        logger.info(
-          `Optimized ${productName}: ${originalSize} bytes → ${finalSize} bytes (${reduction}% reduction)`
-        );
+        return {
+          buffer: imageBuffer,
+          originalSize,
+          optimizedSize: originalSize,
+        };
       }
 
-      // Upload to Convex storage
-      const uploadSecret = process.env.CONVEX_UPLOAD_SECRET;
-      const uploadUrl = await this.client.mutation(api.http.generateUploadUrl, {
-        uploadSecret,
-      });
-
-      const uploadResponse = await fetch(uploadUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "image/webp",
-        },
-        body: new Uint8Array(finalBuffer),
-      });
-
-      if (!uploadResponse.ok) {
-        throw new Error(
-          `Failed to upload optimized image: ${uploadResponse.statusText}`
-        );
-      }
-
-      const { storageId } = await uploadResponse.json();
-
-      logger.info(`Uploaded ${productName} image to storage: ${storageId}`);
+      // Optimize using Sharp
+      const optimized = Buffer.from(
+        await sharp(imageBuffer).webp({ quality: 85, effort: 6 }).toBuffer()
+      );
+      const reduction = (
+        ((originalSize - optimized.length) / originalSize) *
+        100
+      ).toFixed(1);
+      logger.info(
+        `Optimized ${productName}: ${originalSize} bytes → ${optimized.length} bytes (${reduction}% reduction)`
+      );
 
       return {
+        buffer: optimized,
         originalSize,
-        optimizedSize: finalSize,
-        storageId: storageId as string,
-        wasOptimized,
+        optimizedSize: optimized.length,
       };
     } finally {
       // Restore original SSL setting
@@ -447,6 +435,33 @@ class ProductUploader {
         process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalRejectUnauthorized;
       }
     }
+  }
+
+  /**
+   * Upload an optimized image to Convex storage
+   */
+  private async uploadImageToStorage(image: PreparedImage): Promise<string> {
+    const uploadSecret = process.env.CONVEX_UPLOAD_SECRET;
+    const uploadUrl = await this.client.mutation(api.http.generateUploadUrl, {
+      uploadSecret,
+    });
+
+    const uploadResponse = await fetch(uploadUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "image/webp",
+      },
+      body: new Uint8Array(image.buffer),
+    });
+
+    if (!uploadResponse.ok) {
+      throw new Error(
+        `Failed to upload optimized image: ${uploadResponse.statusText}`
+      );
+    }
+
+    const { storageId } = await uploadResponse.json();
+    return storageId as string;
   }
 
   private handleUploadResult(
