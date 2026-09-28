@@ -1,9 +1,14 @@
-import type { GenericDataModel, GenericMutationCtx } from "convex/server";
 import { v } from "convex/values";
 import type { Nutritions } from "../shared/nutritions";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { mutation } from "./_generated/server";
+import { type MutationCtx, mutation } from "./_generated/server";
+import {
+  buildRevivalIndex,
+  findRevivalCandidate,
+  type RevivalIndex,
+  removeFromRevivalIndex,
+} from "./productMatching";
 
 interface CrawlerProduct {
   category: string | null;
@@ -54,14 +59,32 @@ function cleanNutritions(
   return hasData ? cleaned : undefined;
 }
 
+// Read the cafe's soft-removed products once for the whole upload. Every
+// sub-mutation below shares this transaction's 16 MiB read budget, so letting
+// each new product re-scan them fails uploads that add many products at once.
+async function loadRevivalIndex(
+  ctx: MutationCtx,
+  cafeId: Id<"cafes">
+): Promise<RevivalIndex<Id<"products">>> {
+  const removed = await ctx.db
+    .query("products")
+    .withIndex("by_cafe_active", (q) =>
+      q.eq("cafeId", cafeId).eq("isActive", false)
+    )
+    .collect();
+  return buildRevivalIndex(removed);
+}
+
 // Helper function to upload products to database
 async function uploadProductsToDatabase(
-  ctx: GenericMutationCtx<GenericDataModel>,
+  ctx: MutationCtx,
   products: CrawlerProduct[],
   cafeId: Id<"cafes">,
   results: UploadResults,
   downloadImages = false
 ) {
+  const revivalIndex = await loadRevivalIndex(ctx, cafeId);
+
   for (const product of products) {
     try {
       const result = await ctx.runMutation(internal.products.upsertProduct, {
@@ -75,6 +98,7 @@ async function uploadProductsToDatabase(
         price: product.price ?? undefined,
         nutritions: cleanNutritions(product.nutritions),
         downloadImages,
+        revivableProductId: findRevivalCandidate(revivalIndex, product.name),
       });
       if (result.action === "created") {
         results.created++;
@@ -87,6 +111,7 @@ async function uploadProductsToDatabase(
       // Reactivation is reported by the upsert itself -- that patch is what
       // brings a soft-removed product back -- not by the later markAsRemoved.
       if (result.reactivated) {
+        removeFromRevivalIndex(revivalIndex, result.id);
         results.reactivated++;
         results.reactivatedProducts?.push(result.name ?? product.name);
       }

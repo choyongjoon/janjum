@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { normalizeProductName } from "./productMatching";
+import {
+  buildRevivalIndex,
+  findRevivalCandidate,
+  normalizeProductName,
+  removeFromRevivalIndex,
+} from "./productMatching";
 
 describe("normalizeProductName", () => {
   it("collapses old 'HOT '/'ICE ' and new 'H-'/'I-' markers to the same key", () => {
@@ -41,5 +46,31 @@ describe("normalizeProductName", () => {
     expect(normalizeProductName("H 하우스블렌드")).not.toBe(
       normalizeProductName("HOT 하우스블렌드")
     );
+  });
+});
+
+describe("revival index", () => {
+  it("finds the single removed product with a matching name", () => {
+    const index = buildRevivalIndex([
+      { _id: "a", name: "HOT 아메리카노" },
+      { _id: "b", name: "에스프레소" },
+    ]);
+    expect(findRevivalCandidate(index, "H-아메리카노")).toBe("a");
+    expect(findRevivalCandidate(index, "소금빵")).toBeNull();
+  });
+
+  it("refuses ambiguous matches until only one remains", () => {
+    const index = buildRevivalIndex([
+      { _id: "a", name: "에스프레소" },
+      { _id: "b", name: "에스프레소 " },
+    ]);
+    expect(findRevivalCandidate(index, "에스프레소")).toBeNull();
+
+    removeFromRevivalIndex(index, "a");
+    expect(findRevivalCandidate(index, "에스프레소")).toBe("b");
+
+    removeFromRevivalIndex(index, "b");
+    expect(findRevivalCandidate(index, "에스프레소")).toBeNull();
+    expect(index.size).toBe(0);
   });
 });

@@ -31,3 +31,54 @@ export function normalizeProductName(name: string): string {
   const base = rest.replace(SEPARATORS, "");
   return temperature ? `${temperature}:${base}` : base;
 }
+
+/**
+ * Soft-removed products of one cafe grouped by normalised name, so an upload
+ * can look up revival candidates without re-scanning the cafe for every
+ * product. Re-scanning read every removed product once per new item, which
+ * blew Convex's 16 MiB per-transaction read limit when a crawl added many new
+ * products at once (e.g. ediya's bakery menu).
+ */
+export type RevivalIndex<TId extends string> = Map<string, TId[]>;
+
+export function buildRevivalIndex<TId extends string>(
+  removedProducts: Iterable<{ _id: TId; name: string }>
+): RevivalIndex<TId> {
+  const index: RevivalIndex<TId> = new Map();
+  for (const { _id, name } of removedProducts) {
+    const key = normalizeProductName(name);
+    const ids = index.get(key);
+    if (ids) {
+      ids.push(_id);
+    } else {
+      index.set(key, [_id]);
+    }
+  }
+  return index;
+}
+
+/** The single removed product matching `name`, or null if none or ambiguous. */
+export function findRevivalCandidate<TId extends string>(
+  index: RevivalIndex<TId>,
+  name: string
+): TId | null {
+  const ids = index.get(normalizeProductName(name));
+  return ids?.length === 1 ? ids[0] : null;
+}
+
+/** Drop a product that is active again, so it is not revived a second time. */
+export function removeFromRevivalIndex<TId extends string>(
+  index: RevivalIndex<TId>,
+  id: TId
+): void {
+  for (const [key, ids] of index) {
+    const position = ids.indexOf(id);
+    if (position !== -1) {
+      ids.splice(position, 1);
+      if (ids.length === 0) {
+        index.delete(key);
+      }
+      return;
+    }
+  }
+}
