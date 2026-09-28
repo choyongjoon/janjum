@@ -181,7 +181,7 @@ interface UpsertProductArgs {
 
 interface UpsertResult {
   action: string;
-  id: string;
+  id: Id<"products">;
   // Set when this upsert brought a soft-removed product back to life, so the
   // caller can report an accurate "reactivated" count.
   name?: string;
@@ -312,8 +312,21 @@ async function handleExistingProduct(
 async function findRevivableProduct(
   ctx: MutationCtx,
   cafeId: Id<"cafes">,
-  name: string
+  name: string,
+  revivableProductId: Id<"products"> | null | undefined
 ): Promise<ExistingProduct | null> {
+  // The bulk uploader resolves the candidate from an index it builds once per
+  // upload; scanning here for every new product exceeds the read limit.
+  if (revivableProductId !== undefined) {
+    if (revivableProductId === null) {
+      return null;
+    }
+    const candidate = await ctx.db.get(revivableProductId);
+    const isRevivable =
+      candidate?.cafeId === cafeId && candidate.isActive === false;
+    return isRevivable ? candidate : null;
+  }
+
   const removed = await ctx.db
     .query("products")
     .withIndex("by_cafe_active", (q) =>
@@ -375,8 +388,14 @@ export const upsertProduct = internalMutation({
     nutritions: v.optional(nutritionsValidator),
     downloadImages: v.optional(v.boolean()),
     isActive: v.optional(v.boolean()), // Default to true if not specified
+    // Pre-resolved revival candidate (see `findRevivableProduct`): an id, null
+    // for "none", or omitted to scan the cafe's removed products here.
+    revivableProductId: v.optional(v.union(v.id("products"), v.null())),
   },
-  handler: async (ctx, args): Promise<UpsertResult> => {
+  handler: async (
+    ctx,
+    { revivableProductId, ...args }
+  ): Promise<UpsertResult> => {
     const now = Date.now();
 
     // Scope the lookup to the cafe. `externalId` is only unique *within* a
@@ -397,7 +416,12 @@ export const upsertProduct = internalMutation({
     // No match by externalId: the item may be a returning product whose
     // externalId changed. Revive the soft-removed record (preserving addedAt,
     // shortId and reviews) instead of creating a duplicate that looks new.
-    const revivable = await findRevivableProduct(ctx, args.cafeId, args.name);
+    const revivable = await findRevivableProduct(
+      ctx,
+      args.cafeId,
+      args.name,
+      revivableProductId
+    );
     if (revivable) {
       return await handleExistingProduct(ctx, args, revivable, now);
     }
