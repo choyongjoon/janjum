@@ -28,3 +28,8 @@ jobs:
 
       - name: Build project
         run: pnpm build
+
+      # `convex deploy` typechecks convex/ with its own tsconfig, which the
+      # root `tsc` in `pnpm build` doesn't cover
+      - name: Typecheck Convex functions
+        run: pnpm exec tsc --noEmit -p convex
