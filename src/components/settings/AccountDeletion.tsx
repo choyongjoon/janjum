@@ -14,8 +14,13 @@ export function AccountDeletion() {
     // Track deletion confirmation
     trackAccountDeletion("confirmed");
 
-    // Sign out the user from Clerk first
-    await signOut();
+    // The Clerk user was deleted server-side, so its session may already be
+    // gone; clear the local session regardless.
+    try {
+      await signOut();
+    } catch (error) {
+      console.error("Sign out after account deletion failed:", error);
+    }
     // Navigate to home page
     router.navigate({ to: "/" });
     setShowDeleteDialog(false);

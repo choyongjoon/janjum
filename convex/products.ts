@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import type { Nutritions } from "../shared/nutritions";
 import { internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import {
   internalMutation,
   type MutationCtx,
@@ -11,7 +11,15 @@ import {
 } from "./_generated/server";
 import { nutritionsValidator } from "./nutritionsValidator";
 import { normalizeProductName } from "./productMatching";
+import {
+  buildSearchRow,
+  normalizeSearchText,
+  removeProductSearch,
+  type SearchRow,
+  syncProductSearch,
+} from "./productSearch";
 import { generateShortId } from "./shortId";
+import { releaseStorageIds } from "./storageOwnership";
 import { verifyUploadSecret } from "./uploadSecret";
 
 // Field names derived from the validator so changes stay in one place.
@@ -65,6 +73,46 @@ export const getByCafe = query({
   },
 });
 
+/**
+ * Candidate rows for substring search, read from the slim productSearch table
+ * rather than full product documents.
+ */
+async function loadSearchRows(
+  ctx: QueryCtx,
+  cafeId: Id<"cafes"> | undefined
+): Promise<SearchRow[]> {
+  const rows = cafeId
+    ? await ctx.db
+        .query("productSearch")
+        .withIndex("by_cafe_active", (q) =>
+          q.eq("cafeId", cafeId).eq("isActive", true)
+        )
+        .collect()
+    : await ctx.db
+        .query("productSearch")
+        .withIndex("by_is_active", (q) => q.eq("isActive", true))
+        .collect();
+
+  if (rows.length > 0 || (await ctx.db.query("productSearch").first())) {
+    return rows;
+  }
+
+  // Fallback until `pnpm backfill-product-search` has populated the table.
+  // TODO: remove once the backfill has run in every deployment.
+  const products = cafeId
+    ? await ctx.db
+        .query("products")
+        .withIndex("by_cafe_active", (q) =>
+          q.eq("cafeId", cafeId).eq("isActive", true)
+        )
+        .collect()
+    : await ctx.db
+        .query("products")
+        .withIndex("by_is_active_added_at", (q) => q.eq("isActive", true))
+        .collect();
+  return products.map((product) => buildSearchRow(product._id, product));
+}
+
 export const search = query({
   args: {
     searchTerm: v.optional(v.string()),
@@ -78,38 +126,31 @@ export const search = query({
       return [];
     }
 
-    // Filter by cafe if specified. Both branches read only active products
-    // straight from an index instead of scanning the whole table.
-    let products = cafeId
-      ? await ctx.db
-          .query("products")
-          .withIndex("by_cafe_active", (q) =>
-            q.eq("cafeId", cafeId).eq("isActive", true)
-          )
-          .collect()
-      : await ctx.db
-          .query("products")
-          .withIndex("by_is_active_added_at", (q) => q.eq("isActive", true))
-          .collect();
+    let rows = await loadSearchRows(ctx, cafeId);
 
     // Filter by category if specified
     if (category) {
-      products = products.filter(
-        (p) => p.category?.toLowerCase() === category.toLowerCase()
-      );
+      const targetCategory = category.toLowerCase();
+      rows = rows.filter((r) => r.category?.toLowerCase() === targetCategory);
     }
 
     // Filter by search term if specified
     if (searchTerm?.trim()) {
-      const term = searchTerm.toLowerCase().replace(/\s+/g, "");
-      products = products.filter((p) =>
-        p.name.toLowerCase().replace(/\s+/g, "").includes(term)
-      );
+      const term = normalizeSearchText(searchTerm);
+      rows = rows.filter((r) => r.nameKey.includes(term));
     }
 
-    // Get cafe information for each product
+    // Sort by name and limit before reading the full documents
+    const selected = rows
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .slice(0, limit);
+
     const productWithCafes = await Promise.all(
-      products.map(async (product) => {
+      selected.map(async ({ productId }) => {
+        const product = await ctx.db.get(productId);
+        if (!product) {
+          return null;
+        }
         const cafe = await ctx.db.get(product.cafeId);
         return {
           ...product,
@@ -119,10 +160,7 @@ export const search = query({
       })
     );
 
-    // Sort by name and limit results
-    return productWithCafes
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .slice(0, limit);
+    return productWithCafes.filter((product) => product !== null);
   },
 });
 
@@ -136,30 +174,30 @@ export const getSuggestions = query({
       return [];
     }
 
-    // Read only active products from the index instead of scanning every
-    // product (including removed ones) on each keystroke.
-    const products = await ctx.db
-      .query("products")
-      .withIndex("by_is_active_added_at", (q) => q.eq("isActive", true))
-      .collect();
-    const term = searchTerm.toLowerCase().replace(/\s+/g, "");
+    const rows = await loadSearchRows(ctx, undefined);
+    const term = normalizeSearchText(searchTerm);
 
     // Search in name/nameEn
-    const matches = products
-      .filter(
-        (p) =>
-          p.name.toLowerCase().replace(/\s+/g, "").includes(term) ||
-          p.nameEn?.toLowerCase().replace(/\s+/g, "").includes(term)
-      )
-      .map((p) => ({
-        id: p._id,
-        name: p.name,
-        nameEn: p.nameEn,
-        shortId: p.shortId,
-      }))
+    const matches = rows
+      .filter((r) => r.nameKey.includes(term) || r.nameEnKey?.includes(term))
       .slice(0, limit);
 
-    return matches;
+    const suggestions = await Promise.all(
+      matches.map(async ({ productId }) => {
+        const product = await ctx.db.get(productId);
+        if (!product) {
+          return null;
+        }
+        return {
+          id: product._id,
+          name: product.name,
+          nameEn: product.nameEn,
+          shortId: product.shortId,
+        };
+      })
+    );
+
+    return suggestions.filter((suggestion) => suggestion !== null);
   },
 });
 
@@ -168,6 +206,7 @@ interface UpsertProductArgs {
   category?: string;
   description?: string;
   downloadImages?: boolean;
+  externalCategory?: string;
   externalId: string;
   externalImageUrl?: string;
   externalUrl: string;
@@ -188,18 +227,7 @@ interface UpsertResult {
   reactivated: boolean;
 }
 
-interface ExistingProduct {
-  _id: Id<"products">;
-  category?: string;
-  description?: string;
-  externalImageUrl?: string;
-  imageStorageId?: Id<"_storage">;
-  isActive?: boolean;
-  name: string;
-  nutritions?: Nutritions;
-  price?: number;
-  removedAt?: number;
-}
+type ExistingProduct = Doc<"products">;
 
 function hasNutritionChanges(
   existing?: Nutritions,
@@ -226,7 +254,11 @@ function hasProductChanges(
 
   return (
     existing.name !== args.name ||
+    existing.nameEn !== args.nameEn ||
     existing.category !== args.category ||
+    existing.externalCategory !== args.externalCategory ||
+    existing.externalId !== args.externalId ||
+    existing.externalUrl !== args.externalUrl ||
     existing.price !== args.price ||
     existing.description !== args.description ||
     existing.externalImageUrl !== args.externalImageUrl ||
@@ -238,19 +270,19 @@ function hasProductChanges(
   );
 }
 
-function scheduleImageDownloadIfNeeded(
+async function scheduleImageDownloadIfNeeded(
   ctx: MutationCtx,
   args: UpsertProductArgs,
   productId: Id<"products">,
   shouldDownload: boolean
-): void {
+): Promise<void> {
   if (
     shouldDownload &&
     args.downloadImages &&
     args.externalImageUrl &&
     !args.imageStorageId
   ) {
-    ctx.scheduler.runAfter(
+    await ctx.scheduler.runAfter(
       0,
       internal.imageDownloader.downloadAndStoreImageAction,
       {
@@ -286,9 +318,15 @@ async function handleExistingProduct(
     const { downloadImages: _downloadImages, ...dataToStore } = updateData;
 
     await ctx.db.patch(existing._id, dataToStore);
+    await syncProductSearch(ctx, existing._id, { ...existing, ...dataToStore });
 
     const shouldDownloadImage = !existing.imageStorageId;
-    scheduleImageDownloadIfNeeded(ctx, args, existing._id, shouldDownloadImage);
+    await scheduleImageDownloadIfNeeded(
+      ctx,
+      args,
+      existing._id,
+      shouldDownloadImage
+    );
 
     return {
       action: "updated",
@@ -360,8 +398,9 @@ async function createNewProduct(
   const { downloadImages: _downloadImages, ...dataToStore } = insertData;
 
   const id = await ctx.db.insert("products", dataToStore);
+  await syncProductSearch(ctx, id, dataToStore);
 
-  scheduleImageDownloadIfNeeded(ctx, args, id, true);
+  await scheduleImageDownloadIfNeeded(ctx, args, id, true);
 
   return { action: "created", id, reactivated: false };
 }
@@ -665,15 +704,7 @@ export const deleteProduct = mutation({
       .collect();
 
     for (const review of reviews) {
-      if (review.imageStorageIds) {
-        for (const imageId of review.imageStorageIds) {
-          try {
-            await ctx.storage.delete(imageId);
-          } catch (_error) {
-            // Storage cleanup failure is not critical for product deletion
-          }
-        }
-      }
+      await releaseStorageIds(ctx, review.imageStorageIds ?? []);
       await ctx.db.delete(review._id);
     }
 
@@ -688,6 +719,7 @@ export const deleteProduct = mutation({
 
     // Delete the product
     await ctx.db.delete(productId);
+    await removeProductSearch(ctx, productId);
 
     return {
       success: true,
@@ -737,6 +769,10 @@ export const markAsRemoved = internalMutation({
           isActive: false,
           removedAt: now,
           updatedAt: now,
+        });
+        await syncProductSearch(ctx, product._id, {
+          ...product,
+          isActive: false,
         });
         removedProducts.push(product.name);
       }
@@ -947,6 +983,10 @@ export const moveProductsToCafe = mutation({
         await ctx.db.patch(product._id, {
           cafeId: toCafe._id,
           updatedAt: Date.now(),
+        });
+        await syncProductSearch(ctx, product._id, {
+          ...product,
+          cafeId: toCafe._id,
         });
       }
       moved.push(product.name);

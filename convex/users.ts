@@ -2,17 +2,81 @@ import { createClerkClient, type UserJSON } from "@clerk/backend";
 import { type Validator, v } from "convex/values";
 import { nanoid } from "nanoid";
 import { internal } from "./_generated/api";
+import type { Doc } from "./_generated/dataModel";
 import {
   action,
   internalMutation,
+  type MutationCtx,
   mutation,
   type QueryCtx,
   query,
 } from "./_generated/server";
+import {
+  claimStorageIds,
+  recordStorageOwner,
+  releaseStorageIds,
+} from "./storageOwnership";
 import { verifyUploadSecret } from "./uploadSecret";
 
 // Move regex to top level for performance
 const HANDLE_REGEX = /^[a-zA-Z0-9_-]+$/;
+const MAX_NAME_LENGTH = 30;
+const MAX_HANDLE_LENGTH = 30;
+
+/**
+ * The fields of a user that anyone may see. The full document also holds the
+ * Clerk user id (externalId), which only the user themselves gets (`current`).
+ */
+async function toPublicUser(ctx: QueryCtx, user: Doc<"users">) {
+  return {
+    _id: user._id,
+    _creationTime: user._creationTime,
+    name: user.name,
+    handle: user.handle,
+    imageUrl: user.imageStorageId
+      ? (await ctx.storage.getUrl(user.imageStorageId)) || undefined
+      : undefined,
+  };
+}
+
+/**
+ * Delete a user and everything they own: reviews, review photos and profile
+ * image. Refreshes the rating caches of the products they reviewed.
+ */
+async function deleteUserAndData(ctx: MutationCtx, user: Doc<"users">) {
+  // Reviews store the Convex users._id in their userId field (not the Clerk
+  // externalId), so query by _id.
+  const userReviews = await ctx.db
+    .query("reviews")
+    .withIndex("by_user", (q) => q.eq("userId", user._id))
+    .collect();
+
+  // Products whose cached rating stats must be recomputed once this user's
+  // reviews are removed.
+  const affectedProductIds = new Set(userReviews.map((r) => r.productId));
+
+  for (const review of userReviews) {
+    // Best-effort: a missing file must not roll back the account deletion.
+    await releaseStorageIds(ctx, review.imageStorageIds ?? []);
+    await ctx.db.delete(review._id);
+  }
+
+  // Refresh averageRating/totalReviews for each affected product so the
+  // caches don't keep counting the now-deleted reviews. Scheduled (rather
+  // than runMutation) so each recompute runs after this deletion commits,
+  // matching how the codebase triggers follow-up work from a mutation.
+  for (const productId of affectedProductIds) {
+    await ctx.scheduler.runAfter(0, internal.reviews.updateProductStats, {
+      productId,
+    });
+  }
+
+  if (user.imageStorageId) {
+    await releaseStorageIds(ctx, [user.imageStorageId]);
+  }
+
+  await ctx.db.delete(user._id);
+}
 
 export const current = query({
   args: {},
@@ -55,12 +119,14 @@ export const deleteFromClerk = internalMutation({
   async handler(ctx, { clerkUserId }) {
     const user = await userByExternalId(ctx, clerkUserId);
 
+    // Expected when deleteAccount already removed the user before Clerk's
+    // user.deleted webhook arrived.
     if (user === null) {
       console.warn(
         `Can't delete user, there is none for Clerk user ID: ${clerkUserId}`
       );
     } else {
-      await ctx.db.delete(user._id);
+      await deleteUserAndData(ctx, user);
     }
   },
 });
@@ -98,12 +164,7 @@ export const getById = query({
       return null;
     }
 
-    return {
-      ...user,
-      imageUrl: user.imageStorageId
-        ? (await ctx.storage.getUrl(user.imageStorageId)) || undefined
-        : undefined,
-    };
+    return await toPublicUser(ctx, user);
   },
 });
 
@@ -119,12 +180,7 @@ export const getByHandle = query({
       return null;
     }
 
-    return {
-      ...user,
-      imageUrl: user.imageStorageId
-        ? (await ctx.storage.getUrl(user.imageStorageId)) || undefined
-        : undefined,
-    };
+    return await toPublicUser(ctx, user);
   },
 });
 
@@ -135,13 +191,28 @@ export const updateUserProfile = internalMutation({
     handle: v.string(),
     imageStorageId: v.optional(v.id("_storage")),
   },
-  handler: async (ctx, { name, handle, imageStorageId }) => {
+  handler: async (ctx, args) => {
     const user = await getCurrentUserOrThrow(ctx);
+    const name = args.name.trim();
+    const handle = args.handle.trim();
+    const { imageStorageId } = args;
+
+    if (!name || name.length > MAX_NAME_LENGTH) {
+      throw new Error(`이름은 1~${MAX_NAME_LENGTH}자로 입력해주세요.`);
+    }
+    if (!handle || handle.length > MAX_HANDLE_LENGTH) {
+      throw new Error(`핸들은 1~${MAX_HANDLE_LENGTH}자로 입력해주세요.`);
+    }
+
+    // Validate handle format
+    if (!HANDLE_REGEX.test(handle)) {
+      throw new Error("핸들은 영문, 숫자, _, - 만 사용할 수 있습니다.");
+    }
 
     // Check if name is already taken by another user
     const existingUserWithName = await ctx.db
       .query("users")
-      .withIndex("byName", (q) => q.eq("name", name.trim()))
+      .withIndex("byName", (q) => q.eq("name", name))
       .filter((q) => q.neq(q.field("_id"), user._id))
       .first();
 
@@ -152,7 +223,7 @@ export const updateUserProfile = internalMutation({
     // Check if handle is already taken by another user
     const existingUserWithHandle = await ctx.db
       .query("users")
-      .withIndex("byHandle", (q) => q.eq("handle", handle.trim()))
+      .withIndex("byHandle", (q) => q.eq("handle", handle))
       .filter((q) => q.neq(q.field("_id"), user._id))
       .first();
 
@@ -160,20 +231,42 @@ export const updateUserProfile = internalMutation({
       throw new Error("이미 사용 중인 핸들입니다.");
     }
 
-    // Validate handle format
-    if (!HANDLE_REGEX.test(handle)) {
-      throw new Error("핸들은 영문, 숫자, _, - 만 사용할 수 있습니다.");
+    // Only the user's own upload may become their profile image; otherwise
+    // deleting the account would delete whatever file the client pointed at.
+    const previousImageId = user.imageStorageId;
+    if (imageStorageId) {
+      await claimStorageIds(
+        ctx,
+        user._id,
+        [imageStorageId],
+        previousImageId ? [previousImageId] : []
+      );
     }
 
     // Update user profile in Convex
     await ctx.db.patch(user._id, {
-      name: name.trim(),
-      handle: handle.trim(),
+      name,
+      handle,
       hasCompletedSetup: true, // Mark setup as completed
       ...(imageStorageId && { imageStorageId }),
     });
 
-    return { success: true, userId: user._id, externalId: user.externalId };
+    // Delete the replaced profile image
+    if (
+      imageStorageId &&
+      previousImageId &&
+      previousImageId !== imageStorageId
+    ) {
+      await releaseStorageIds(ctx, [previousImageId]);
+    }
+
+    return {
+      success: true,
+      userId: user._id,
+      externalId: user.externalId,
+      name,
+      handle,
+    };
   },
 });
 
@@ -200,8 +293,8 @@ export const updateProfile = action({
 
       await clerkClient.users.updateUser(result.externalId, {
         privateMetadata: {
-          name: name.trim(),
-          handle: handle.trim(),
+          name: result.name,
+          handle: result.handle,
           convexUserId: result.userId,
         },
       });
@@ -249,6 +342,9 @@ export const updateImage = mutation({
   handler: async (ctx, { userId, storageId, uploadSecret }) => {
     verifyUploadSecret(uploadSecret);
 
+    // The replacement file (e.g. an optimized image) belongs to the user.
+    await recordStorageOwner(ctx, userId, storageId);
+
     await ctx.db.patch(userId, {
       imageStorageId: storageId,
     });
@@ -257,59 +353,32 @@ export const updateImage = mutation({
   },
 });
 
-export const deleteAccount = mutation({
+/**
+ * Delete the current user's account: the Clerk user and all Convex data.
+ *
+ * The Clerk user is deleted first. If that fails nothing has been removed and
+ * the user can retry; deleting only the Convex data would leave a Clerk user
+ * who can still sign in but has no Convex user (Clerk only sends user.created
+ * once), so every authenticated call would fail.
+ */
+export const deleteAccount = action({
   args: {},
   handler: async (ctx) => {
-    const user = await getCurrentUserOrThrow(ctx);
-
-    // Delete all user's reviews first. Reviews store the Convex users._id in
-    // their userId field (not the Clerk externalId), so query by _id.
-    const userReviews = await ctx.db
-      .query("reviews")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .collect();
-
-    // Products whose cached rating stats must be recomputed once this user's
-    // reviews are removed.
-    const affectedProductIds = new Set(userReviews.map((r) => r.productId));
-
-    for (const review of userReviews) {
-      // Delete review images from storage. A missing/failed file must not
-      // roll back the whole account deletion, so treat cleanup as best-effort.
-      if (review.imageStorageIds) {
-        for (const imageId of review.imageStorageIds) {
-          try {
-            await ctx.storage.delete(imageId);
-          } catch (_error) {
-            // Storage cleanup failure is not critical for account deletion
-          }
-        }
-      }
-      // Delete the review
-      await ctx.db.delete(review._id);
+    const identity = await ctx.auth.getUserIdentity();
+    if (identity === null) {
+      throw new Error("Can't get current user");
     }
 
-    // Refresh averageRating/totalReviews for each affected product so the
-    // caches don't keep counting the now-deleted reviews. Scheduled (rather
-    // than runMutation) so each recompute runs after this deletion commits,
-    // matching how the codebase triggers follow-up work from a mutation.
-    for (const productId of affectedProductIds) {
-      await ctx.scheduler.runAfter(0, internal.reviews.updateProductStats, {
-        productId,
-      });
-    }
+    const clerkClient = createClerkClient({
+      secretKey: process.env.CLERK_SECRET_KEY,
+    });
+    await clerkClient.users.deleteUser(identity.subject);
 
-    // Delete user's profile image from storage (best-effort, see above).
-    if (user.imageStorageId) {
-      try {
-        await ctx.storage.delete(user.imageStorageId);
-      } catch (_error) {
-        // Storage cleanup failure is not critical for account deletion
-      }
-    }
-
-    // Delete the user record
-    await ctx.db.delete(user._id);
+    // Clerk's user.deleted webhook runs the same cleanup; whichever arrives
+    // second finds no user and does nothing.
+    await ctx.runMutation(internal.users.deleteFromClerk, {
+      clerkUserId: identity.subject,
+    });
 
     return { success: true };
   },
