@@ -72,6 +72,10 @@ export function ReviewForm({
     },
   });
 
+  const discardUploadsMutation = useMutation({
+    mutationFn: useConvexMutation(api.uploads.discardUploads),
+  });
+
   const submitReviewMutation = useMutation({
     mutationFn: useConvexMutation(api.reviews.upsertReview),
     onSuccess: () => {
@@ -115,9 +119,10 @@ export function ReviewForm({
 
     setIsUploading(true);
 
+    let newStorageIds: Id<"_storage">[] = [];
     try {
       // Upload new images
-      const newStorageIds = await Promise.all(
+      newStorageIds = await Promise.all(
         images
           .filter((file): file is File => file instanceof File)
           .map((file) => uploadImageMutation.mutateAsync(file))
@@ -148,6 +153,10 @@ export function ReviewForm({
       trackReviewSubmit(productId, rating);
     } catch {
       showToast("후기 등록에 실패했습니다. 다시 시도해주세요.", "error");
+      // Don't leave the photos of a failed submission behind in storage
+      if (newStorageIds.length > 0) {
+        discardUploadsMutation.mutate({ storageIds: newStorageIds });
+      }
     } finally {
       setIsUploading(false);
     }

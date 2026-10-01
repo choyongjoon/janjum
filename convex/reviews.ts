@@ -12,8 +12,16 @@ import {
   type QueryCtx,
   query,
 } from "./_generated/server";
+import {
+  claimStorageIds,
+  recordStorageOwner,
+  releaseStorageIds,
+} from "./storageOwnership";
 import { verifyUploadSecret } from "./uploadSecret";
 import { getCurrentUserOrThrow } from "./users";
+
+// Matches the review textarea's maxLength.
+const MAX_REVIEW_TEXT_LENGTH = 500;
 
 async function resolveImageUrls(
   ctx: QueryCtx,
@@ -184,6 +192,12 @@ export const upsertReview = mutation({
       );
     }
 
+    if (args.text && args.text.length > MAX_REVIEW_TEXT_LENGTH) {
+      throw new Error(
+        `Review text must be at most ${MAX_REVIEW_TEXT_LENGTH} characters`
+      );
+    }
+
     // Validate image count (max 2)
     if (args.imageStorageIds && args.imageStorageIds.length > 2) {
       throw new Error("Maximum 2 images allowed per review");
@@ -196,18 +210,35 @@ export const upsertReview = mutation({
       .filter((q) => q.eq(q.field("userId"), userId))
       .first();
 
+    // Only the user's own uploads may be attached; otherwise deleting the
+    // review would delete whatever file the client pointed at.
+    const previousImageIds = existingReview?.imageStorageIds ?? [];
+    await claimStorageIds(
+      ctx,
+      user._id,
+      args.imageStorageIds ?? [],
+      previousImageIds
+    );
+
     let reviewId: Id<"reviews">;
 
     if (existingReview) {
-      // Update existing review
+      // Update existing review. isVisible is left as-is so editing a review
+      // doesn't undo moderation.
       await ctx.db.patch(existingReview._id, {
         rating: args.rating,
         text: args.text,
         imageStorageIds: args.imageStorageIds,
         updatedAt: now,
-        isVisible: true, // Reset visibility on update
       });
       reviewId = existingReview._id;
+
+      // Delete the photos the user removed from the review
+      const keptImageIds = new Set(args.imageStorageIds ?? []);
+      await releaseStorageIds(
+        ctx,
+        previousImageIds.filter((imageId) => !keptImageIds.has(imageId))
+      );
     } else {
       // Create new review
       reviewId = await ctx.db.insert("reviews", {
@@ -252,15 +283,7 @@ export const deleteReview = mutation({
 
     // Clean up the review's images (best-effort) before deleting it, matching
     // the cleanup done in deleteProduct/deleteAccount.
-    if (review.imageStorageIds) {
-      for (const imageId of review.imageStorageIds) {
-        try {
-          await ctx.storage.delete(imageId);
-        } catch (_error) {
-          // Storage cleanup failure is not critical for review deletion
-        }
-      }
-    }
+    await releaseStorageIds(ctx, review.imageStorageIds ?? []);
 
     await ctx.db.delete(reviewId);
 
@@ -410,7 +433,8 @@ export const getById = query({
       ...review,
       product,
       cafe,
-      user,
+      // Only public profile fields; the full document includes the Clerk id.
+      user: user && { _id: user._id, name: user.name, handle: user.handle },
       imageUrls: await resolveImageUrls(ctx, review.imageStorageIds),
       ratingText: getRatingText(review.rating),
     };
@@ -440,6 +464,16 @@ export const updateImages = mutation({
   },
   handler: async (ctx, { reviewId, imageStorageIds, uploadSecret }) => {
     verifyUploadSecret(uploadSecret);
+
+    const review = await ctx.db.get(reviewId);
+    if (!review) {
+      throw new Error(`Review ${reviewId} not found`);
+    }
+
+    // Replacement files (e.g. optimized images) belong to the review author.
+    for (const storageId of imageStorageIds) {
+      await recordStorageOwner(ctx, review.userId as Id<"users">, storageId);
+    }
 
     const now = Date.now();
 

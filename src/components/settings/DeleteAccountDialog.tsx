@@ -1,4 +1,4 @@
-import { useConvexMutation } from "@convex-dev/react-query";
+import { useConvexAction } from "@convex-dev/react-query";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../../../convex/_generated/api";
@@ -18,7 +18,7 @@ export function DeleteAccountDialog({
   const [isDeleting, setIsDeleting] = useState(false);
 
   const deleteAccountMutation = useMutation({
-    mutationFn: useConvexMutation(api.users.deleteAccount),
+    mutationFn: useConvexAction(api.users.deleteAccount),
     onSuccess: () => {
       onConfirm();
     },

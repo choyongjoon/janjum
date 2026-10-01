@@ -9,6 +9,7 @@ import {
   type RevivalIndex,
   removeFromRevivalIndex,
 } from "./productMatching";
+import { verifyUploadSecret } from "./uploadSecret";
 
 interface CrawlerProduct {
   category: string | null;
@@ -133,11 +134,7 @@ export const uploadProductsFromJson = mutation({
     ctx,
     { products, cafeSlug, dryRun = false, downloadImages = false, uploadSecret }
   ) => {
-    // Environment-based authentication
-    const allowedSecret = process.env.CONVEX_UPLOAD_SECRET;
-    if (!allowedSecret || uploadSecret !== allowedSecret) {
-      throw new Error("Unauthorized: Invalid upload secret");
-    }
+    verifyUploadSecret(uploadSecret);
 
     const startTime = Date.now();
 

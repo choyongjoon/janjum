@@ -67,6 +67,10 @@ export function useSettingsForm() {
     mutationFn: useConvexAction(api.users.updateProfile),
   });
 
+  const discardUploadsMutation = useMutation({
+    mutationFn: useConvexMutation(api.uploads.discardUploads),
+  });
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -181,12 +185,22 @@ export function useSettingsForm() {
     setErrorMessage("");
     setSuccessMessage("");
 
+    let uploadedImageId: Id<"_storage"> | undefined;
     try {
       const imageStorageId = await uploadImage();
+      if (selectedImage) {
+        uploadedImageId = imageStorageId;
+      }
       await updateProfile(imageStorageId);
       await refetchUser();
       handlePostUpdate();
     } catch (error: unknown) {
+      // Don't leave the image of a failed update behind in storage. Already
+      // attached images are ignored by the server, so this is safe even if
+      // the update itself succeeded and only the refetch failed.
+      if (uploadedImageId) {
+        discardUploadsMutation.mutate({ storageIds: [uploadedImageId] });
+      }
       const message =
         error instanceof Error
           ? error.message

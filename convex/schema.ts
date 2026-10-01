@@ -38,7 +38,24 @@ export default defineSchema({
     .index("by_cafe_active", ["cafeId", "isActive"])
     .index("by_short_id", ["shortId"])
     .index("by_rating", ["averageRating"])
-    .index("by_is_active_added_at", ["isActive", "addedAt"]),
+    .index("by_is_active_added_at", ["isActive", "addedAt"])
+    .index("by_image_storage_id", ["imageStorageId"]),
+  // Slim copy of the fields product search filters on. Search does substring
+  // matching, which needs every candidate in memory; reading these small rows
+  // instead of full product documents keeps that well under the read limit.
+  // Kept in sync by convex/productSearch.ts.
+  productSearch: defineTable({
+    productId: v.id("products"),
+    cafeId: v.id("cafes"),
+    isActive: v.boolean(),
+    name: v.string(),
+    nameKey: v.string(), // normalized name, see normalizeSearchText
+    nameEnKey: v.optional(v.string()),
+    category: v.optional(v.string()),
+  })
+    .index("by_product", ["productId"])
+    .index("by_is_active", ["isActive"])
+    .index("by_cafe_active", ["cafeId", "isActive"]),
   reviews: defineTable({
     productId: v.id("products"),
     userId: v.string(), // Convex users._id (the review author's document id)
@@ -63,5 +80,12 @@ export default defineSchema({
   })
     .index("byExternalId", ["externalId"])
     .index("byName", ["name"])
-    .index("byHandle", ["handle"]),
+    .index("byHandle", ["handle"])
+    .index("byImageStorageId", ["imageStorageId"]),
+  // Which user uploaded a storage file, so users can only attach (and later
+  // delete) their own uploads. See convex/storageOwnership.ts.
+  storageOwners: defineTable({
+    storageId: v.id("_storage"),
+    userId: v.id("users"),
+  }).index("by_storage_id", ["storageId"]),
 });
