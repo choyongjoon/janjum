@@ -69,15 +69,19 @@ export const generateUploadUrl = mutation({
 });
 
 export const getStorageMetadata = query({
-  args: { storageId: v.id("_storage") },
-  handler: async (ctx, { storageId }) => {
+  args: { storageId: v.id("_storage"), uploadSecret: v.optional(v.string()) },
+  handler: async (ctx, { storageId, uploadSecret }) => {
+    verifyUploadSecret(uploadSecret);
+
     return await ctx.db.system.get(storageId);
   },
 });
 
 export const getStorageUrl = query({
-  args: { storageId: v.id("_storage") },
-  handler: async (ctx, { storageId }) => {
+  args: { storageId: v.id("_storage"), uploadSecret: v.optional(v.string()) },
+  handler: async (ctx, { storageId, uploadSecret }) => {
+    verifyUploadSecret(uploadSecret);
+
     return await ctx.storage.getUrl(storageId);
   },
 });
