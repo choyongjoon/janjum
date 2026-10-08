@@ -83,6 +83,7 @@ class ImageOptimizer {
     try {
       const metadata = await convex.query(api.http.getStorageMetadata, {
         storageId,
+        uploadSecret: UPLOAD_SECRET,
       });
 
       if (!metadata) {
@@ -152,6 +153,7 @@ class ImageOptimizer {
       // Get the image URL from storage
       const imageUrl = await convex.query(api.http.getStorageUrl, {
         storageId,
+        uploadSecret: UPLOAD_SECRET,
       });
       if (!imageUrl) {
         logger.warn(`No URL found for storage ID: ${storageId}`);

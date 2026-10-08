@@ -23,6 +23,16 @@ import { getCurrentUserOrThrow } from "./users";
 // Matches the review textarea's maxLength.
 const MAX_REVIEW_TEXT_LENGTH = 500;
 
+// Upper bound for the client-supplied page size of the public review lists
+const MAX_PAGE_SIZE = 100;
+
+function clampPageSize(limit: number): number {
+  if (!Number.isFinite(limit)) {
+    return MAX_PAGE_SIZE;
+  }
+  return Math.min(Math.max(Math.floor(limit), 1), MAX_PAGE_SIZE);
+}
+
 async function resolveImageUrls(
   ctx: QueryCtx,
   imageStorageIds: Id<"_storage">[] | undefined
@@ -87,7 +97,7 @@ export const getByProduct = query({
       .withIndex("by_product", (q) => q.eq("productId", productId))
       .filter((q) => q.neq(q.field("isVisible"), false)) // Show visible reviews
       .order("desc")
-      .take(limit);
+      .take(clampPageSize(limit));
 
     // Add image URLs for review photos
     return await Promise.all(
@@ -349,7 +359,7 @@ export const getUserReviews = query({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .filter((q) => q.neq(q.field("isVisible"), false))
       .order("desc")
-      .take(limit);
+      .take(clampPageSize(limit));
 
     // Get product information for each review
     return await Promise.all(
@@ -390,7 +400,7 @@ export const getRecentReviews = query({
       .withIndex("by_created_at")
       .filter((q) => q.neq(q.field("isVisible"), false))
       .order("desc")
-      .take(limit);
+      .take(clampPageSize(limit));
 
     // Get product information for each review
     return await Promise.all(

@@ -99,7 +99,7 @@ function BlogPost() {
             <div className="rounded-lg bg-base-100 p-8 shadow-sm">
               <div
                 className="markdown-content prose prose-lg max-w-none"
-                // biome-ignore lint/security/noDangerouslySetInnerHtml: Markdown content is sanitized by marked library
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: marked does not sanitize; safe only because posts are markdown files in this repo, never user input
                 dangerouslySetInnerHTML={{
                   __html: processMarkdown(post.content),
                 }}

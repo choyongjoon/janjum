@@ -225,6 +225,60 @@ describe("upload secret", () => {
   });
 });
 
+describe("storage queries for scripts", () => {
+  it("require the upload secret", async () => {
+    const t = setup();
+    const storageId = await storeFile(t);
+
+    await expect(
+      t.query(api.http.getStorageMetadata, { storageId })
+    ).rejects.toThrow("Unauthorized");
+    await expect(
+      t.query(api.http.getStorageUrl, { storageId })
+    ).rejects.toThrow("Unauthorized");
+
+    const metadata = await t.query(api.http.getStorageMetadata, {
+      storageId,
+      uploadSecret: SECRET,
+    });
+    expect(metadata?._id).toBe(storageId);
+  });
+});
+
+describe("review list page size", () => {
+  it("caps the client-supplied limit", async () => {
+    const t = setup();
+    const { productId } = await createProduct(t);
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 105; i++) {
+        const userId = await ctx.db.insert("users", {
+          name: `u${i}`,
+          handle: `u${i}`,
+          externalId: `u${i}`,
+          hasCompletedSetup: true,
+        });
+        await ctx.db.insert("reviews", {
+          productId,
+          userId,
+          rating: 4,
+          createdAt: i,
+          updatedAt: i,
+          isVisible: true,
+        });
+      }
+    });
+
+    const huge = await t.query(api.reviews.getByProduct, {
+      productId,
+      limit: 1_000_000,
+    });
+    expect(huge).toHaveLength(100);
+
+    const zero = await t.query(api.reviews.getRecentReviews, { limit: 0 });
+    expect(zero).toHaveLength(1);
+  });
+});
+
 describe("product search", () => {
   const crawled = (name: string, externalId: string) => ({
     name,
