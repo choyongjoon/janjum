@@ -51,6 +51,9 @@ const UID_REGEX = /uid=(\d+)/;
 const WHITESPACE_REGEX = /\s+/g;
 const COMMA_REGEX = /,/g;
 
+// Listing pages shorter than this are logged in full when they have no links
+const MAX_LOGGED_HTML_LENGTH = 4000;
+
 // Descriptions shorter than this are placeholders
 const MIN_DESCRIPTION_LENGTH = 6;
 
@@ -177,6 +180,11 @@ function dumpListingForDebugging(mode: number, html: string): void {
     logger.warn(
       `No product links on mode=${mode} (${html.length} chars); wrote ${filepath}`
     );
+    // Short pages are block/challenge pages; log them since CI artifacts
+    // aren't always reachable
+    if (html.length <= MAX_LOGGED_HTML_LENGTH) {
+      logger.warn(`mode=${mode} page: ${html.replace(WHITESPACE_REGEX, " ")}`);
+    }
   } catch (error) {
     logger.warn(
       `Could not dump listing HTML: ${error instanceof Error ? error.message : String(error)}`
