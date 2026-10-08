@@ -1,13 +1,16 @@
 import fs from "node:fs";
 import path from "node:path";
 import { type CheerioAPI, load } from "cheerio";
+import { type BrowserContext, chromium } from "playwright";
 import { logger } from "../../shared/logger";
 import type { Nutritions } from "../../shared/nutritions";
 import { type Product, writeProductsToJson } from "./crawlerUtils";
-import { fetchText, mapWithConcurrency } from "./httpUtils";
+import { mapWithConcurrency } from "./httpUtils";
 
-// Listing and detail pages are server-rendered, so they are fetched and
-// parsed directly instead of rendered in a browser.
+// Listing and detail pages are server-rendered, but the site answers clients
+// without its CUPID cookie with a bot-check page that sets the cookie in
+// JavaScript and reloads. Pages are loaded in a browser so the check passes,
+// then parsed from the HTML.
 
 // ================================================
 // SITE STRUCTURE CONFIGURATION
@@ -41,6 +44,9 @@ const SELECTORS = {
   nutritionTable: "table.table",
 } as const;
 
+// Present on the bot-check page only
+const CHALLENGE_MARKER = 'action="/___verify"';
+
 // ================================================
 // REGEX PATTERNS
 // ================================================
@@ -48,6 +54,7 @@ const SELECTORS = {
 const SERVING_SIZE_REGEX = /([\d,]+(?:\.\d+)?)\s*(ml|g)/i;
 const NUMERIC_REGEX = /[\d,]*\.?\d+/;
 const UID_REGEX = /uid=(\d+)/;
+const CHALLENGE_RELOAD_URL_REGEX = /ckattempt=/;
 const WHITESPACE_REGEX = /\s+/g;
 const COMMA_REGEX = /,/g;
 
@@ -68,8 +75,22 @@ const maxProductsInTestMode = Number.parseInt(
 );
 
 const CRAWLER_CONFIG = {
-  concurrency: 5,
+  concurrency: 3,
+  navigationTimeoutMs: 30_000,
+  botCheckTimeoutMs: 10_000,
+  launchOptions: {
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  },
 } as const;
+
+// Only the HTML is parsed, so skip loading everything else
+const BLOCKED_RESOURCE_TYPES = new Set([
+  "image",
+  "media",
+  "font",
+  "stylesheet",
+]);
 
 // ================================================
 // TYPES
@@ -163,6 +184,47 @@ function extractNutritionData($: CheerioAPI): Nutritions | null {
 }
 
 /**
+ * Load the first listing so the bot-check script can set the cookie and
+ * reload. Later pages in the same context then load directly.
+ */
+async function passBotCheck(context: BrowserContext): Promise<void> {
+  const page = await context.newPage();
+  try {
+    await page.goto(`${SITE_CONFIG.menuBaseUrl}?mode=1`, {
+      waitUntil: "commit",
+      timeout: CRAWLER_CONFIG.navigationTimeoutMs,
+    });
+    await page.waitForURL(CHALLENGE_RELOAD_URL_REGEX, {
+      waitUntil: "domcontentloaded",
+      timeout: CRAWLER_CONFIG.botCheckTimeoutMs,
+    });
+    logger.info("Passed the bot check");
+  } catch {
+    // No reload means no bot check was served; loadHtml catches the rest
+    logger.info("No bot check reload seen, continuing");
+  } finally {
+    await page.close();
+  }
+}
+
+async function loadHtml(context: BrowserContext, url: string): Promise<string> {
+  const page = await context.newPage();
+  try {
+    await page.goto(url, {
+      waitUntil: "domcontentloaded",
+      timeout: CRAWLER_CONFIG.navigationTimeoutMs,
+    });
+    const html = await page.content();
+    if (html.includes(CHALLENGE_MARKER)) {
+      throw new Error(`Got the bot check page instead of ${url}`);
+    }
+    return html;
+  } finally {
+    await page.close();
+  }
+}
+
+/**
  * Dump a listing page that had no product links so a site change or block page
  * can be diagnosed from CI artifacts instead of a bare "0 products" failure.
  */
@@ -192,12 +254,13 @@ function dumpListingForDebugging(mode: number, html: string): void {
   }
 }
 
-async function fetchCategoryProducts(category: {
-  name: string;
-  mode: number;
-}): Promise<ListedProduct[]> {
+async function fetchCategoryProducts(
+  context: BrowserContext,
+  category: { name: string; mode: number }
+): Promise<ListedProduct[]> {
   try {
-    const html = await fetchText(
+    const html = await loadHtml(
+      context,
       `${SITE_CONFIG.menuBaseUrl}?mode=${category.mode}`
     );
     const $ = load(html);
@@ -224,13 +287,13 @@ async function fetchCategoryProducts(category: {
   }
 }
 
-async function crawlProduct({
-  categoryName,
-  uid,
-}: ListedProduct): Promise<Product | null> {
+async function crawlProduct(
+  context: BrowserContext,
+  { categoryName, uid }: ListedProduct
+): Promise<Product | null> {
   const externalUrl = `${SITE_CONFIG.detailBaseUrl}?uid=${uid}`;
   try {
-    const $ = load(await fetchText(externalUrl));
+    const $ = load(await loadHtml(context, externalUrl));
 
     // The title holds tag badges before the name: <span class="tag">NEW</span>
     const title = $(SELECTORS.detailName).first();
@@ -279,9 +342,23 @@ async function crawlProduct({
 // ================================================
 
 export const runTheventiCrawler = async () => {
+  const browser = await chromium.launch({
+    ...CRAWLER_CONFIG.launchOptions,
+    args: [...CRAWLER_CONFIG.launchOptions.args],
+  });
   try {
+    const context = await browser.newContext({ locale: "ko-KR" });
+    await context.route("**/*", (route) =>
+      BLOCKED_RESOURCE_TYPES.has(route.request().resourceType())
+        ? route.abort()
+        : route.continue()
+    );
+
+    await passBotCheck(context);
     const perCategory = await Promise.all(
-      MENU_CATEGORIES.map(fetchCategoryProducts)
+      MENU_CATEGORIES.map((category) =>
+        fetchCategoryProducts(context, category)
+      )
     );
 
     // A product listed in several tabs keeps the first one
@@ -298,7 +375,7 @@ export const runTheventiCrawler = async () => {
     const results = await mapWithConcurrency(
       listed,
       CRAWLER_CONFIG.concurrency,
-      crawlProduct
+      (product) => crawlProduct(context, product)
     );
     await writeProductsToJson(
       results.filter((p): p is Product => p !== null),
@@ -307,6 +384,8 @@ export const runTheventiCrawler = async () => {
   } catch (error) {
     logger.error("The Venti crawler failed:", error);
     throw error;
+  } finally {
+    await browser.close();
   }
 };
 
