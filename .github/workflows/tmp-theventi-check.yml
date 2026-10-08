@@ -1,0 +1,38 @@
+# Temporary: crawl-only check for the theventi fix. No categorize/upload.
+name: Temp theventi crawl check
+on:
+  push:
+    branches: [claude/compassionate-cori-s2i9gl]
+    paths: [.github/workflows/tmp-theventi-check.yml]
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: "pnpm"
+          cache-dependency-path: "pnpm-lock.yaml"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: mkdir -p actors/crawler/crawler-outputs
+      - run: pnpm run crawl theventi
+        env:
+          NODE_ENV: production
+          CI: true
+      - name: Summarize output
+        run: |
+          f=$(ls actors/crawler/crawler-outputs/theventi-products-*.json)
+          node -e '
+            const d = require(process.argv[1]);
+            const byCat = {};
+            for (const p of d) byCat[p.externalCategory] = (byCat[p.externalCategory] || 0) + 1;
+            console.log("total", d.length, JSON.stringify(byCat));
+            console.log("with nutrition", d.filter((p) => p.nutritions).length);
+            console.log("missing image", d.filter((p) => !p.externalImageUrl).length);
+            console.log(JSON.stringify(d.slice(0, 2)));
+          ' "$PWD/$f"
