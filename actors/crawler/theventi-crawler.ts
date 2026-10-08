@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { type CheerioAPI, load } from "cheerio";
 import { logger } from "../../shared/logger";
 import type { Nutritions } from "../../shared/nutritions";
@@ -157,14 +159,40 @@ function extractNutritionData($: CheerioAPI): Nutritions | null {
   return hasData ? nutritions : null;
 }
 
+/**
+ * Dump a listing page that had no product links so a site change or block page
+ * can be diagnosed from CI artifacts instead of a bare "0 products" failure.
+ */
+function dumpListingForDebugging(mode: number, html: string): void {
+  try {
+    const outputDir = path.join(
+      process.cwd(),
+      "actors",
+      "crawler",
+      "crawler-outputs"
+    );
+    fs.mkdirSync(outputDir, { recursive: true });
+    const filepath = path.join(outputDir, `theventi-mode${mode}-debug.html`);
+    fs.writeFileSync(filepath, html, "utf8");
+    logger.warn(
+      `No product links on mode=${mode} (${html.length} chars); wrote ${filepath}`
+    );
+  } catch (error) {
+    logger.warn(
+      `Could not dump listing HTML: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
 async function fetchCategoryProducts(category: {
   name: string;
   mode: number;
 }): Promise<ListedProduct[]> {
   try {
-    const $ = load(
-      await fetchText(`${SITE_CONFIG.menuBaseUrl}?mode=${category.mode}`)
+    const html = await fetchText(
+      `${SITE_CONFIG.menuBaseUrl}?mode=${category.mode}`
     );
+    const $ = load(html);
     const uids = new Set<string>();
     $(SELECTORS.productLink).each((_, link) => {
       const uid = $(link).attr("href")?.match(UID_REGEX)?.[1];
@@ -173,6 +201,9 @@ async function fetchCategoryProducts(category: {
       }
     });
 
+    if (uids.size === 0) {
+      dumpListingForDebugging(category.mode, html);
+    }
     logger.info(`📋 ${category.name}: ${uids.size} products`);
     const listed = [...uids].map((uid) => ({
       categoryName: category.name,
