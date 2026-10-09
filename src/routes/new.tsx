@@ -1,21 +1,23 @@
-import { useQueries } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import {
-  NEW_PRODUCTS_PAGE_SIZE,
-  recentProductsPageQueryOptions,
+  NEW_PRODUCTS_CAFE_PAGE_SIZE,
+  NEW_PRODUCTS_PER_CAFE,
+  recentCafeProductsPageQueryOptions,
+  recentProductsByCafeQueryOptions,
 } from "~/components/NewProductsSection";
 import { ProductCard } from "~/components/ProductCard";
 import { useProductReviewStats } from "~/hooks/useProductReviewStats";
-import type { Doc } from "../../convex/_generated/dataModel";
+import type { Doc, Id } from "../../convex/_generated/dataModel";
 import { seo } from "../utils/seo";
 
 export const Route = createFileRoute("/new")({
   component: NewProductsPage,
   loader: async (opts) => {
-    // SSR only the first page; further pages load on demand via "더 보기".
+    // SSR the first products of each cafe; the rest load on demand via "더 보기".
     await opts.context.queryClient.ensureQueryData(
-      recentProductsPageQueryOptions(0)
+      recentProductsByCafeQueryOptions
     );
   },
   head: () => ({
@@ -55,47 +57,80 @@ function formatRelativeDate(timestamp: number): string {
   return `${Math.floor(days / 30)}개월 전`;
 }
 
-function groupByCafe(
-  products: ProductWithCafe[]
-): { cafeName: string; products: ProductWithCafe[] }[] {
-  const groups = new Map<string, ProductWithCafe[]>();
+function CafeGroup({
+  cafeId,
+  cafeName,
+  initialProducts,
+  totalCount,
+}: {
+  cafeId: Id<"cafes">;
+  cafeName: string;
+  initialProducts: ProductWithCafe[];
+  totalCount: number;
+}) {
+  const [extraPageCount, setExtraPageCount] = useState(0);
 
-  for (const product of products) {
-    const existing = groups.get(product.cafeName);
-    if (existing) {
-      existing.push(product);
-    } else {
-      groups.set(product.cafeName, [product]);
-    }
-  }
-
-  // Sort cafe groups by the most recent product's addedAt (newest first)
-  return [...groups.entries()]
-    .map(([cafeName, cafeProducts]) => ({ cafeName, products: cafeProducts }))
-    .sort(
-      (a, b) =>
-        (b.products.at(0)?.addedAt ?? 0) - (a.products.at(0)?.addedAt ?? 0)
-    );
-}
-
-function NewProductsPage() {
-  const [pageCount, setPageCount] = useState(1);
-
-  const pageQueries = useQueries({
-    queries: Array.from({ length: pageCount }, (_, pageIndex) =>
-      recentProductsPageQueryOptions(pageIndex * NEW_PRODUCTS_PAGE_SIZE)
+  const extraPageQueries = useQueries({
+    queries: Array.from({ length: extraPageCount }, (_, pageIndex) =>
+      recentCafeProductsPageQueryOptions(
+        cafeId,
+        NEW_PRODUCTS_PER_CAFE + pageIndex * NEW_PRODUCTS_CAFE_PAGE_SIZE
+      )
     ),
   });
 
-  const products = pageQueries.flatMap((page) => page.data?.products ?? []);
-  const totalCount = pageQueries.at(0)?.data?.totalCount ?? 0;
+  const products = [
+    ...initialProducts,
+    ...extraPageQueries.flatMap((page) => page.data?.products ?? []),
+  ];
   const hasMore = products.length < totalCount;
-  const isLoadingMore = pageQueries.some((page) => page.isPending);
+  const isLoadingMore = extraPageQueries.some((page) => page.isPending);
 
   const reviewStats = useProductReviewStats(
     products.map((product) => product._id)
   );
-  const cafeGroups = groupByCafe(products);
+
+  return (
+    <section className="mb-10">
+      <h2 className="mb-4 font-bold text-xl">
+        {cafeName}{" "}
+        <span className="text-base text-base-content/50">{totalCount}</span>
+      </h2>
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        {products.map((product) => (
+          <div key={product._id}>
+            <ProductCard
+              product={product}
+              reviewStats={reviewStats?.[product._id]}
+            />
+            <p className="mt-1 text-base-content/50 text-xs">
+              {formatRelativeDate(product.addedAt)}
+            </p>
+          </div>
+        ))}
+      </div>
+      {hasMore && (
+        <div className="mt-4 flex justify-center">
+          <button
+            className="btn btn-outline btn-sm"
+            disabled={isLoadingMore}
+            onClick={() => setExtraPageCount((count) => count + 1)}
+            type="button"
+          >
+            {isLoadingMore
+              ? "불러오는 중..."
+              : `더 보기 (${totalCount - products.length}개 남음)`}
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function NewProductsPage() {
+  const { data, isPending } = useQuery(recentProductsByCafeQueryOptions);
+  const cafes = data?.cafes ?? [];
+  const totalCount = data?.totalCount ?? 0;
 
   return (
     <div className="min-h-screen bg-base-200">
@@ -107,45 +142,21 @@ function NewProductsPage() {
           )}
         </h1>
 
-        {cafeGroups.length === 0 && !isLoadingMore && (
+        {cafes.length === 0 && !isPending && (
           <p className="text-center text-base-content/60">
             최근 30일 이내 신상품이 없습니다.
           </p>
         )}
 
-        {cafeGroups.map(({ cafeName, products: cafeProducts }) => (
-          <div className="mb-10" key={cafeName}>
-            <h2 className="mb-4 font-bold text-xl">{cafeName}</h2>
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              {cafeProducts.map((product) => (
-                <div key={product._id}>
-                  <ProductCard
-                    product={product}
-                    reviewStats={reviewStats?.[product._id]}
-                  />
-                  <p className="mt-1 text-base-content/50 text-xs">
-                    {formatRelativeDate(product.addedAt)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
+        {cafes.map((cafe) => (
+          <CafeGroup
+            cafeId={cafe.cafeId}
+            cafeName={cafe.cafeName}
+            initialProducts={cafe.products}
+            key={cafe.cafeId}
+            totalCount={cafe.totalCount}
+          />
         ))}
-
-        {hasMore && (
-          <div className="flex justify-center">
-            <button
-              className="btn btn-outline btn-wide"
-              disabled={isLoadingMore}
-              onClick={() => setPageCount((count) => count + 1)}
-              type="button"
-            >
-              {isLoadingMore
-                ? "불러오는 중..."
-                : `더 보기 (${totalCount - products.length}개 남음)`}
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );

@@ -383,13 +383,14 @@ async function findRevivableProduct(
 async function createNewProduct(
   ctx: MutationCtx,
   args: UpsertProductArgs,
-  now: number
+  now: number,
+  addedAt = now
 ): Promise<UpsertResult> {
   const shortId = generateShortId();
 
   const insertData = {
     ...args,
-    addedAt: now,
+    addedAt,
     updatedAt: now,
     isActive: args.isActive ?? true,
     shortId,
@@ -430,10 +431,13 @@ export const upsertProduct = internalMutation({
     // Pre-resolved revival candidate (see `findRevivableProduct`): an id, null
     // for "none", or omitted to scan the cafe's removed products here.
     revivableProductId: v.optional(v.union(v.id("products"), v.null())),
+    // `addedAt` to use only if this call creates a new product. Existing and
+    // revived products keep their own `addedAt`.
+    addedAtIfCreated: v.optional(v.number()),
   },
   handler: async (
     ctx,
-    { revivableProductId, ...args }
+    { revivableProductId, addedAtIfCreated, ...args }
   ): Promise<UpsertResult> => {
     const now = Date.now();
 
@@ -465,71 +469,141 @@ export const upsertProduct = internalMutation({
       return await handleExistingProduct(ctx, args, revivable, now);
     }
 
-    return await createNewProduct(ctx, args, now);
+    return await createNewProduct(ctx, args, now, addedAtIfCreated);
   },
 });
+
+const RECENT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+const BULK_IMPORT_WINDOW_MS = 24 * 60 * 60 * 1000;
+const MAX_RECENT_PAGE_SIZE = 100;
+const MAX_RECENT_PER_CAFE = 20;
+
+interface CafeInfo {
+  creationTime: number;
+  name: string;
+}
+
+// Active products added in the last 30 days, newest first. Excludes
+// bulk-imported products (added within 24h of cafe creation).
+async function collectRecentProducts(ctx: QueryCtx) {
+  const thirtyDaysAgo = Date.now() - RECENT_WINDOW_MS;
+
+  const products = await ctx.db
+    .query("products")
+    .withIndex("by_is_active_added_at", (q) =>
+      q.eq("isActive", true).gte("addedAt", thirtyDaysAgo)
+    )
+    .collect();
+
+  // Cache cafe lookups to avoid redundant queries
+  const cafeCache = new Map<string, CafeInfo>();
+  const getCafe = async (cafeId: Id<"cafes">) => {
+    const cached = cafeCache.get(cafeId);
+    if (cached) {
+      return cached;
+    }
+    const cafe = await ctx.db.get(cafeId);
+    const result = {
+      name: cafe?.name || "",
+      creationTime: cafe?._creationTime ?? 0,
+    };
+    cafeCache.set(cafeId, result);
+    return result;
+  };
+
+  const filtered: { product: Doc<"products">; cafe: CafeInfo }[] = [];
+  for (const product of products) {
+    const cafe = await getCafe(product.cafeId);
+    if (product.addedAt - cafe.creationTime >= BULK_IMPORT_WINDOW_MS) {
+      filtered.push({ product, cafe });
+    }
+  }
+
+  filtered.sort((a, b) => b.product.addedAt - a.product.addedAt);
+  return filtered;
+}
+
+function withCafeAndImage(
+  ctx: QueryCtx,
+  items: { product: Doc<"products">; cafe: CafeInfo }[]
+) {
+  return Promise.all(
+    items.map(async ({ product, cafe }) => ({
+      ...product,
+      cafeName: cafe.name,
+      imageUrl: await resolveImageUrl(ctx, product.imageStorageId),
+    }))
+  );
+}
+
+function clampCount(value: number | undefined, fallback: number, max: number) {
+  return Math.min(Math.max(Math.floor(value ?? fallback), 0), max);
+}
 
 export const getRecent = query({
   args: {
     limit: v.optional(v.number()),
     offset: v.optional(v.number()),
+    cafeId: v.optional(v.id("cafes")),
   },
-  handler: async (ctx, { limit, offset }) => {
-    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-    const oneDayMs = 24 * 60 * 60 * 1000;
+  handler: async (ctx, { limit, offset, cafeId }) => {
+    const all = await collectRecentProducts(ctx);
+    const filtered = cafeId
+      ? all.filter(({ product }) => product.cafeId === cafeId)
+      : all;
 
-    const products = await ctx.db
-      .query("products")
-      .withIndex("by_is_active_added_at", (q) =>
-        q.eq("isActive", true).gte("addedAt", thirtyDaysAgo)
-      )
-      .collect();
+    const start = clampCount(offset, 0, Number.MAX_SAFE_INTEGER);
+    const size = clampCount(limit, MAX_RECENT_PAGE_SIZE, MAX_RECENT_PAGE_SIZE);
+    const products = await withCafeAndImage(
+      ctx,
+      filtered.slice(start, start + size)
+    );
 
-    // Cache cafe lookups to avoid redundant queries
-    const cafeCache = new Map<string, { name: string; creationTime: number }>();
-    const getCafe = async (cafeId: Id<"cafes">) => {
-      const cached = cafeCache.get(cafeId);
-      if (cached) {
-        return cached;
-      }
-      const cafe = await ctx.db.get(cafeId);
-      const result = {
-        name: cafe?.name || "",
-        creationTime: cafe?._creationTime ?? 0,
-      };
-      cafeCache.set(cafeId, result);
-      return result;
-    };
+    return { products, totalCount: filtered.length };
+  },
+});
 
-    // Exclude bulk-imported products (added within 24h of cafe creation)
-    const filtered: typeof products = [];
-    for (const product of products) {
-      const cafe = await getCafe(product.cafeId);
-      if (product.addedAt - cafe.creationTime >= oneDayMs) {
-        filtered.push(product);
+// Recent products grouped by cafe, with only the first `perCafe` products of
+// each cafe. Groups are ordered by their newest product.
+export const getRecentByCafe = query({
+  args: {
+    perCafe: v.optional(v.number()),
+  },
+  handler: async (ctx, { perCafe }) => {
+    const size = clampCount(perCafe, 4, MAX_RECENT_PER_CAFE);
+    const all = await collectRecentProducts(ctx);
+
+    const groups = new Map<
+      Id<"cafes">,
+      { items: typeof all; totalCount: number }
+    >();
+    for (const item of all) {
+      const group = groups.get(item.product.cafeId);
+      if (group) {
+        group.totalCount += 1;
+        if (group.items.length < size) {
+          group.items.push(item);
+        }
+      } else {
+        groups.set(item.product.cafeId, {
+          items: size > 0 ? [item] : [],
+          totalCount: 1,
+        });
       }
     }
 
-    // Sort by addedAt descending (newest first)
-    filtered.sort((a, b) => b.addedAt - a.addedAt);
-
-    const start = offset ?? 0;
-    const limited = limit
-      ? filtered.slice(start, start + limit)
-      : filtered.slice(start);
-
-    const productsWithCafes = await Promise.all(
-      limited.map(async (product) => {
-        const cafe = await getCafe(product.cafeId);
-        return {
-          ...product,
-          cafeName: cafe.name,
-          imageUrl: await resolveImageUrl(ctx, product.imageStorageId),
-        };
-      })
+    // Map keeps insertion order, and `all` is newest first, so groups are
+    // already ordered by their newest product.
+    const cafes = await Promise.all(
+      [...groups.entries()].map(async ([cafeId, group]) => ({
+        cafeId,
+        cafeName: group.items.at(0)?.cafe.name ?? "",
+        totalCount: group.totalCount,
+        products: await withCafeAndImage(ctx, group.items),
+      }))
     );
 
-    return { products: productsWithCafes, totalCount: filtered.length };
+    return { cafes, totalCount: all.length };
   },
 });
 

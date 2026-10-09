@@ -2,6 +2,7 @@ import { convexQuery } from "@convex-dev/react-query";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import { useProductReviewStats } from "../hooks/useProductReviewStats";
 import { ProductCard } from "./ProductCard";
 
@@ -12,11 +13,24 @@ export const recentProductsQueryOptions = {
   staleTime: STALE_TIME,
 };
 
-export const NEW_PRODUCTS_PAGE_SIZE = 40;
+export const NEW_PRODUCTS_PER_CAFE = 4;
 
-export const recentProductsPageQueryOptions = (offset: number) => ({
+export const recentProductsByCafeQueryOptions = {
+  ...convexQuery(api.products.getRecentByCafe, {
+    perCafe: NEW_PRODUCTS_PER_CAFE,
+  }),
+  staleTime: STALE_TIME,
+};
+
+export const NEW_PRODUCTS_CAFE_PAGE_SIZE = 8;
+
+export const recentCafeProductsPageQueryOptions = (
+  cafeId: Id<"cafes">,
+  offset: number
+) => ({
   ...convexQuery(api.products.getRecent, {
-    limit: NEW_PRODUCTS_PAGE_SIZE,
+    cafeId,
+    limit: NEW_PRODUCTS_CAFE_PAGE_SIZE,
     offset,
   }),
   staleTime: STALE_TIME,
