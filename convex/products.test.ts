@@ -1,12 +1,13 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "./_generated/api";
 import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const SECRET = "test-secret";
 
 function setup() {
   return convexTest(schema, modules);
@@ -72,5 +73,58 @@ describe("recent products by cafe", () => {
       "big-4",
       "big-5",
     ]);
+  });
+});
+
+describe("upload into a new external category", () => {
+  beforeEach(() => {
+    vi.stubEnv("CONVEX_UPLOAD_SECRET", SECRET);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const crawled = (name: string, externalCategory: string) => ({
+    name,
+    nameEn: "",
+    externalId: name,
+    externalUrl: "https://example.com",
+    externalCategory,
+    externalImageUrl: "",
+    description: "",
+    category: null,
+    price: null,
+  });
+
+  it("dates products in a new category to the cafe creation", async () => {
+    const t = setup();
+    const cafeId = await t.run((ctx) =>
+      ctx.db.insert("cafes", { name: "카페", slug: "cafe" })
+    );
+    await t.mutation(api.dataUploader.uploadProductsFromJson, {
+      cafeSlug: "cafe",
+      uploadSecret: SECRET,
+      products: [crawled("아메리카노", "COFFEE")],
+    });
+
+    await t.mutation(api.dataUploader.uploadProductsFromJson, {
+      cafeSlug: "cafe",
+      uploadSecret: SECRET,
+      products: [
+        crawled("아메리카노", "COFFEE"),
+        crawled("카페라떼", "COFFEE"),
+        crawled("크루아상", "BREAD"),
+      ],
+    });
+
+    const { cafe, products } = await t.run(async (ctx) => ({
+      cafe: await ctx.db.get(cafeId),
+      products: await ctx.db.query("products").collect(),
+    }));
+    const addedAt = (name: string) =>
+      products.find((product) => product.name === name)?.addedAt;
+    expect(addedAt("크루아상")).toBe(Math.floor(cafe?._creationTime ?? 0));
+    expect(addedAt("카페라떼")).toBeGreaterThan(cafe?._creationTime ?? 0);
   });
 });

@@ -383,13 +383,14 @@ async function findRevivableProduct(
 async function createNewProduct(
   ctx: MutationCtx,
   args: UpsertProductArgs,
-  now: number
+  now: number,
+  addedAt = now
 ): Promise<UpsertResult> {
   const shortId = generateShortId();
 
   const insertData = {
     ...args,
-    addedAt: now,
+    addedAt,
     updatedAt: now,
     isActive: args.isActive ?? true,
     shortId,
@@ -430,10 +431,13 @@ export const upsertProduct = internalMutation({
     // Pre-resolved revival candidate (see `findRevivableProduct`): an id, null
     // for "none", or omitted to scan the cafe's removed products here.
     revivableProductId: v.optional(v.union(v.id("products"), v.null())),
+    // `addedAt` to use only if this call creates a new product. Existing and
+    // revived products keep their own `addedAt`.
+    addedAtIfCreated: v.optional(v.number()),
   },
   handler: async (
     ctx,
-    { revivableProductId, ...args }
+    { revivableProductId, addedAtIfCreated, ...args }
   ): Promise<UpsertResult> => {
     const now = Date.now();
 
@@ -465,7 +469,7 @@ export const upsertProduct = internalMutation({
       return await handleExistingProduct(ctx, args, revivable, now);
     }
 
-    return await createNewProduct(ctx, args, now);
+    return await createNewProduct(ctx, args, now, addedAtIfCreated);
   },
 });
 

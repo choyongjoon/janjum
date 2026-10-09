@@ -76,15 +76,50 @@ async function loadRevivalIndex(
   return buildRevivalIndex(removed);
 }
 
+// External categories the cafe already has products in, active or removed.
+// Read once per upload for the same read-budget reason as above.
+async function loadKnownCategories(
+  ctx: MutationCtx,
+  cafeId: Id<"cafes">
+): Promise<Set<string>> {
+  const known = new Set<string>();
+  for await (const product of ctx.db
+    .query("products")
+    .withIndex("by_cafe", (q) => q.eq("cafeId", cafeId))) {
+    if (product.externalCategory) {
+      known.add(product.externalCategory);
+    }
+  }
+  return known;
+}
+
+// A product created in a category the cafe never had before is an existing
+// menu item that the crawler now covers (e.g. a bakery tab added to the
+// crawl), not a new launch. Date it to the cafe's creation so it stays out of
+// the new-products list, like the cafe's first import.
+function getAddedAtIfCreated(
+  product: CrawlerProduct,
+  knownCategories: Set<string>,
+  cafeCreationTime: number
+): number | undefined {
+  const isNewCategory =
+    knownCategories.size > 0 &&
+    Boolean(product.externalCategory) &&
+    !knownCategories.has(product.externalCategory);
+  return isNewCategory ? Math.floor(cafeCreationTime) : undefined;
+}
+
 // Helper function to upload products to database
 async function uploadProductsToDatabase(
   ctx: MutationCtx,
   products: CrawlerProduct[],
-  cafeId: Id<"cafes">,
+  cafe: { _id: Id<"cafes">; _creationTime: number },
   results: UploadResults,
   downloadImages = false
 ) {
+  const cafeId = cafe._id;
   const revivalIndex = await loadRevivalIndex(ctx, cafeId);
+  const knownCategories = await loadKnownCategories(ctx, cafeId);
 
   for (const product of products) {
     try {
@@ -100,6 +135,11 @@ async function uploadProductsToDatabase(
         nutritions: cleanNutritions(product.nutritions),
         downloadImages,
         revivableProductId: findRevivalCandidate(revivalIndex, product.name),
+        addedAtIfCreated: getAddedAtIfCreated(
+          product,
+          knownCategories,
+          cafe._creationTime
+        ),
       });
       if (result.action === "created") {
         results.created++;
@@ -173,7 +213,7 @@ export const uploadProductsFromJson = mutation({
     await uploadProductsToDatabase(
       ctx,
       products,
-      cafe._id,
+      cafe,
       results,
       downloadImages
     );
