@@ -18,6 +18,7 @@
     "backfill-product-search": "tsx scripts/backfillProductSearch.ts",
     "backfill-product-search:prod": "dotenv -e .env.prod-upload -- tsx scripts/backfillProductSearch.ts",
     "data-sync:prod": "scripts/dataSyncProd.sh",
+    "data-sync:prod:all": "scripts/dataSyncProdAll.sh",
     "test": "vitest",
     "test:e2e": "playwright test",
     "prepare": "husky",
