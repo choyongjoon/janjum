@@ -5,6 +5,7 @@ import { ConvexClient } from "convex/browser";
 import dotenv from "dotenv";
 import sharp from "sharp";
 import { api } from "../../convex/_generated/api";
+import { toOptimizedWebp } from "../../shared/imageOptimization";
 import { logger } from "../../shared/logger";
 import { dedupeByExternalId } from "./dedupe";
 import {
@@ -399,21 +400,14 @@ class ProductUploader {
       const imageBuffer = Buffer.from(arrayBuffer);
       const originalSize = imageBuffer.length;
 
-      // Check if already WebP
       const metadata = await sharp(imageBuffer).metadata();
-      if (metadata.format === "webp") {
-        logger.info(`Image for ${productName} is already WebP format`);
-        return {
-          buffer: imageBuffer,
-          originalSize,
-          optimizedSize: originalSize,
-        };
-      }
-
-      // Optimize using Sharp
-      const optimized = Buffer.from(
-        await sharp(imageBuffer).webp({ quality: 85, effort: 6 }).toBuffer()
-      );
+      const resized = await toOptimizedWebp(imageBuffer);
+      // Keep a WebP original that re-encoding would not make smaller. Other
+      // formats always get converted, since they're uploaded as image/webp.
+      const optimized =
+        metadata.format === "webp" && resized.length >= originalSize
+          ? imageBuffer
+          : resized;
       const reduction = (
         ((originalSize - optimized.length) / originalSize) *
         100

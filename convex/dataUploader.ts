@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import type { Nutritions } from "../shared/nutritions";
 import { api, internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { type MutationCtx, mutation } from "./_generated/server";
 import {
   buildRevivalIndex,
@@ -9,6 +9,7 @@ import {
   type RevivalIndex,
   removeFromRevivalIndex,
 } from "./productMatching";
+import { hasProductChanges, softRemoveMissingProducts } from "./products";
 import { verifyUploadSecret } from "./uploadSecret";
 
 interface CrawlerProduct {
@@ -60,37 +61,54 @@ function cleanNutritions(
   return hasData ? cleaned : undefined;
 }
 
-// Read the cafe's soft-removed products once for the whole upload. Every
-// sub-mutation below shares this transaction's 16 MiB read budget, so letting
-// each new product re-scan them fails uploads that add many products at once.
-async function loadRevivalIndex(
-  ctx: MutationCtx,
-  cafeId: Id<"cafes">
-): Promise<RevivalIndex<Id<"products">>> {
-  const removed = await ctx.db
-    .query("products")
-    .withIndex("by_cafe_active", (q) =>
-      q.eq("cafeId", cafeId).eq("isActive", false)
-    )
-    .collect();
-  return buildRevivalIndex(removed);
+interface CafeSnapshot {
+  activeProducts: Doc<"products">[];
+  // First product per externalId, matching what upsertProduct's
+  // `by_cafe_external_id(...).first()` lookup would return.
+  byExternalId: Map<string, Doc<"products">>;
+  // External categories the cafe already has products in, active or removed.
+  knownCategories: Set<string>;
+  revivalIndex: RevivalIndex<Id<"products">>;
 }
 
-// External categories the cafe already has products in, active or removed.
-// Read once per upload for the same read-budget reason as above.
-async function loadKnownCategories(
+// Read the cafe's products once for the whole upload and derive everything the
+// upload needs from that single scan. Every sub-mutation below shares this
+// transaction's read budget, and database I/O is billed per document read, so
+// the upload used to cost ~4 full scans of the cafe's menu per run (categories,
+// removed products, one lookup per product, and the removal pass).
+async function loadCafeSnapshot(
   ctx: MutationCtx,
   cafeId: Id<"cafes">
-): Promise<Set<string>> {
-  const known = new Set<string>();
+): Promise<CafeSnapshot> {
+  const activeProducts: Doc<"products">[] = [];
+  const removedProducts: Doc<"products">[] = [];
+  const byExternalId = new Map<string, Doc<"products">>();
+  const knownCategories = new Set<string>();
+
   for await (const product of ctx.db
     .query("products")
     .withIndex("by_cafe", (q) => q.eq("cafeId", cafeId))) {
+    // Same split as the by_cafe_active index lookups this replaces: products
+    // with no isActive flag are neither removable nor revivable.
+    if (product.isActive === true) {
+      activeProducts.push(product);
+    } else if (product.isActive === false) {
+      removedProducts.push(product);
+    }
+    if (!byExternalId.has(product.externalId)) {
+      byExternalId.set(product.externalId, product);
+    }
     if (product.externalCategory) {
-      known.add(product.externalCategory);
+      knownCategories.add(product.externalCategory);
     }
   }
-  return known;
+
+  return {
+    activeProducts,
+    byExternalId,
+    knownCategories,
+    revivalIndex: buildRevivalIndex(removedProducts),
+  };
 }
 
 // A product created in a category the cafe never had before is an existing
@@ -109,31 +127,56 @@ function getAddedAtIfCreated(
   return isNewCategory ? Math.floor(cafeCreationTime) : undefined;
 }
 
+// Crawler output (nulls for missing values) to upsertProduct's arguments.
+function toUpsertArgs(
+  product: CrawlerProduct,
+  cafeId: Id<"cafes">,
+  downloadImages: boolean
+) {
+  return {
+    ...product,
+    cafeId,
+    category: product.category ?? undefined,
+    nameEn: product.nameEn ?? undefined,
+    description: product.description ?? undefined,
+    externalCategory: product.externalCategory ?? undefined,
+    externalImageUrl: product.externalImageUrl ?? undefined,
+    price: product.price ?? undefined,
+    nutritions: cleanNutritions(product.nutritions),
+    downloadImages,
+  };
+}
+
 // Helper function to upload products to database
 async function uploadProductsToDatabase(
   ctx: MutationCtx,
   products: CrawlerProduct[],
   cafe: { _id: Id<"cafes">; _creationTime: number },
+  snapshot: CafeSnapshot,
   results: UploadResults,
   downloadImages = false
 ) {
   const cafeId = cafe._id;
-  const revivalIndex = await loadRevivalIndex(ctx, cafeId);
-  const knownCategories = await loadKnownCategories(ctx, cafeId);
+  const { byExternalId, knownCategories, revivalIndex } = snapshot;
 
   for (const product of products) {
     try {
+      const args = toUpsertArgs(product, cafeId, downloadImages);
+
+      // Most of a daily crawl is unchanged. Compare against the snapshot here
+      // instead of running a sub-mutation that re-reads the product only to
+      // decide there is nothing to write.
+      const existing = byExternalId.get(product.externalId);
+      if (existing && !hasProductChanges(existing, args)) {
+        results.unchanged++;
+        continue;
+      }
+      // The snapshot copy is stale once written; let any later duplicate of
+      // this externalId go through upsertProduct's own lookup.
+      byExternalId.delete(product.externalId);
+
       const result = await ctx.runMutation(internal.products.upsertProduct, {
-        ...product,
-        cafeId,
-        category: product.category ?? undefined,
-        nameEn: product.nameEn ?? undefined,
-        description: product.description ?? undefined,
-        externalCategory: product.externalCategory ?? undefined,
-        externalImageUrl: product.externalImageUrl ?? undefined,
-        price: product.price ?? undefined,
-        nutritions: cleanNutritions(product.nutritions),
-        downloadImages,
+        ...args,
         revivableProductId: findRevivalCandidate(revivalIndex, product.name),
         addedAtIfCreated: getAddedAtIfCreated(
           product,
@@ -209,23 +252,25 @@ export const uploadProductsFromJson = mutation({
       };
     }
 
+    const snapshot = await loadCafeSnapshot(ctx, cafe._id);
+
     // Upload processed products
     await uploadProductsToDatabase(
       ctx,
       products,
       cafe,
+      snapshot,
       results,
       downloadImages
     );
 
-    // After uploading, check for removed products
-    const currentExternalIds = products.map((p) => p.externalId);
-    const removalResults = await ctx.runMutation(
-      internal.products.markAsRemoved,
-      {
-        cafeId: cafe._id,
-        currentExternalIds,
-      }
+    // After uploading, soft-remove active products the crawl no longer lists.
+    // Upserts only touch crawled externalIds (or revive removed products), so
+    // the snapshot's active list is still accurate for everything else.
+    const removalResults = await softRemoveMissingProducts(
+      ctx,
+      snapshot.activeProducts,
+      new Set(products.map((p) => p.externalId))
     );
 
     // Update results with removal information. `reactivated` is already

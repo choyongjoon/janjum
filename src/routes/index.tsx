@@ -16,7 +16,7 @@ export const Route = createFileRoute("/")({
   loader: async (opts) => {
     await Promise.all([
       opts.context.queryClient.ensureQueryData(convexQuery(api.cafes.list, {})),
-      opts.context.queryClient.ensureQueryData(recentProductsQueryOptions),
+      opts.context.queryClient.ensureQueryData(recentProductsQueryOptions()),
     ]);
   },
   head: () => ({

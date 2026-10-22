@@ -4,6 +4,10 @@ import { ConvexHttpClient } from "convex/browser";
 import sharp from "sharp";
 import { api } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
+import {
+  OPTIMIZED_IMAGE_MAX_BYTES,
+  toOptimizedWebp,
+} from "../shared/imageOptimization";
 import { logger } from "../shared/logger";
 
 const CONVEX_URL = process.env.VITE_CONVEX_URL;
@@ -40,12 +44,7 @@ class ImageOptimizer {
 
   async optimizeImage(imageBuffer: ArrayBuffer): Promise<ArrayBuffer> {
     try {
-      const optimizedBuffer = await sharp(imageBuffer)
-        .webp({
-          quality: 85,
-          effort: 6,
-        })
-        .toBuffer();
+      const optimizedBuffer = await toOptimizedWebp(imageBuffer);
 
       this.stats.totalSizeBefore += imageBuffer.byteLength;
       this.stats.totalSizeAfter += optimizedBuffer.byteLength;
@@ -91,15 +90,16 @@ class ImageOptimizer {
         return true; // Re-download if we can't get metadata
       }
 
-      // Check if the stored file is already WebP
+      // WebP files can still be oversized: early uploads were never resized.
       const contentType = metadata.contentType;
       const isWebP = contentType === "image/webp";
+      const isSmall = metadata.size <= OPTIMIZED_IMAGE_MAX_BYTES;
 
       logger.debug(
-        `Storage ${storageId} metadata: ${contentType}, isWebP: ${isWebP}`
+        `Storage ${storageId} metadata: ${contentType}, ${metadata.size} bytes`
       );
 
-      return !isWebP; // Return true if needs optimization (not WebP)
+      return !(isWebP && isSmall);
     } catch (error) {
       logger.error(`Error checking storage metadata for ${storageId}:`, error);
       return true; // Re-download on error
@@ -146,7 +146,7 @@ class ImageOptimizer {
       const needsOptimization =
         await this.checkIfStorageNeedsOptimization(storageId);
       if (!needsOptimization) {
-        logger.info(`Image ${storageId} is already optimized (WebP), skipping`);
+        logger.info(`Image ${storageId} is already optimized, skipping`);
         return null;
       }
 
@@ -163,18 +163,19 @@ class ImageOptimizer {
       // Download the original image
       const originalImageBuffer = await this.downloadImage(imageUrl);
 
-      // Double-check format after download (fallback safety check)
-      const imageFormat = await sharp(originalImageBuffer).metadata();
-      if (imageFormat.format === "webp") {
-        logger.info(
-          `Image ${storageId} is already in WebP format (detected after download)`
-        );
-        return null;
-      }
-
       // Optimize the image
       const optimizedImageBuffer =
         await this.optimizeImage(originalImageBuffer);
+
+      // Re-encoding a small WebP can make it bigger; keep the original then.
+      const imageFormat = await sharp(originalImageBuffer).metadata();
+      if (
+        imageFormat.format === "webp" &&
+        optimizedImageBuffer.byteLength >= originalImageBuffer.byteLength
+      ) {
+        logger.info(`Image ${storageId} would not get smaller, skipping`);
+        return null;
+      }
 
       // Upload the optimized version
       const newStorageId =
