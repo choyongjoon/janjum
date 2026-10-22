@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import type { Nutritions } from "../shared/nutritions";
+import { getRecentProductsSince } from "../shared/recentProducts";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import {
@@ -245,7 +246,7 @@ function hasNutritionChanges(
   return NUTRITION_FIELDS.some((field) => existing[field] !== args[field]);
 }
 
-function hasProductChanges(
+export function hasProductChanges(
   existing: ExistingProduct,
   args: UpsertProductArgs
 ): boolean {
@@ -473,27 +474,35 @@ export const upsertProduct = internalMutation({
   },
 });
 
-const RECENT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 const BULK_IMPORT_WINDOW_MS = 24 * 60 * 60 * 1000;
 const MAX_RECENT_PAGE_SIZE = 100;
 const MAX_RECENT_PER_CAFE = 20;
+// Upper bound on products read per call, so a client-supplied `since` far in
+// the past can't turn this into a scan of the whole products table.
+const MAX_RECENT_SCAN = 1000;
 
 interface CafeInfo {
   creationTime: number;
   name: string;
 }
 
-// Active products added in the last 30 days, newest first. Excludes
-// bulk-imported products (added within 24h of cafe creation).
-async function collectRecentProducts(ctx: QueryCtx) {
-  const thirtyDaysAgo = Date.now() - RECENT_WINDOW_MS;
-
+// Active products added since `since`, newest first. Excludes bulk-imported
+// products (added within 24h of cafe creation).
+//
+// Clients pass `since` from getRecentProductsSince(), which only changes once a
+// day. Keeping Date.now() out of the query makes it deterministic, so Convex
+// can answer repeat calls from its query cache without reading any documents.
+// The Date.now() fallback is only for clients that predate the argument.
+async function collectRecentProducts(ctx: QueryCtx, since: number | undefined) {
   const products = await ctx.db
     .query("products")
     .withIndex("by_is_active_added_at", (q) =>
-      q.eq("isActive", true).gte("addedAt", thirtyDaysAgo)
+      q
+        .eq("isActive", true)
+        .gte("addedAt", since ?? getRecentProductsSince(Date.now()))
     )
-    .collect();
+    .order("desc")
+    .take(MAX_RECENT_SCAN);
 
   // Cache cafe lookups to avoid redundant queries
   const cafeCache = new Map<string, CafeInfo>();
@@ -519,7 +528,7 @@ async function collectRecentProducts(ctx: QueryCtx) {
     }
   }
 
-  filtered.sort((a, b) => b.product.addedAt - a.product.addedAt);
+  // Already newest first: the index is read in descending addedAt order.
   return filtered;
 }
 
@@ -545,9 +554,10 @@ export const getRecent = query({
     limit: v.optional(v.number()),
     offset: v.optional(v.number()),
     cafeId: v.optional(v.id("cafes")),
+    since: v.optional(v.number()),
   },
-  handler: async (ctx, { limit, offset, cafeId }) => {
-    const all = await collectRecentProducts(ctx);
+  handler: async (ctx, { limit, offset, cafeId, since }) => {
+    const all = await collectRecentProducts(ctx, since);
     const filtered = cafeId
       ? all.filter(({ product }) => product.cafeId === cafeId)
       : all;
@@ -568,10 +578,11 @@ export const getRecent = query({
 export const getRecentByCafe = query({
   args: {
     perCafe: v.optional(v.number()),
+    since: v.optional(v.number()),
   },
-  handler: async (ctx, { perCafe }) => {
+  handler: async (ctx, { perCafe, since }) => {
     const size = clampCount(perCafe, 4, MAX_RECENT_PER_CAFE);
-    const all = await collectRecentProducts(ctx);
+    const all = await collectRecentProducts(ctx, since);
 
     const groups = new Map<
       Id<"cafes">,
@@ -658,18 +669,19 @@ export const getByExternalIds = query({
       return [];
     }
 
-    // Query products by cafeId and filter by externalIds
-    const products = await ctx.db
-      .query("products")
-      .withIndex("by_cafe", (q) => q.eq("cafeId", cafe._id))
-      .filter((q) =>
-        q.or(
-          ...externalIds.map((externalId) =>
-            q.eq(q.field("externalId"), externalId)
+    // One index lookup per id. The previous `by_cafe` + filter read every
+    // product of the cafe, soft-removed ones included, on each upload.
+    const found = await Promise.all(
+      [...new Set(externalIds)].map((externalId) =>
+        ctx.db
+          .query("products")
+          .withIndex("by_cafe_external_id", (q) =>
+            q.eq("cafeId", cafe._id).eq("externalId", externalId)
           )
-        )
+          .first()
       )
-      .collect();
+    );
+    const products = found.filter((product) => product !== null);
 
     return products.map((product) => ({
       externalId: product.externalId,
@@ -821,8 +833,6 @@ export const markAsRemoved = internalMutation({
     currentExternalIds: v.array(v.string()),
   },
   handler: async (ctx, { cafeId, currentExternalIds }) => {
-    const now = Date.now();
-
     // Read only the active products straight from the index; the previous
     // `by_cafe` + filter also pulled in every soft-removed product.
     const activeProducts = await ctx.db
@@ -832,32 +842,47 @@ export const markAsRemoved = internalMutation({
       )
       .collect();
 
-    // Set lookup instead of Array#includes inside the loop, which made this
-    // O(active x crawled) string comparisons inside the upload transaction.
-    const crawledIds = new Set(currentExternalIds);
-    const removedProducts: string[] = [];
-
-    for (const product of activeProducts) {
-      if (!crawledIds.has(product.externalId)) {
-        await ctx.db.patch(product._id, {
-          isActive: false,
-          removedAt: now,
-          updatedAt: now,
-        });
-        await syncProductSearch(ctx, product._id, {
-          ...product,
-          isActive: false,
-        });
-        removedProducts.push(product.name);
-      }
-    }
-
-    return {
-      removed: removedProducts.length,
-      removedProducts,
-    };
+    return await softRemoveMissingProducts(
+      ctx,
+      activeProducts,
+      new Set(currentExternalIds)
+    );
   },
 });
+
+/**
+ * Soft-remove each of `activeProducts` whose externalId is not in
+ * `crawledIds`. Shared by `markAsRemoved` and the bulk uploader, which passes
+ * the active products it already read instead of scanning them again.
+ */
+export async function softRemoveMissingProducts(
+  ctx: MutationCtx,
+  activeProducts: Doc<"products">[],
+  crawledIds: Set<string>
+): Promise<{ removed: number; removedProducts: string[] }> {
+  const now = Date.now();
+  const removedProducts: string[] = [];
+
+  for (const product of activeProducts) {
+    if (!crawledIds.has(product.externalId)) {
+      await ctx.db.patch(product._id, {
+        isActive: false,
+        removedAt: now,
+        updatedAt: now,
+      });
+      await syncProductSearch(ctx, product._id, {
+        ...product,
+        isActive: false,
+      });
+      removedProducts.push(product.name);
+    }
+  }
+
+  return {
+    removed: removedProducts.length,
+    removedProducts,
+  };
+}
 
 /**
  * Restore per-product `addedAt` values.

@@ -128,3 +128,82 @@ describe("upload into a new external category", () => {
     expect(addedAt("카페라떼")).toBeGreaterThan(cafe?._creationTime ?? 0);
   });
 });
+
+describe("repeat uploads", () => {
+  beforeEach(() => {
+    vi.stubEnv("CONVEX_UPLOAD_SECRET", SECRET);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const crawled = (name: string) => ({
+    name,
+    nameEn: "",
+    externalId: name,
+    externalUrl: "https://example.com",
+    externalCategory: "COFFEE",
+    externalImageUrl: "",
+    description: "",
+    category: null,
+    price: 4500,
+    nutritions: { calories: 10, sugar: null },
+  });
+
+  it("leaves unchanged products alone and still removes missing ones", async () => {
+    const t = setup();
+    await t.run((ctx) =>
+      ctx.db.insert("cafes", { name: "카페", slug: "cafe" })
+    );
+    const upload = (products: ReturnType<typeof crawled>[]) =>
+      t.mutation(api.dataUploader.uploadProductsFromJson, {
+        cafeSlug: "cafe",
+        uploadSecret: SECRET,
+        products,
+      });
+
+    await upload([crawled("아메리카노"), crawled("카페라떼")]);
+    const before = await t.run((ctx) => ctx.db.query("products").collect());
+
+    const result = await upload([crawled("아메리카노")]);
+    expect(result).toMatchObject({
+      created: 0,
+      updated: 0,
+      unchanged: 1,
+      removed: 1,
+      removedProducts: ["카페라떼"],
+    });
+
+    const after = await t.run((ctx) => ctx.db.query("products").collect());
+    const americano = (products: typeof before) =>
+      products.find((product) => product.name === "아메리카노");
+    expect(americano(after)?.updatedAt).toBe(americano(before)?.updatedAt);
+    expect(after.find((product) => product.name === "카페라떼")?.isActive).toBe(
+      false
+    );
+
+    const revived = await upload([
+      crawled("아메리카노"),
+      { ...crawled("카페라떼"), price: 5000 },
+    ]);
+    expect(revived).toMatchObject({ updated: 1, unchanged: 1, removed: 0 });
+  });
+});
+
+describe("recent products since", () => {
+  it("only returns products added on or after `since`", async () => {
+    const t = setup();
+    const later = Date.now() + 2 * ONE_DAY_MS;
+    await createCafeWithProducts(t, "cafe", 3, later);
+
+    const recent = await t.query(api.products.getRecent, {
+      since: later - 1,
+    });
+    expect(recent.totalCount).toBe(2);
+    expect(recent.products.map((product) => product.name)).toEqual([
+      "cafe-0",
+      "cafe-1",
+    ]);
+  });
+});

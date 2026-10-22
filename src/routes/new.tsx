@@ -17,7 +17,7 @@ export const Route = createFileRoute("/new")({
   loader: async (opts) => {
     // SSR the first products of each cafe; the rest load on demand via "더 보기".
     await opts.context.queryClient.ensureQueryData(
-      recentProductsByCafeQueryOptions
+      recentProductsByCafeQueryOptions()
     );
   },
   head: () => ({
@@ -128,7 +128,7 @@ function CafeGroup({
 }
 
 function NewProductsPage() {
-  const { data, isPending } = useQuery(recentProductsByCafeQueryOptions);
+  const { data, isPending } = useQuery(recentProductsByCafeQueryOptions());
   const cafes = data?.cafes ?? [];
   const totalCount = data?.totalCount ?? 0;
 
