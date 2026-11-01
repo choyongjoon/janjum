@@ -243,6 +243,34 @@ describe("storage queries for scripts", () => {
     });
     expect(metadata?._id).toBe(storageId);
   });
+
+  it("list every storage file exactly once across pages", async () => {
+    const t = setup();
+    const stored = await t.run(async (ctx) => {
+      const ids: Id<"_storage">[] = [];
+      for (let i = 0; i < 25; i++) {
+        ids.push(await ctx.storage.store(new Blob([`image ${i}`])));
+      }
+      return ids;
+    });
+
+    const listed: Id<"_storage">[] = [];
+    let cursor: string | undefined;
+    let hasMore = true;
+    while (hasMore) {
+      const page = await t.query(api.storage.getAllStorageFiles, {
+        cursor,
+        limit: 10,
+        uploadSecret: SECRET,
+      });
+      listed.push(...page.files);
+      cursor = page.nextCursor ?? undefined;
+      hasMore = page.hasMore;
+    }
+
+    expect(listed).toHaveLength(stored.length);
+    expect(new Set(listed)).toEqual(new Set(stored));
+  });
 });
 
 describe("review list page size", () => {

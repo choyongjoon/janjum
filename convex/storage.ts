@@ -19,24 +19,19 @@ export const getAllStorageFiles = query({
     // Ensure we don't exceed Convex limits
     const safeLimit = Math.min(limit, 8000);
 
-    let storageQuery = ctx.db.system.query("_storage");
-
-    if (cursor) {
-      // Resume from cursor
-      storageQuery = storageQuery.filter((q) => q.gt(q.field("_id"), cursor));
-    }
-
-    const storageFiles = await storageQuery.order("asc").take(safeLimit + 1); // Take one extra to check if there are more
-
-    const hasMore = storageFiles.length > safeLimit;
-    const items = hasMore ? storageFiles.slice(0, safeLimit) : storageFiles;
-    const nextCursor = hasMore ? items.at(-1)?._id : null;
+    // Use Convex pagination: _ids are not ordered by creation time, so a
+    // `_id > cursor` filter on a creation-ordered query returns some files on
+    // several pages and skips others.
+    const page = await ctx.db.system
+      .query("_storage")
+      .order("asc")
+      .paginate({ cursor: cursor ?? null, numItems: safeLimit });
 
     return {
-      files: items.map((file) => file._id),
-      nextCursor,
-      hasMore,
-      total: items.length,
+      files: page.page.map((file) => file._id),
+      nextCursor: page.isDone ? null : page.continueCursor,
+      hasMore: !page.isDone,
+      total: page.page.length,
     };
   },
 });

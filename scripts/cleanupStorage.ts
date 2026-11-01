@@ -25,6 +25,8 @@ const client = new ConvexHttpClient(convexUrl);
 // in local dev, in which case the server-side check is skipped.
 const UPLOAD_SECRET = process.env.CONVEX_UPLOAD_SECRET;
 
+const METADATA_BATCH_SIZE = 1000;
+
 interface StorageReference {
   field: string;
   recordId: string;
@@ -55,7 +57,7 @@ async function getAllStorageFiles(): Promise<Id<"_storage">[]> {
 
       const result: {
         files: Id<"_storage">[];
-        nextCursor: Id<"_storage"> | null | undefined;
+        nextCursor: string | null;
         hasMore: boolean;
         total: number;
       } = await client.query(api.storage.getAllStorageFiles, {
@@ -192,27 +194,32 @@ async function findDanglingFiles(): Promise<DanglingFile[]> {
   logger.info(
     `Getting metadata for ${danglingStorageIds.length} dangling files...`
   );
-  try {
-    const metadataResults = await client.query(api.storage.getStorageMetadata, {
-      storageIds: danglingStorageIds,
-      uploadSecret: UPLOAD_SECRET,
-    });
+  // One query per batch: reading every file in one query exceeds Convex's
+  // per-query read limits once there are tens of thousands of files.
+  for (let i = 0; i < danglingStorageIds.length; i += METADATA_BATCH_SIZE) {
+    const batch = danglingStorageIds.slice(i, i + METADATA_BATCH_SIZE);
+    try {
+      const metadataResults = await client.query(
+        api.storage.getStorageMetadata,
+        { storageIds: batch, uploadSecret: UPLOAD_SECRET }
+      );
 
-    for (const result of metadataResults) {
-      danglingFiles.push({
-        storageId: result.storageId,
-        size: result.metadata?.size,
-        contentType: result.metadata?.contentType,
-      });
-    }
-  } catch (error) {
-    logger.warn(
-      "Could not get metadata for some files, proceeding with basic info:",
-      error
-    );
-    // Fallback to basic storage ID info
-    for (const storageId of danglingStorageIds) {
-      danglingFiles.push({ storageId });
+      for (const result of metadataResults) {
+        danglingFiles.push({
+          storageId: result.storageId,
+          size: result.metadata?.size,
+          contentType: result.metadata?.contentType,
+        });
+      }
+    } catch (error) {
+      logger.warn(
+        `Could not get metadata for batch starting at index ${i}, proceeding with basic info:`,
+        error
+      );
+      // Fallback to basic storage ID info
+      for (const storageId of batch) {
+        danglingFiles.push({ storageId });
+      }
     }
   }
 
