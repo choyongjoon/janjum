@@ -5,6 +5,7 @@ import { ConvexClient } from "convex/browser";
 import dotenv from "dotenv";
 import sharp from "sharp";
 import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import { toOptimizedWebp } from "../../shared/imageOptimization";
 import { logger } from "../../shared/logger";
 import { dedupeByExternalId } from "./dedupe";
@@ -23,6 +24,8 @@ const IMAGE_CONCURRENCY = process.env.IMAGE_CONCURRENCY
 dotenv.config({ path: ".env.local" });
 
 const CONVEX_URL = process.env.VITE_CONVEX_URL;
+// Each id costs one index read and one delete in a single mutation.
+const DELETE_BATCH_SIZE = 100;
 
 interface UploadOptions {
   cafeSlug: string;
@@ -211,19 +214,61 @@ class ProductUploader {
     // Download, optimize to WebP, and upload to storage before sending product data.
     // On a dry run images are still downloaded and optimized (to catch broken
     // URLs and report sizes) but never uploaded to storage.
-    const processedProducts = downloadImages
+    const { products: processedProducts, uploadedStorageIds } = downloadImages
       ? await this.preprocessImages(products, cafeSlug, dryRun)
-      : products;
+      : { products, uploadedStorageIds: [] };
 
     // Send products to server with pre-processed images (already in WebP format)
     // downloadImages=false tells server not to download again since we already did it
-    return await this.client.mutation(api.dataUploader.uploadProductsFromJson, {
-      products: processedProducts,
-      cafeSlug,
-      dryRun,
-      downloadImages: false, // Images already processed and uploaded
-      uploadSecret,
-    });
+    try {
+      return await this.client.mutation(
+        api.dataUploader.uploadProductsFromJson,
+        {
+          products: processedProducts,
+          cafeSlug,
+          dryRun,
+          downloadImages: false, // Images already processed and uploaded
+          uploadSecret,
+        }
+      );
+    } catch (error) {
+      // The images were stored before the mutation, and a failed mutation
+      // writes no product that references them. Left alone they become
+      // orphans, re-uploaded on every retry and every daily run.
+      await this.deleteOrphanedImages(uploadedStorageIds, uploadSecret);
+      throw error;
+    }
+  }
+
+  private async deleteOrphanedImages(
+    storageIds: string[],
+    uploadSecret: string
+  ): Promise<void> {
+    if (storageIds.length === 0) {
+      return;
+    }
+    let deleted = 0;
+    try {
+      for (let i = 0; i < storageIds.length; i += DELETE_BATCH_SIZE) {
+        const result = await this.client.mutation(
+          api.storage.deleteUnreferencedProductImages,
+          {
+            storageIds: storageIds.slice(
+              i,
+              i + DELETE_BATCH_SIZE
+            ) as Id<"_storage">[],
+            uploadSecret,
+          }
+        );
+        deleted += result.deleted;
+      }
+      logger.info(`Deleted ${deleted} image(s) uploaded for the failed upload`);
+    } catch (cleanupError) {
+      logger.warn(
+        "Failed to delete images uploaded for the failed upload; run cleanup-storage to remove them:",
+        cleanupError
+      );
+    }
   }
 
   /**
@@ -251,9 +296,11 @@ class ProductUploader {
 
       return productMap;
     } catch (error) {
-      logger.warn("Failed to fetch existing products from database:", error);
-      // Return empty map to continue with normal processing
-      return new Map();
+      // Continuing with an empty map would re-upload every product's image and
+      // repoint the products at the copies. Fail the upload instead.
+      throw new Error(
+        `Failed to fetch existing products from database: ${error}`
+      );
     }
   }
 
@@ -266,7 +313,7 @@ class ProductUploader {
     products: ProductData[],
     cafeSlug: string,
     dryRun: boolean
-  ): Promise<ProductData[]> {
+  ): Promise<{ products: ProductData[]; uploadedStorageIds: string[] }> {
     logger.info(
       `Pre-processing images for ${products.length} products${dryRun ? " (dry run: nothing will be uploaded to storage)" : ""}...`
     );
@@ -321,7 +368,10 @@ class ProductUploader {
       );
     }
 
-    return processedProducts;
+    const uploadedStorageIds = results.flatMap(({ outcome }) =>
+      outcome.kind === "uploaded" ? [outcome.storageId] : []
+    );
+    return { products: processedProducts, uploadedStorageIds };
   }
 
   private logImageOutcome(

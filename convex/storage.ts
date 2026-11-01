@@ -19,18 +19,15 @@ export const getAllStorageFiles = query({
     // Ensure we don't exceed Convex limits
     const safeLimit = Math.min(limit, 8000);
 
-    let storageQuery = ctx.db.system.query("_storage");
-
-    if (cursor) {
-      // Resume from cursor
-      storageQuery = storageQuery.filter((q) => q.gt(q.field("_id"), cursor));
-    }
-
-    const storageFiles = await storageQuery.order("asc").take(safeLimit + 1); // Take one extra to check if there are more
-
-    const hasMore = storageFiles.length > safeLimit;
-    const items = hasMore ? storageFiles.slice(0, safeLimit) : storageFiles;
-    const nextCursor = hasMore ? items.at(-1)?._id : null;
+    // Real pagination. The previous version sorted by _creationTime but
+    // resumed with `_id > cursor`; ids aren't in creation order, so pages
+    // overlapped and skipped files, and every page rescanned the table.
+    const result = await ctx.db.system
+      .query("_storage")
+      .paginate({ cursor: cursor ?? null, numItems: safeLimit });
+    const items = result.page;
+    const hasMore = !result.isDone;
+    const nextCursor = hasMore ? result.continueCursor : null;
 
     return {
       files: items.map((file) => file._id),
@@ -169,5 +166,35 @@ export const getStorageStats = query({
       totalSizeMB: Math.round((totalSize / 1024 / 1024) * 100) / 100,
       contentTypes,
     };
+  },
+});
+
+/**
+ * Delete product images the uploader stored for an upload that then failed.
+ * Skips any file a product references, in case the failed-looking upload had
+ * actually committed (e.g. the response was lost after the mutation ran).
+ */
+export const deleteUnreferencedProductImages = mutation({
+  args: {
+    storageIds: v.array(v.id("_storage")),
+    uploadSecret: v.optional(v.string()),
+  },
+  handler: async (ctx, { storageIds, uploadSecret }) => {
+    verifyUploadSecret(uploadSecret);
+
+    let deleted = 0;
+    for (const storageId of storageIds) {
+      const referenced = await ctx.db
+        .query("products")
+        .withIndex("by_image_storage_id", (q) =>
+          q.eq("imageStorageId", storageId)
+        )
+        .first();
+      if (!referenced) {
+        await ctx.storage.delete(storageId);
+        deleted++;
+      }
+    }
+    return { deleted, kept: storageIds.length - deleted };
   },
 });

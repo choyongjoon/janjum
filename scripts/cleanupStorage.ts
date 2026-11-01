@@ -24,6 +24,7 @@ const client = new ConvexHttpClient(convexUrl);
 // Admin read queries are gated by this secret in production. May be undefined
 // in local dev, in which case the server-side check is skipped.
 const UPLOAD_SECRET = process.env.CONVEX_UPLOAD_SECRET;
+const METADATA_BATCH_SIZE = 1000;
 
 interface StorageReference {
   field: string;
@@ -55,7 +56,7 @@ async function getAllStorageFiles(): Promise<Id<"_storage">[]> {
 
       const result: {
         files: Id<"_storage">[];
-        nextCursor: Id<"_storage"> | null | undefined;
+        nextCursor: string | null | undefined;
         hasMore: boolean;
         total: number;
       } = await client.query(api.storage.getAllStorageFiles, {
@@ -193,24 +194,30 @@ async function findDanglingFiles(): Promise<DanglingFile[]> {
     `Getting metadata for ${danglingStorageIds.length} dangling files...`
   );
   try {
-    const metadataResults = await client.query(api.storage.getStorageMetadata, {
-      storageIds: danglingStorageIds,
-      uploadSecret: UPLOAD_SECRET,
-    });
-
-    for (const result of metadataResults) {
-      danglingFiles.push({
-        storageId: result.storageId,
-        size: result.metadata?.size,
-        contentType: result.metadata?.contentType,
-      });
+    // In chunks: one query over tens of thousands of ids fails server-side.
+    for (let i = 0; i < danglingStorageIds.length; i += METADATA_BATCH_SIZE) {
+      const metadataResults = await client.query(
+        api.storage.getStorageMetadata,
+        {
+          storageIds: danglingStorageIds.slice(i, i + METADATA_BATCH_SIZE),
+          uploadSecret: UPLOAD_SECRET,
+        }
+      );
+      for (const result of metadataResults) {
+        danglingFiles.push({
+          storageId: result.storageId,
+          size: result.metadata?.size,
+          contentType: result.metadata?.contentType,
+        });
+      }
     }
   } catch (error) {
     logger.warn(
       "Could not get metadata for some files, proceeding with basic info:",
       error
     );
-    // Fallback to basic storage ID info
+    // Fallback to basic storage ID info, dropping any chunks already added
+    danglingFiles.length = 0;
     for (const storageId of danglingStorageIds) {
       danglingFiles.push({ storageId });
     }
