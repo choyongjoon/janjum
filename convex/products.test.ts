@@ -207,3 +207,76 @@ describe("recent products since", () => {
     ]);
   });
 });
+
+describe("orphaned product images", () => {
+  beforeEach(() => {
+    vi.stubEnv("CONVEX_UPLOAD_SECRET", SECRET);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const storeImage = (t: TestConvex) =>
+    t.run((ctx) => ctx.storage.store(new Blob(["image"])));
+
+  const crawled = (imageStorageId: string) => ({
+    name: "아메리카노",
+    nameEn: "",
+    externalId: "americano",
+    externalUrl: "https://example.com",
+    externalCategory: "COFFEE",
+    externalImageUrl: "https://example.com/a.png",
+    description: "",
+    category: null,
+    price: 4500,
+    imageStorageId,
+  });
+
+  it("deletes the image an upload replaces", async () => {
+    const t = setup();
+    await t.run((ctx) =>
+      ctx.db.insert("cafes", { name: "카페", slug: "cafe" })
+    );
+    const oldImage = await storeImage(t);
+    const newImage = await storeImage(t);
+    const upload = (imageStorageId: string) =>
+      t.mutation(api.dataUploader.uploadProductsFromJson, {
+        cafeSlug: "cafe",
+        uploadSecret: SECRET,
+        products: [crawled(imageStorageId)],
+      });
+
+    await upload(oldImage);
+    await upload(newImage);
+
+    const { oldFile, newFile } = await t.run(async (ctx) => ({
+      oldFile: await ctx.storage.getUrl(oldImage),
+      newFile: await ctx.storage.getUrl(newImage),
+    }));
+    expect(oldFile).toBeNull();
+    expect(newFile).not.toBeNull();
+  });
+
+  it("only deletes unreferenced images after a failed upload", async () => {
+    const t = setup();
+    await t.run((ctx) =>
+      ctx.db.insert("cafes", { name: "카페", slug: "cafe" })
+    );
+    const used = await storeImage(t);
+    const orphan = await storeImage(t);
+    await t.mutation(api.dataUploader.uploadProductsFromJson, {
+      cafeSlug: "cafe",
+      uploadSecret: SECRET,
+      products: [crawled(used)],
+    });
+
+    const result = await t.mutation(
+      api.storage.deleteUnreferencedProductImages,
+      { storageIds: [used, orphan], uploadSecret: SECRET }
+    );
+    expect(result).toEqual({ deleted: 1, kept: 1 });
+    const usedUrl = await t.run((ctx) => ctx.storage.getUrl(used));
+    expect(usedUrl).not.toBeNull();
+  });
+});

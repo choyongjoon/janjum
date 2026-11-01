@@ -171,3 +171,33 @@ export const getStorageStats = query({
     };
   },
 });
+
+/**
+ * Delete product images the uploader stored for an upload that then failed.
+ * Skips any file a product references, in case the failed-looking upload had
+ * actually committed (e.g. the response was lost after the mutation ran).
+ */
+export const deleteUnreferencedProductImages = mutation({
+  args: {
+    storageIds: v.array(v.id("_storage")),
+    uploadSecret: v.optional(v.string()),
+  },
+  handler: async (ctx, { storageIds, uploadSecret }) => {
+    verifyUploadSecret(uploadSecret);
+
+    let deleted = 0;
+    for (const storageId of storageIds) {
+      const referenced = await ctx.db
+        .query("products")
+        .withIndex("by_image_storage_id", (q) =>
+          q.eq("imageStorageId", storageId)
+        )
+        .first();
+      if (!referenced) {
+        await ctx.storage.delete(storageId);
+        deleted++;
+      }
+    }
+    return { deleted, kept: storageIds.length - deleted };
+  },
+});

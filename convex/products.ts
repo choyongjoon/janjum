@@ -295,6 +295,35 @@ async function scheduleImageDownloadIfNeeded(
   }
 }
 
+/**
+ * The uploader stores a new image whenever it can't find the product's current
+ * one, then this upsert points the product at it. Delete the file it replaced,
+ * unless another product still uses it, so it doesn't linger as an orphan.
+ */
+async function deleteReplacedImage(
+  ctx: MutationCtx,
+  existing: ExistingProduct,
+  newImageStorageId: Id<"_storage"> | undefined
+): Promise<void> {
+  const oldImageStorageId = existing.imageStorageId;
+  if (
+    !(oldImageStorageId && newImageStorageId) ||
+    oldImageStorageId === newImageStorageId
+  ) {
+    return;
+  }
+  const otherUsers = await ctx.db
+    .query("products")
+    .withIndex("by_image_storage_id", (q) =>
+      q.eq("imageStorageId", oldImageStorageId)
+    )
+    .take(2);
+  if (otherUsers.some((product) => product._id !== existing._id)) {
+    return;
+  }
+  await ctx.storage.delete(oldImageStorageId);
+}
+
 async function handleExistingProduct(
   ctx: MutationCtx,
   args: UpsertProductArgs,
@@ -320,6 +349,7 @@ async function handleExistingProduct(
 
     await ctx.db.patch(existing._id, dataToStore);
     await syncProductSearch(ctx, existing._id, { ...existing, ...dataToStore });
+    await deleteReplacedImage(ctx, existing, dataToStore.imageStorageId);
 
     const shouldDownloadImage = !existing.imageStorageId;
     await scheduleImageDownloadIfNeeded(
