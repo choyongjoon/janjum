@@ -279,4 +279,28 @@ describe("orphaned product images", () => {
     const usedUrl = await t.run((ctx) => ctx.storage.getUrl(used));
     expect(usedUrl).not.toBeNull();
   });
+
+  it("lists every storage file exactly once across pages", async () => {
+    const t = setup();
+    const stored = [
+      await storeImage(t),
+      await storeImage(t),
+      await storeImage(t),
+    ];
+
+    const listed: string[] = [];
+    let cursor: string | undefined;
+    let hasMore = true;
+    while (hasMore) {
+      const page = await t.query(api.storage.getAllStorageFiles, {
+        cursor,
+        limit: 2,
+        uploadSecret: SECRET,
+      });
+      listed.push(...page.files);
+      cursor = page.nextCursor ?? undefined;
+      hasMore = page.hasMore;
+    }
+    expect([...listed].sort()).toEqual([...stored].sort());
+  });
 });
