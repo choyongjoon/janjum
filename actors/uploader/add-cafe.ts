@@ -17,6 +17,7 @@ type CafeKey = keyof typeof AVAILABLE_CAFES;
 interface ParsedArgs {
   cafeKey: CafeKey;
   imageUrl?: string;
+  replaceImage: boolean;
 }
 
 const OG_IMAGE_REGEX =
@@ -51,7 +52,7 @@ function parseArgs(): ParsedArgs {
   if (args.length === 0 || args.includes("--help") || args.includes("-h")) {
     logger.info(`
 Usage:
-  pnpm add-cafe <cafe-key> [--image-url <url>]
+  pnpm add-cafe <cafe-key> [--image-url <url>] [--replace-image]
 
 Available cafes:
 ${Object.entries(AVAILABLE_CAFES)
@@ -60,6 +61,7 @@ ${Object.entries(AVAILABLE_CAFES)
 
 Options:
   --image-url <url>  Provide a specific image URL (otherwise fetches og:image from website)
+  --replace-image    Replace the image of a cafe that already has one
 `);
     process.exit(0);
   }
@@ -77,7 +79,11 @@ Options:
     imageUrl = args[imageUrlIndex + 1];
   }
 
-  return { cafeKey: cafeKey as CafeKey, imageUrl };
+  return {
+    cafeKey: cafeKey as CafeKey,
+    imageUrl,
+    replaceImage: args.includes("--replace-image"),
+  };
 }
 
 function resolveUrl(url: string, baseUrl: string): string {
@@ -224,7 +230,7 @@ async function main() {
     throw new Error("CONVEX_UPLOAD_SECRET is not set");
   }
 
-  const { cafeKey, imageUrl: providedImageUrl } = parseArgs();
+  const { cafeKey, imageUrl: providedImageUrl, replaceImage } = parseArgs();
   const cafe = AVAILABLE_CAFES[cafeKey];
 
   logger.info(`Adding cafe: ${cafe.name} (${cafe.slug})`);
@@ -235,15 +241,17 @@ async function main() {
     slug: cafe.slug,
   });
 
-  if (existing?.imageStorageId) {
+  if (existing?.imageStorageId && !replaceImage) {
     logger.info(
       `Cafe "${cafe.name}" already exists with image (id: ${existing._id})`
     );
-    logger.info("Nothing to do.");
+    logger.info("Nothing to do. Pass --replace-image to replace it.");
     process.exit(0);
   }
 
-  if (existing) {
+  if (existing?.imageStorageId) {
+    logger.info(`Replacing the image of "${cafe.name}"...`);
+  } else if (existing) {
     logger.info(`Cafe "${cafe.name}" exists but has no image, adding one...`);
   }
 

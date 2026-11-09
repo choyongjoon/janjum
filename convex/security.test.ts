@@ -334,3 +334,24 @@ describe("product search", () => {
     expect(rows).toHaveLength(1);
   });
 });
+
+describe("cafe image", () => {
+  it("deletes the replaced image", async () => {
+    const t = setup();
+    const { cafeId } = await createProduct(t);
+    const oldImage = await storeFile(t);
+    const newImage = await storeFile(t);
+    await t.run((ctx) => ctx.db.patch(cafeId, { imageStorageId: oldImage }));
+
+    await t.mutation(api.cafes.updateImage, {
+      cafeId,
+      storageId: newImage,
+      uploadSecret: SECRET,
+    });
+
+    const cafe = await t.run((ctx) => ctx.db.get(cafeId));
+    expect(cafe?.imageStorageId).toBe(newImage);
+    expect(await fileExists(t, oldImage)).toBe(false);
+    expect(await fileExists(t, newImage)).toBe(true);
+  });
+});
