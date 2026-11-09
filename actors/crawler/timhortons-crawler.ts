@@ -43,12 +43,22 @@ const SKIPPED_CATEGORIES = new Set([
   "99000000",
 ]);
 
-const ICECAP_CATEGORY = "03000000";
-const ICECAP_PREFIX = "아이스캡";
+// 커피, 음료, 아이스캡; serving sizes elsewhere are grams
+const DRINK_CATEGORIES = new Set(["01000000", "02000000", "03000000"]);
 
 // The site hides list rows with this display code (e.g. a store-only
 // 2000원 블랙커피)
 const HIDDEN_DISPLAY_CD = "4";
+
+// Combos such as "보늬밤 크림 도넛 SET" are listed under 도넛 and 디저트 with
+// set_yn "4". Other set_yn values are normal items (most 아이스캡 drinks
+// have one), so only this value is skipped.
+const COMBO_SET_YN = "4";
+const COMBO_NAME_REGEX = /\bSET$/i;
+
+// Multi-packs (도넛 6팩, 더즌팩, 팀빗 20p, 파운드(홀)) repeat single items
+// with whole-pack nutrition of up to ~2,900 kcal
+const PACK_NAME_REGEX = /(?:\d+팩|더즌팩|\d+\s*p|\(홀\))$/i;
 
 // Drinks list one nutrition row per size (S, M, L, X) and others one row
 // with "N". Pick the no-size row, else Medium, the default cup.
@@ -58,7 +68,7 @@ const FORM_CONTENT_TYPE = "application/x-www-form-urlencoded; charset=UTF-8";
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
 const REQUEST_TIMEOUT_MS = 20_000;
-const CONCURRENCY = 4;
+const CONCURRENCY = 2;
 const RSA_MODULUS_LENGTH = 512;
 const AES_IV_LENGTH = 16;
 
@@ -72,7 +82,8 @@ const PLUS_REGEX = /\+/g;
 const SLASH_REGEX = /\//g;
 const EQUALS_REGEX = /=/g;
 const COMMA_REGEX = /,/g;
-// Values look like "9.7 ", "1,610.8", "-", "" or a range "180~230"
+// Values look like "9.7 ", "1,610.8", "-" or "". An upper bound such as
+// "<1.0" is left out rather than stored as a made-up exact value.
 const NUMBER_REGEX = /^\d[\d,]*(?:\.\d+)?/;
 
 // ================================================
@@ -115,6 +126,8 @@ interface Category {
 interface ListItem {
   menu_cd: string;
   menu_display_cd: string;
+  menu_nm: string;
+  set_yn: string;
 }
 
 interface MenuGroup {
@@ -328,7 +341,9 @@ function toNutritions(
   servingSizeUnit: string
 ): Nutritions | null {
   const row = pickNutritionRow(rows ?? []);
-  if (!row) {
+  // A range ("253~444" kcal) comes with zeros for every other nutrient, so
+  // the row is not trusted at all
+  if (!row || [row.weight, row.calory].some((v) => v?.includes("~"))) {
     return null;
   }
 
@@ -360,22 +375,23 @@ function clean(text: string | null | undefined): string {
   return (text ?? "").replace(WHITESPACE_REGEX, " ").trim();
 }
 
-// 아이스캡 subcategories are named "커피", "논커피" and "스무디", which would
-// read as hot coffee and other drinks without the parent's name
+// Subcategories are specific enough on their own: "브루 커피", "커피 아이스캡",
+// "티베이스 음료", "도넛"
 function externalCategory(detail: MenuDetail): string {
-  const subcategory = clean(detail.menu_class_cd2_nm);
-  if (
-    detail.menu_class_cd1 === ICECAP_CATEGORY &&
-    !subcategory.startsWith(ICECAP_PREFIX)
-  ) {
-    return `${ICECAP_PREFIX} ${subcategory}`;
-  }
-  return subcategory || clean(detail.menu_class_cd1_nm);
+  return clean(detail.menu_class_cd2_nm) || clean(detail.menu_class_cd1_nm);
 }
 
 function isFood(detail: MenuDetail): boolean {
-  return !["01000000", "02000000", ICECAP_CATEGORY].includes(
-    detail.menu_class_cd1
+  return !DRINK_CATEGORIES.has(detail.menu_class_cd1);
+}
+
+function isCrawled(item: ListItem): boolean {
+  const name = clean(item.menu_nm);
+  return (
+    item.menu_display_cd !== HIDDEN_DISPLAY_CD &&
+    item.set_yn !== COMBO_SET_YN &&
+    !COMBO_NAME_REGEX.test(name) &&
+    !PACK_NAME_REGEX.test(name)
   );
 }
 
@@ -409,7 +425,7 @@ async function fetchMenuCodes(session: Session): Promise<string[]> {
     let count = 0;
     for (const group of groups.result_data) {
       for (const item of group.menu_list ?? []) {
-        if (item.menu_display_cd !== HIDDEN_DISPLAY_CD) {
+        if (isCrawled(item)) {
           codes.add(item.menu_cd);
           count += 1;
         }

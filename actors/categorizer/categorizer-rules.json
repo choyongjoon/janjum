@@ -687,6 +687,102 @@
       "usageCount": 0
     },
     {
+      "id": "direct-espresso-coffee",
+      "type": "direct",
+      "condition": {
+        "externalCategory": "에스프레소 커피"
+      },
+      "targetCategory": "커피",
+      "confidence": "high",
+      "createdBy": "system",
+      "createdAt": 1794182400000,
+      "usageCount": 0
+    },
+    {
+      "id": "direct-decaf-coffee",
+      "type": "direct",
+      "condition": {
+        "externalCategory": "디카페인 커피"
+      },
+      "targetCategory": "커피",
+      "confidence": "high",
+      "createdBy": "system",
+      "createdAt": 1794182400000,
+      "usageCount": 0
+    },
+    {
+      "id": "direct-brew-coffee",
+      "type": "direct",
+      "condition": {
+        "externalCategory": "브루 커피"
+      },
+      "targetCategory": "커피",
+      "confidence": "high",
+      "createdBy": "system",
+      "createdAt": 1794182400000,
+      "usageCount": 0
+    },
+    {
+      "id": "direct-cold-brew",
+      "type": "direct",
+      "condition": {
+        "externalCategory": "콜드브루"
+      },
+      "targetCategory": "커피",
+      "confidence": "high",
+      "createdBy": "system",
+      "createdAt": 1794182400000,
+      "usageCount": 0
+    },
+    {
+      "id": "direct-iced-capp-coffee",
+      "type": "direct",
+      "condition": {
+        "externalCategory": "커피 아이스캡"
+      },
+      "targetCategory": "블렌디드",
+      "confidence": "high",
+      "createdBy": "system",
+      "createdAt": 1794182400000,
+      "usageCount": 0
+    },
+    {
+      "id": "direct-iced-capp-non-coffee",
+      "type": "direct",
+      "condition": {
+        "externalCategory": "논커피 아이스캡"
+      },
+      "targetCategory": "블렌디드",
+      "confidence": "high",
+      "createdBy": "system",
+      "createdAt": 1794182400000,
+      "usageCount": 0
+    },
+    {
+      "id": "direct-iced-capp-smoothie",
+      "type": "direct",
+      "condition": {
+        "externalCategory": "아이스캡 스무디"
+      },
+      "targetCategory": "스무디",
+      "confidence": "high",
+      "createdBy": "system",
+      "createdAt": 1794182400000,
+      "usageCount": 0
+    },
+    {
+      "id": "direct-tea-based-drink",
+      "type": "direct",
+      "condition": {
+        "externalCategory": "티베이스 음료"
+      },
+      "targetCategory": "차",
+      "confidence": "high",
+      "createdBy": "system",
+      "createdAt": 1794182400000,
+      "usageCount": 0
+    },
+    {
       "id": "pattern-ice-cream-ending",
       "type": "pattern",
       "condition": {
