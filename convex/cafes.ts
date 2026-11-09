@@ -101,9 +101,20 @@ export const updateImage = mutation({
   handler: async (ctx, { cafeId, storageId, uploadSecret }) => {
     verifyUploadSecret(uploadSecret);
 
+    const cafe = await ctx.db.get(cafeId);
+    if (!cafe) {
+      throw new Error(`Cafe not found: ${cafeId}`);
+    }
+
     await ctx.db.patch(cafeId, {
       imageStorageId: storageId,
     });
+
+    // A replaced image is referenced by nothing else; delete it so it does
+    // not linger as an orphan in storage
+    if (cafe.imageStorageId && cafe.imageStorageId !== storageId) {
+      await ctx.storage.delete(cafe.imageStorageId);
+    }
 
     return { success: true };
   },
