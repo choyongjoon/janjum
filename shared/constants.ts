@@ -67,4 +67,8 @@ export const AVAILABLE_CAFES = {
     name: "탐앤탐스",
     slug: "tomntoms",
   },
+  timhortons: {
+    name: "팀홀튼",
+    slug: "timhortons",
+  },
 } as const;
