@@ -149,7 +149,13 @@
       "id": "pattern-strawberry-latte-exclusion",
       "type": "pattern",
       "condition": {
-        "nameContains": ["딸기라떼", "딸기 라떼", "멜론라떼"]
+        "nameContains": [
+          "딸기라떼",
+          "딸기 라떼",
+          "멜론라떼",
+          "요거트 라떼",
+          "요거트라떼"
+        ]
       },
       "targetCategory": "그 외",
       "confidence": "high",

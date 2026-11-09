@@ -57,8 +57,10 @@ const COMBO_SET_YN = "4";
 const COMBO_NAME_REGEX = /\bSET$/i;
 
 // Multi-packs (도넛 6팩, 더즌팩, 팀빗 20p, 파운드(홀)) repeat single items
-// with whole-pack nutrition of up to ~2,900 kcal
-const PACK_NAME_REGEX = /(?:\d+팩|더즌팩|\d+\s*p|\(홀\))$/i;
+// with whole-pack nutrition of up to ~2,900 kcal. Single 팀빗 are "… 1p".
+const PACK_NAME_REGEX = /(?:\d+팩|더즌팩|(?:[2-9]|\d{2,})\s*p|\(홀\))$/i;
+// "알밤 팀빗 1p" is one piece; the suffix only tells it apart from the packs
+const SINGLE_PIECE_SUFFIX_REGEX = /\s+1\s*p$/i;
 
 // Drinks list one nutrition row per size (S, M, L, X) and others one row
 // with "N". Pick the no-size row, else Medium, the default cup.
@@ -475,7 +477,7 @@ async function toProduct(
     nutrition_info: NutritionRow[] | null;
   }>(session, TR.nutrition, { menu_cd: detail.menu_cd, stor_cd: "" });
   const nutritions = toNutritions(nutrition_info, isFood(detail) ? "g" : "ml");
-  const name = clean(detail.menu_nm);
+  const name = clean(detail.menu_nm).replace(SINGLE_PIECE_SUFFIX_REGEX, "");
   const price = Number.parseInt(detail.menu_price ?? "", 10);
 
   logger.info(
