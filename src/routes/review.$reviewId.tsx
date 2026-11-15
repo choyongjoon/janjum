@@ -4,7 +4,7 @@ import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import type { Id } from "convex/_generated/dataModel";
 import { api } from "../../convex/_generated/api";
 import { ReviewCard } from "../components/reviews/ReviewCard";
-import { seo } from "../utils/seo";
+import { canonicalLink, seo } from "../utils/seo";
 
 export const Route = createFileRoute("/review/$reviewId")({
   component: ReviewPage,
@@ -34,8 +34,10 @@ export const Route = createFileRoute("/review/$reviewId")({
         image:
           loaderData?.product?.externalImageUrl ||
           "/android-chrome-512x512.png",
+        path: `/review/${loaderData?._id}`,
       }),
     ],
+    links: loaderData ? canonicalLink(`/review/${loaderData._id}`) : [],
   }),
 });
 

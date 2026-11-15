@@ -5,7 +5,7 @@ import { ProfileHeader } from "~/components/profile/ProfileHeader";
 import { ProfileReviews } from "~/components/profile/ProfileReviews";
 import { ProfileStats } from "~/components/profile/ProfileStats";
 import { api } from "../../convex/_generated/api";
-import { seo } from "../utils/seo";
+import { canonicalLink, seo } from "../utils/seo";
 
 export const Route = createFileRoute("/user/$handle")({
   component: UserProfilePage,
@@ -21,8 +21,10 @@ export const Route = createFileRoute("/user/$handle")({
         description: `@${loaderData?.handle || "사용자"}님의 카페 음료 후기와 프로필을 확인하세요.`,
         image: "/android-chrome-512x512.png",
         keywords: "사용자 프로필, 후기, 잔점",
+        path: `/user/${loaderData?.handle}`,
       }),
     ],
+    links: loaderData ? canonicalLink(`/user/${loaderData.handle}`) : [],
   }),
 });
 

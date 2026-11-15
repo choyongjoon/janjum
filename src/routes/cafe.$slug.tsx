@@ -1,6 +1,6 @@
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
 import type { Id } from "convex/_generated/dataModel";
 import { useMemo, useState } from "react";
 import { z } from "zod";
@@ -13,16 +13,16 @@ import {
 import { ProductSearchInput } from "~/components/cafe/ProductSearchInput";
 import { useProductReviewStats } from "~/hooks/useProductReviewStats";
 import { api } from "../../convex/_generated/api";
+import { CafeNotFound } from "../components/cafe/CafeNotFound";
 import { ProductCard } from "../components/ProductCard";
 import { getOrderedCategories } from "../utils/categories";
-import { seo } from "../utils/seo";
+import { canonicalLink, DEFAULT_OG_IMAGE, seo } from "../utils/seo";
 
 const searchSchema = z.object({
   category: z.string().optional(),
-  order: z
-    .enum(["latest", "most-reviews", "highest-rating"])
-    .optional()
-    .default("latest"),
+  // No .default(): a default makes the router redirect /cafe/x to
+  // /cafe/x?order=latest, so crawlers never see the canonical URL.
+  order: z.enum(["latest", "most-reviews", "highest-rating"]).optional(),
 });
 
 export const Route = createFileRoute("/cafe/$slug")({
@@ -32,6 +32,14 @@ export const Route = createFileRoute("/cafe/$slug")({
     const cafe = await opts.context.queryClient.ensureQueryData(
       convexQuery(api.cafes.getBySlug, { slug: opts.params.slug })
     );
+    if (!cafe) {
+      throw notFound();
+    }
+    // Prefetch the menu so the product grid (and its links to every product
+    // page) is in the server-rendered HTML that search crawlers read.
+    await opts.context.queryClient.ensureQueryData(
+      convexQuery(api.products.getByCafe, { cafeId: cafe._id })
+    );
     return { cafe };
   },
   head: ({ loaderData }) => ({
@@ -39,10 +47,16 @@ export const Route = createFileRoute("/cafe/$slug")({
       ...seo({
         title: `${loaderData?.cafe?.name || "카페"} | 잔점`,
         description: `${loaderData?.cafe?.name || "카페"} 음료 정보를 확인하세요.`,
-        image: "/android-chrome-512x512.png",
+        image: loaderData?.cafe?.imageUrl || DEFAULT_OG_IMAGE,
+        path: `/cafe/${loaderData?.cafe?.slug}`,
       }),
     ],
+    // Category/order query params are views of the same page.
+    links: loaderData?.cafe
+      ? canonicalLink(`/cafe/${loaderData.cafe.slug}`)
+      : [],
   }),
+  notFoundComponent: CafeNotFound,
 });
 
 function CafePage() {

@@ -5,9 +5,13 @@ import { AuthWrapper } from "~/components/auth/AuthWrapper";
 import { ProfileHeader } from "~/components/profile/ProfileHeader";
 import { ProfileReviews } from "~/components/profile/ProfileReviews";
 import { ProfileStats } from "~/components/profile/ProfileStats";
+import { seo } from "~/utils/seo";
 import { api } from "../../convex/_generated/api";
 
 export const Route = createFileRoute("/profile")({
+  head: () => ({
+    meta: seo({ title: "내 프로필 | 잔점", noindex: true }),
+  }),
   component: AuthenticatedProfilePage,
 });
 

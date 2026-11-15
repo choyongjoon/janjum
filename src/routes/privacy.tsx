@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { seo } from "../utils/seo";
+import { canonicalLink, seo } from "../utils/seo";
 
 export const Route = createFileRoute("/privacy")({
   component: PrivacyPage,
@@ -11,8 +11,10 @@ export const Route = createFileRoute("/privacy")({
           "잔점 개인정보 처리 방침 및 개인정보 보호 정책을 확인하세요.",
         image: "/android-chrome-512x512.png",
         keywords: "개인정보 처리방침, 개인정보 보호정책, 잔점",
+        path: "/privacy",
       }),
     ],
+    links: canonicalLink("/privacy"),
   }),
 });
 

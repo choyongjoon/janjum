@@ -1,3 +1,4 @@
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import type { Nutritions } from "../shared/nutritions";
 import { getRecentProductsSince } from "../shared/recentProducts";
@@ -1128,6 +1129,22 @@ export const moveProductsToCafe = mutation({
       alreadyMoved,
       missing,
       sample: moved.slice(0, 10),
+    };
+  },
+});
+
+// Lightweight page of product URLs for /sitemap.xml. Paginated so the sitemap
+// can cover the whole catalog without hitting per-query read limits.
+export const listForSitemap = query({
+  args: { paginationOpts: paginationOptsValidator },
+  handler: async (ctx, { paginationOpts }) => {
+    const result = await ctx.db.query("products").paginate(paginationOpts);
+    return {
+      ...result,
+      page: result.page.map((product) => ({
+        shortId: product.shortId,
+        updatedAt: product.updatedAt,
+      })),
     };
   },
 });

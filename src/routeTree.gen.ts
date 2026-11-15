@@ -8,6 +8,8 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
+import { createServerRootRoute } from '@tanstack/react-start/server'
+
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SearchRouteImport } from './routes/search'
@@ -23,6 +25,10 @@ import { Route as ReviewReviewIdRouteImport } from './routes/review.$reviewId'
 import { Route as ProductShortIdRouteImport } from './routes/product.$shortId'
 import { Route as CafeSlugRouteImport } from './routes/cafe.$slug'
 import { Route as BlogPostIdRouteImport } from './routes/blog.$postId'
+import { ServerRoute as SitemapDotxmlServerRouteImport } from './routes/sitemap[.]xml'
+import { ServerRoute as LlmsDottxtServerRouteImport } from './routes/llms[.]txt'
+
+const rootServerRouteImport = createServerRootRoute()
 
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
@@ -93,6 +99,16 @@ const BlogPostIdRoute = BlogPostIdRouteImport.update({
   id: '/$postId',
   path: '/$postId',
   getParentRoute: () => BlogRoute,
+} as any)
+const SitemapDotxmlServerRoute = SitemapDotxmlServerRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootServerRouteImport,
+} as any)
+const LlmsDottxtServerRoute = LlmsDottxtServerRouteImport.update({
+  id: '/llms.txt',
+  path: '/llms.txt',
+  getParentRoute: () => rootServerRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -207,6 +223,31 @@ export interface RootRouteChildren {
   ReviewReviewIdRoute: typeof ReviewReviewIdRoute
   UserHandleRoute: typeof UserHandleRoute
 }
+export interface FileServerRoutesByFullPath {
+  '/llms.txt': typeof LlmsDottxtServerRoute
+  '/sitemap.xml': typeof SitemapDotxmlServerRoute
+}
+export interface FileServerRoutesByTo {
+  '/llms.txt': typeof LlmsDottxtServerRoute
+  '/sitemap.xml': typeof SitemapDotxmlServerRoute
+}
+export interface FileServerRoutesById {
+  __root__: typeof rootServerRouteImport
+  '/llms.txt': typeof LlmsDottxtServerRoute
+  '/sitemap.xml': typeof SitemapDotxmlServerRoute
+}
+export interface FileServerRouteTypes {
+  fileServerRoutesByFullPath: FileServerRoutesByFullPath
+  fullPaths: '/llms.txt' | '/sitemap.xml'
+  fileServerRoutesByTo: FileServerRoutesByTo
+  to: '/llms.txt' | '/sitemap.xml'
+  id: '__root__' | '/llms.txt' | '/sitemap.xml'
+  fileServerRoutesById: FileServerRoutesById
+}
+export interface RootServerRouteChildren {
+  LlmsDottxtServerRoute: typeof LlmsDottxtServerRoute
+  SitemapDotxmlServerRoute: typeof SitemapDotxmlServerRoute
+}
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
@@ -310,6 +351,24 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+declare module '@tanstack/react-start/server' {
+  interface ServerFileRoutesByPath {
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlServerRouteImport
+      parentRoute: typeof rootServerRouteImport
+    }
+    '/llms.txt': {
+      id: '/llms.txt'
+      path: '/llms.txt'
+      fullPath: '/llms.txt'
+      preLoaderRoute: typeof LlmsDottxtServerRouteImport
+      parentRoute: typeof rootServerRouteImport
+    }
+  }
+}
 
 interface BlogRouteChildren {
   BlogPostIdRoute: typeof BlogPostIdRoute
@@ -340,3 +399,10 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+const rootServerRouteChildren: RootServerRouteChildren = {
+  LlmsDottxtServerRoute: LlmsDottxtServerRoute,
+  SitemapDotxmlServerRoute: SitemapDotxmlServerRoute,
+}
+export const serverRouteTree = rootServerRouteImport
+  ._addFileChildren(rootServerRouteChildren)
+  ._addFileTypes<FileServerRouteTypes>()
