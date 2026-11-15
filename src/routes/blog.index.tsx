@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { getBlogPosts } from "~/utils/blogData";
 import { formatDateKorean } from "~/utils/dateFormat";
-import { seo } from "~/utils/seo";
+import { canonicalLink, seo } from "~/utils/seo";
 
 export const Route = createFileRoute("/blog/")({
   head: () => ({
@@ -11,8 +11,10 @@ export const Route = createFileRoute("/blog/")({
         description: "카페 음료와 잔점에 관한 이야기를 담은 블로그입니다.",
         image: "/android-chrome-512x512.png",
         keywords: "잔점 블로그, 카페, 음료, 후기, 커피",
+        path: "/blog",
       }),
     ],
+    links: canonicalLink("/blog"),
   }),
   component: BlogIndex,
 });

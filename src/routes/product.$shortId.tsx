@@ -1,6 +1,6 @@
 import { convexQuery } from "@convex-dev/react-query";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import type { Id } from "convex/_generated/dataModel";
 import { NutritionInfoSection } from "~/components/NutritionInfoSection";
 import { RatingSummary } from "~/components/RatingSummary";
@@ -8,7 +8,7 @@ import { api } from "../../convex/_generated/api";
 import { BackLink } from "../components/BackLink";
 import { ExternalLinkIcon } from "../components/icons/ExternalLinkIcon";
 import { ReviewSection } from "../components/reviews/ReviewSection";
-import { seo } from "../utils/seo";
+import { canonicalLink, DEFAULT_OG_IMAGE, seo } from "../utils/seo";
 
 export const Route = createFileRoute("/product/$shortId")({
   component: ProductPage,
@@ -18,10 +18,11 @@ export const Route = createFileRoute("/product/$shortId")({
         shortId: opts.params.shortId,
       })
     );
+    if (!product) {
+      throw notFound();
+    }
     await opts.context.queryClient.ensureQueryData(
-      convexQuery(api.cafes.getById, {
-        cafeId: product?.cafeId as Id<"cafes">,
-      })
+      convexQuery(api.cafes.getById, { cafeId: product.cafeId })
     );
     return { product };
   },
@@ -33,12 +34,31 @@ export const Route = createFileRoute("/product/$shortId")({
           loaderData?.product?.description ||
           `${loaderData?.product?.name || "상품"} 정보를 확인하세요.`,
         image:
+          loaderData?.product?.imageUrl ||
           loaderData?.product?.externalImageUrl ||
-          "/android-chrome-512x512.png",
+          DEFAULT_OG_IMAGE,
+        path: `/product/${loaderData?.product?.shortId}`,
       }),
     ],
+    links: loaderData?.product
+      ? canonicalLink(`/product/${loaderData.product.shortId}`)
+      : [],
   }),
+  notFoundComponent: ProductNotFound,
 });
+
+function ProductNotFound() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-base-200">
+      <div className="text-center">
+        <h1 className="mb-4 font-bold text-2xl">상품을 찾을 수 없습니다</h1>
+        <Link className="btn btn-primary" to="/">
+          홈으로 돌아가기
+        </Link>
+      </div>
+    </div>
+  );
+}
 
 function ProductPage() {
   const { shortId } = Route.useParams();
@@ -60,16 +80,7 @@ function ProductPage() {
   );
 
   if (!product) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-base-200">
-        <div className="text-center">
-          <h1 className="mb-4 font-bold text-2xl">상품을 찾을 수 없습니다</h1>
-          <Link className="btn btn-primary" to="/">
-            홈으로 돌아가기
-          </Link>
-        </div>
-      </div>
-    );
+    return <ProductNotFound />;
   }
 
   const { isActive } = product;

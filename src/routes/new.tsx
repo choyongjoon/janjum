@@ -10,7 +10,7 @@ import {
 import { ProductCard } from "~/components/ProductCard";
 import { useProductReviewStats } from "~/hooks/useProductReviewStats";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
-import { seo } from "../utils/seo";
+import { canonicalLink, seo } from "../utils/seo";
 
 export const Route = createFileRoute("/new")({
   component: NewProductsPage,
@@ -26,8 +26,10 @@ export const Route = createFileRoute("/new")({
         title: "신상품 - 잔점",
         description: "최근 30일 이내에 새로 추가된 카페 음료를 확인하세요.",
         keywords: "신상품, 신메뉴, 카페, 음료, 잔점",
+        path: "/new",
       }),
     ],
+    links: canonicalLink("/new"),
   }),
 });
 

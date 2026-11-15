@@ -9,8 +9,12 @@ import { ProfileImageUpload } from "~/components/settings/ProfileImageUpload";
 import { SettingsHeader } from "~/components/settings/SettingsHeader";
 import { SocialConnections } from "~/components/settings/SocialConnections";
 import { useSettingsForm } from "~/hooks/useSettingsForm";
+import { seo } from "~/utils/seo";
 
 export const Route = createFileRoute("/settings")({
+  head: () => ({
+    meta: seo({ title: "설정 | 잔점", noindex: true }),
+  }),
   component: AuthenticatedSettingsPage,
 });
 

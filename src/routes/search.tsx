@@ -4,6 +4,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { usePostHogEvents } from "~/hooks/usePostHogEvents";
 import { useProductReviewStats } from "~/hooks/useProductReviewStats";
+import { seo } from "~/utils/seo";
 import { api } from "../../convex/_generated/api";
 import { SearchIcon } from "../components/icons/SearchIcon";
 import { ProductCard } from "../components/ProductCard";
@@ -14,6 +15,9 @@ interface SearchFilters {
 }
 
 export const Route = createFileRoute("/search")({
+  head: () => ({
+    meta: seo({ title: "음료 검색 | 잔점", noindex: true }),
+  }),
   component: SearchPage,
   validateSearch: (search: Record<string, unknown>): SearchFilters => ({
     searchTerm: (search.searchTerm as string) || "",

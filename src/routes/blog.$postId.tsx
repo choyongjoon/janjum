@@ -1,8 +1,8 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { marked } from "marked";
 import { getBlogPost } from "~/utils/blogData";
 import { formatDateKorean } from "~/utils/dateFormat";
-import { seo } from "~/utils/seo";
+import { canonicalLink, seo } from "~/utils/seo";
 
 // Configure marked options with post-processing
 const processMarkdown = (content: string) => {
@@ -27,6 +27,9 @@ export const Route = createFileRoute("/blog/$postId")({
   component: BlogPost,
   loader: (opts) => {
     const post = getBlogPost(opts.params.postId);
+    if (!post) {
+      throw notFound();
+    }
     return { post };
   },
   head: ({ loaderData }) => ({
@@ -36,8 +39,10 @@ export const Route = createFileRoute("/blog/$postId")({
         description: loaderData?.post?.excerpt || "잔점 블로그 포스트입니다.",
         image: "/android-chrome-512x512.png",
         keywords: "잔점 블로그, 카페, 음료",
+        path: `/blog/${loaderData?.post?.id}`,
       }),
     ],
+    links: loaderData?.post ? canonicalLink(`/blog/${loaderData.post.id}`) : [],
   }),
 });
 
