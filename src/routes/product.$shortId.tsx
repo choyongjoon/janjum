@@ -7,10 +7,11 @@ import { RatingSummary } from "~/components/RatingSummary";
 import { api } from "../../convex/_generated/api";
 import { BackLink } from "../components/BackLink";
 import { ExternalLinkIcon } from "../components/icons/ExternalLinkIcon";
+import { JsonLd } from "../components/JsonLd";
 import { ReviewSection } from "../components/reviews/ReviewSection";
 import { canonicalLink, DEFAULT_OG_IMAGE, seo } from "../utils/seo";
 import { productDescription, productTitle } from "../utils/seoDescriptions";
-import { jsonLdScript, productJsonLd } from "../utils/structuredData";
+import { productJsonLd } from "../utils/structuredData";
 
 export const Route = createFileRoute("/product/$shortId")({
   component: ProductPage,
@@ -47,9 +48,6 @@ export const Route = createFileRoute("/product/$shortId")({
     ],
     links: loaderData?.product
       ? canonicalLink(`/product/${loaderData.product.shortId}`)
-      : [],
-    scripts: loaderData?.product
-      ? [jsonLdScript(productJsonLd(loaderData.product, loaderData.cafe))]
       : [],
   }),
   notFoundComponent: ProductNotFound,
@@ -95,6 +93,7 @@ function ProductPage() {
 
   return (
     <div className="min-h-screen bg-base-200">
+      <JsonLd data={productJsonLd(product, cafe)} />
       {/* Product Details */}
       <div className="container mx-auto px-4 py-8">
         {/* Back Link */}
