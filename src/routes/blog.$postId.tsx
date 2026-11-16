@@ -3,6 +3,7 @@ import { marked } from "marked";
 import { getBlogPost } from "~/utils/blogData";
 import { formatDateKorean } from "~/utils/dateFormat";
 import { canonicalLink, seo } from "~/utils/seo";
+import { blogPostJsonLd, jsonLdScript } from "~/utils/structuredData";
 
 // Configure marked options with post-processing
 const processMarkdown = (content: string) => {
@@ -43,6 +44,9 @@ export const Route = createFileRoute("/blog/$postId")({
       }),
     ],
     links: loaderData?.post ? canonicalLink(`/blog/${loaderData.post.id}`) : [],
+    scripts: loaderData?.post
+      ? [jsonLdScript(blogPostJsonLd(loaderData.post))]
+      : [],
   }),
 });
 

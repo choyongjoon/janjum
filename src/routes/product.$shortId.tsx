@@ -9,6 +9,8 @@ import { BackLink } from "../components/BackLink";
 import { ExternalLinkIcon } from "../components/icons/ExternalLinkIcon";
 import { ReviewSection } from "../components/reviews/ReviewSection";
 import { canonicalLink, DEFAULT_OG_IMAGE, seo } from "../utils/seo";
+import { productDescription, productTitle } from "../utils/seoDescriptions";
+import { jsonLdScript, productJsonLd } from "../utils/structuredData";
 
 export const Route = createFileRoute("/product/$shortId")({
   component: ProductPage,
@@ -21,18 +23,21 @@ export const Route = createFileRoute("/product/$shortId")({
     if (!product) {
       throw notFound();
     }
-    await opts.context.queryClient.ensureQueryData(
+    const cafe = await opts.context.queryClient.ensureQueryData(
       convexQuery(api.cafes.getById, { cafeId: product.cafeId })
     );
-    return { product };
+    return { product, cafe };
   },
   head: ({ loaderData }) => ({
     meta: [
       ...seo({
-        title: `${loaderData?.product?.name || "상품"} | 잔점`,
-        description:
-          loaderData?.product?.description ||
-          `${loaderData?.product?.name || "상품"} 정보를 확인하세요.`,
+        title: productTitle(
+          loaderData?.product?.name || "상품",
+          loaderData?.cafe?.name
+        ),
+        description: loaderData?.product
+          ? productDescription(loaderData.product, loaderData.cafe?.name)
+          : undefined,
         image:
           loaderData?.product?.imageUrl ||
           loaderData?.product?.externalImageUrl ||
@@ -42,6 +47,9 @@ export const Route = createFileRoute("/product/$shortId")({
     ],
     links: loaderData?.product
       ? canonicalLink(`/product/${loaderData.product.shortId}`)
+      : [],
+    scripts: loaderData?.product
+      ? [jsonLdScript(productJsonLd(loaderData.product, loaderData.cafe))]
       : [],
   }),
   notFoundComponent: ProductNotFound,

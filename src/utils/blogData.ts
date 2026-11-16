@@ -1,7 +1,7 @@
 // Import markdown blog posts
 import startPostMd from "~/data/blog-posts/start.md?raw";
 
-interface BlogPost {
+export interface BlogPost {
   content: string;
   excerpt: string;
   id: string;
