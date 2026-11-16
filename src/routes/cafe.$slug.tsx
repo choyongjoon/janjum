@@ -17,6 +17,8 @@ import { CafeNotFound } from "../components/cafe/CafeNotFound";
 import { ProductCard } from "../components/ProductCard";
 import { getOrderedCategories } from "../utils/categories";
 import { canonicalLink, DEFAULT_OG_IMAGE, seo } from "../utils/seo";
+import { cafeDescription, cafeTitle } from "../utils/seoDescriptions";
+import { cafeJsonLd, jsonLdScript } from "../utils/structuredData";
 
 const searchSchema = z.object({
   category: z.string().optional(),
@@ -37,16 +39,20 @@ export const Route = createFileRoute("/cafe/$slug")({
     }
     // Prefetch the menu so the product grid (and its links to every product
     // page) is in the server-rendered HTML that search crawlers read.
-    await opts.context.queryClient.ensureQueryData(
+    const products = await opts.context.queryClient.ensureQueryData(
       convexQuery(api.products.getByCafe, { cafeId: cafe._id })
     );
-    return { cafe };
+    return {
+      cafe,
+      productCount: products.length,
+      description: cafeDescription(cafe.name, products),
+    };
   },
   head: ({ loaderData }) => ({
     meta: [
       ...seo({
-        title: `${loaderData?.cafe?.name || "카페"} | 잔점`,
-        description: `${loaderData?.cafe?.name || "카페"} 음료 정보를 확인하세요.`,
+        title: cafeTitle(loaderData?.cafe?.name || "카페"),
+        description: loaderData?.description,
         image: loaderData?.cafe?.imageUrl || DEFAULT_OG_IMAGE,
         path: `/cafe/${loaderData?.cafe?.slug}`,
       }),
@@ -54,6 +60,9 @@ export const Route = createFileRoute("/cafe/$slug")({
     // Category/order query params are views of the same page.
     links: loaderData?.cafe
       ? canonicalLink(`/cafe/${loaderData.cafe.slug}`)
+      : [],
+    scripts: loaderData?.cafe
+      ? [jsonLdScript(cafeJsonLd(loaderData.cafe, loaderData.productCount))]
       : [],
   }),
   notFoundComponent: CafeNotFound,
