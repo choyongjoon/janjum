@@ -126,6 +126,13 @@ export const Route = createRootRouteWithContext<{
     ],
   }),
   beforeLoad: async (ctx) => {
+    // The token is only needed during SSR, to authenticate server-side Convex
+    // queries. In the browser, ConvexProviderWithClerk supplies it, so skip the
+    // server round trip that would otherwise delay every client navigation.
+    if (typeof document !== "undefined") {
+      return { userId: null, token: null };
+    }
+
     // Don't let an auth lookup failure take down the whole page; fall back to
     // signed-out and let ClerkProvider resolve the session on the client.
     const { userId, token } = await fetchClerkAuth().catch(() => ({
