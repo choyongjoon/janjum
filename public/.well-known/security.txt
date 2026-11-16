@@ -1,0 +1,5 @@
+# 잔점 (janjum.com) 보안 취약점 신고 안내 — RFC 9116
+Contact: mailto:contact@janjum.com
+Expires: 2027-11-16T00:00:00.000Z
+Preferred-Languages: ko, en
+Canonical: https://janjum.com/.well-known/security.txt
