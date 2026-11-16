@@ -181,6 +181,78 @@ const nutritionProperties = (nutritions: ProductForJsonLd["nutritions"]) => {
   });
 };
 
+// schema.org NutritionInformation property per nutrition field (MenuItem only).
+const NUTRITION_INFORMATION_KEYS: Partial<
+  Record<keyof NonNullable<ProductForJsonLd["nutritions"]>, string>
+> = {
+  servingSize: "servingSize",
+  calories: "calories",
+  sugar: "sugarContent",
+  carbohydrates: "carbohydrateContent",
+  protein: "proteinContent",
+  fat: "fatContent",
+  saturatedFat: "saturatedFatContent",
+  transFat: "transFatContent",
+  natrium: "sodiumContent",
+  cholesterol: "cholesterolContent",
+};
+
+const nutritionInformation = (nutritions: ProductForJsonLd["nutritions"]) => {
+  const entries = nutritionProperties(nutritions).flatMap((property) => {
+    const field = NUTRITION_PROPERTIES.find((p) => p.name === property.name);
+    const schemaKey = field ? NUTRITION_INFORMATION_KEYS[field.key] : undefined;
+    return schemaKey
+      ? [[schemaKey, `${property.value} ${property.unitText}`] as const]
+      : [];
+  });
+  return entries.length > 0
+    ? { "@type": "NutritionInformation", ...Object.fromEntries(entries) }
+    : undefined;
+};
+
+const menuItemOffer = (product: ProductForJsonLd, url: string) => {
+  if (!product.price) {
+    return;
+  }
+  return {
+    "@type": "Offer",
+    url,
+    price: product.price,
+    priceCurrency: "KRW",
+    availability:
+      product.isActive === false
+        ? "https://schema.org/Discontinued"
+        : "https://schema.org/InStock",
+  };
+};
+
+const productRating = (product: ProductForJsonLd) => {
+  const totalReviews = product.totalReviews ?? 0;
+  if (totalReviews === 0 || !product.averageRating) {
+    return;
+  }
+  return {
+    "@type": "AggregateRating",
+    ratingValue: product.averageRating,
+    reviewCount: totalReviews,
+    bestRating: 5,
+    worstRating: 1,
+  };
+};
+
+/**
+ * Structured data for a drink page.
+ *
+ * - Always a schema.org `MenuItem`: the drink as it appears on the cafe's
+ *   menu, with its price and nutrition. Google has no rich result for
+ *   MenuItem, so a price here isn't read as a shop listing. Janjum doesn't sell
+ *   anything, and a `Product` with `offers` made Google validate these pages
+ *   as merchant listings (shipping, return policy...).
+ * - Plus a `Product` with `aggregateRating` only when real reviews exist: that
+ *   is the review-site case Google's product snippets support, and it never
+ *   carries `offers`. Drinks without reviews get no `Product`, so nothing is
+ *   made up to satisfy "offers, review or aggregateRating is required".
+ */
 export const productJsonLd = (
   product: ProductForJsonLd,
   cafe: CafeForJsonLd | null | undefined
@@ -188,59 +260,41 @@ export const productJsonLd = (
   const path = `/product/${product.shortId}`;
   const url = absoluteUrl(path);
   const image = product.imageUrl || product.externalImageUrl;
-  const totalReviews = product.totalReviews ?? 0;
-  const isActive = product.isActive !== false;
+  const offers = menuItemOffer(product, url);
+  const aggregateRating = productRating(product);
+  const nutrition = nutritionInformation(product.nutritions);
 
-  const productNode: JsonLd = {
-    "@type": "Product",
-    "@id": `${url}#product`,
+  const common: JsonLd = {
     name: product.name,
     ...(product.nameEn ? { alternateName: product.nameEn } : {}),
     url,
-    sku: product.shortId,
     ...(image ? { image: absoluteUrl(image) } : {}),
     ...(product.description ? { description: product.description } : {}),
-    ...(product.category ? { category: product.category } : {}),
-    ...(cafe ? { brand: { "@type": "Brand", name: cafe.name } } : {}),
-    releaseDate: new Date(product.addedAt).toISOString().slice(0, 10),
-    ...(product.price
-      ? {
-          offers: {
-            "@type": "Offer",
-            url,
-            price: product.price,
-            priceCurrency: "KRW",
-            availability: isActive
-              ? "https://schema.org/InStock"
-              : "https://schema.org/Discontinued",
-            ...(cafe
-              ? { seller: { "@type": "Organization", name: cafe.name } }
-              : {}),
-          },
-        }
-      : {}),
-    ...(totalReviews > 0 && product.averageRating
-      ? {
-          aggregateRating: {
-            "@type": "AggregateRating",
-            ratingValue: product.averageRating,
-            reviewCount: totalReviews,
-            bestRating: 5,
-            worstRating: 1,
-          },
-        }
-      : {}),
   };
 
-  const properties = nutritionProperties(product.nutritions);
-  if (properties.length > 0) {
-    productNode.additionalProperty = properties;
-  }
+  const menuItem: JsonLd = {
+    "@type": "MenuItem",
+    "@id": `${url}#menu-item`,
+    ...common,
+    ...(offers ? { offers } : {}),
+    ...(nutrition ? { nutrition } : {}),
+  };
+
+  const reviewedProduct: JsonLd | undefined = aggregateRating
+    ? {
+        "@type": "Product",
+        "@id": `${url}#product`,
+        ...common,
+        ...(cafe ? { brand: { "@type": "Brand", name: cafe.name } } : {}),
+        aggregateRating,
+      }
+    : undefined;
 
   return {
     "@context": "https://schema.org",
     "@graph": [
-      productNode,
+      menuItem,
+      ...(reviewedProduct ? [reviewedProduct] : []),
       breadcrumbList([
         { name: SITE_NAME, path: "/" },
         ...(cafe ? [{ name: cafe.name, path: `/cafe/${cafe.slug}` }] : []),

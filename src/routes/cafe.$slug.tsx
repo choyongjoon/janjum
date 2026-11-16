@@ -14,11 +14,12 @@ import { ProductSearchInput } from "~/components/cafe/ProductSearchInput";
 import { useProductReviewStats } from "~/hooks/useProductReviewStats";
 import { api } from "../../convex/_generated/api";
 import { CafeNotFound } from "../components/cafe/CafeNotFound";
+import { JsonLd } from "../components/JsonLd";
 import { ProductCard } from "../components/ProductCard";
 import { getOrderedCategories } from "../utils/categories";
 import { canonicalLink, DEFAULT_OG_IMAGE, seo } from "../utils/seo";
 import { cafeDescription, cafeTitle } from "../utils/seoDescriptions";
-import { cafeJsonLd, jsonLdScript } from "../utils/structuredData";
+import { cafeJsonLd } from "../utils/structuredData";
 
 const searchSchema = z.object({
   category: z.string().optional(),
@@ -60,9 +61,6 @@ export const Route = createFileRoute("/cafe/$slug")({
     // Category/order query params are views of the same page.
     links: loaderData?.cafe
       ? canonicalLink(`/cafe/${loaderData.cafe.slug}`)
-      : [],
-    scripts: loaderData?.cafe
-      ? [jsonLdScript(cafeJsonLd(loaderData.cafe, loaderData.productCount))]
       : [],
   }),
   notFoundComponent: CafeNotFound,
@@ -167,6 +165,7 @@ function CafePage() {
 
   return (
     <div className="min-h-screen bg-base-200">
+      <JsonLd data={cafeJsonLd(cafe, products?.length ?? 0)} />
       {/* Cafe Header */}
       <CafeHeader cafe={cafe} numProducts={products?.length} />
 

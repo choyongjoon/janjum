@@ -4,13 +4,14 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { BrandCafeListSection } from "~/components/BrandCafeListSection";
 import { SearchIcon } from "~/components/icons/SearchIcon";
+import { JsonLd } from "~/components/JsonLd";
 import {
   NewProductsSection,
   recentProductsQueryOptions,
 } from "~/components/NewProductsSection";
 import { api } from "../../convex/_generated/api";
 import { canonicalLink, seo } from "../utils/seo";
-import { jsonLdScript, websiteJsonLd } from "../utils/structuredData";
+import { websiteJsonLd } from "../utils/structuredData";
 
 export const Route = createFileRoute("/")({
   component: Home,
@@ -32,7 +33,6 @@ export const Route = createFileRoute("/")({
       }),
     ],
     links: canonicalLink("/"),
-    scripts: [jsonLdScript(websiteJsonLd())],
   }),
 });
 
@@ -55,6 +55,7 @@ function Home() {
 
   return (
     <div className="min-h-screen bg-base-200">
+      <JsonLd data={websiteJsonLd()} />
       {/* Hero Section */}
       <div className="hero bg-gradient-to-b from-primary to-secondary py-6 text-primary-content">
         <div className="hero-content w-full max-w-md flex-col gap-4 text-center">

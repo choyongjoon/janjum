@@ -9,55 +9,74 @@ const baseProduct = {
   isActive: true,
   averageRating: 4.5,
   totalReviews: 3,
-  nutritions: { calories: 10, caffeine: 150, caffeineUnit: "mg" },
+  category: "커피",
+  nutritions: { calories: 10, sugar: 0, caffeine: 150, caffeineUnit: "mg" },
   externalImageUrl: "https://example.com/a.png",
 };
+const cafe = { name: "스타벅스", slug: "starbucks" };
+
+const graphOf = (data: Record<string, unknown>) =>
+  data["@graph"] as Record<string, unknown>[];
 
 describe("productJsonLd", () => {
-  it("builds Product with offer, rating, nutrition and breadcrumbs", () => {
-    const data = productJsonLd(baseProduct, {
-      name: "스타벅스",
-      slug: "starbucks",
-    });
-    const [product, breadcrumbs] = data["@graph"] as Record<string, unknown>[];
-
-    expect(product).toMatchObject({
-      "@type": "Product",
+  it("describes the drink as a MenuItem with price and nutrition", () => {
+    const [menuItem] = graphOf(productJsonLd(baseProduct, cafe));
+    expect(menuItem).toMatchObject({
+      "@type": "MenuItem",
       name: "카페 아메리카노",
       url: "https://janjum.com/product/abc123",
-      brand: { "@type": "Brand", name: "스타벅스" },
-      releaseDate: "2025-01-02",
       offers: {
         price: 4700,
         priceCurrency: "KRW",
         availability: "https://schema.org/InStock",
       },
-      aggregateRating: { ratingValue: 4.5, reviewCount: 3 },
-      additionalProperty: [
-        { name: "열량", value: 10, unitText: "kcal" },
-        { name: "카페인", value: 150, unitText: "mg" },
-      ],
+      nutrition: {
+        "@type": "NutritionInformation",
+        calories: "10 kcal",
+        sugarContent: "0 g",
+      },
     });
-    expect(breadcrumbs).toMatchObject({
+  });
+
+  it("adds a review-only Product (no offers, one brand, no category) when rated", () => {
+    const graph = graphOf(productJsonLd(baseProduct, cafe));
+    const products = graph.filter((node) => node["@type"] === "Product");
+    expect(products).toHaveLength(1);
+    const [product] = products;
+    expect(product).toMatchObject({
+      brand: { "@type": "Brand", name: "스타벅스" },
+      aggregateRating: { ratingValue: 4.5, reviewCount: 3 },
+    });
+    expect(product.offers).toBeUndefined();
+    expect(product.category).toBeUndefined();
+  });
+
+  it("emits no Product without real reviews, and never invents ratings", () => {
+    const graph = graphOf(
+      productJsonLd(
+        { ...baseProduct, price: undefined, totalReviews: 0, averageRating: 0 },
+        cafe
+      )
+    );
+    expect(graph.some((node) => node["@type"] === "Product")).toBe(false);
+    expect(graph[0].offers).toBeUndefined();
+    expect(JSON.stringify(graph)).not.toContain("aggregateRating");
+  });
+
+  it("marks discontinued drinks and keeps breadcrumbs", () => {
+    const graph = graphOf(
+      productJsonLd({ ...baseProduct, isActive: false }, cafe)
+    );
+    expect(graph[0]).toMatchObject({
+      offers: { availability: "https://schema.org/Discontinued" },
+    });
+    expect(graph.at(-1)).toMatchObject({
       "@type": "BreadcrumbList",
       itemListElement: [
         { position: 1, item: "https://janjum.com/" },
         { position: 2, item: "https://janjum.com/cafe/starbucks" },
         { position: 3, item: "https://janjum.com/product/abc123" },
       ],
-    });
-  });
-
-  it("omits rating without reviews and marks discontinued offers", () => {
-    const data = productJsonLd(
-      { ...baseProduct, isActive: false, totalReviews: 0, averageRating: 0 },
-      null
-    );
-    const [product] = data["@graph"] as Record<string, unknown>[];
-    expect(product.aggregateRating).toBeUndefined();
-    expect(product.brand).toBeUndefined();
-    expect(product).toMatchObject({
-      offers: { availability: "https://schema.org/Discontinued" },
     });
   });
 });
