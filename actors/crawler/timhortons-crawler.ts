@@ -19,6 +19,9 @@ import { mapWithConcurrency } from "./httpUtils";
 // SITE STRUCTURE CONFIGURATION
 // ================================================
 
+// Error code TH0306 returns when a listed menu has no detail anymore
+const MENU_NOT_FOUND_REGEX = /\bTH03060011\b/;
+
 const SITE_CONFIG = {
   baseUrl: "https://www.tim-hortons.co.kr",
   apiUrl: "https://www.tim-hortons.co.kr/timhortons",
@@ -447,13 +450,34 @@ async function fetchMenus(
   session: Session,
   codes: string[]
 ): Promise<MenuDetail[]> {
+  const skipped: string[] = [];
   const details = await mapWithConcurrency(codes, CONCURRENCY, (menuCd) =>
     call<{ result_data: MenuDetail[] }>(session, TR.menuDetail, {
       menu_cd: menuCd,
       id_member: "",
       stor_cd: "",
+    }).catch((error: unknown) => {
+      // A menu can stay in the category list after its detail is gone
+      // ("해당 메뉴정보가 존재하지 않습니다"). Skip it instead of failing the run.
+      if (error instanceof Error && MENU_NOT_FOUND_REGEX.test(error.message)) {
+        skipped.push(menuCd);
+        return { result_data: [] };
+      }
+      throw error;
     })
   );
+
+  if (skipped.length > 0) {
+    logger.warn(
+      `Skipped ${skipped.length} listed menus with no detail: ${skipped.join(", ")}`
+    );
+  }
+  // Guard against an API change silently dropping most of the menu
+  if (skipped.length > codes.length / 2) {
+    throw new Error(
+      `${skipped.length}/${codes.length} menus had no detail; aborting`
+    );
+  }
 
   const menus = new Map<string, MenuDetail>();
   for (const { result_data } of details) {
