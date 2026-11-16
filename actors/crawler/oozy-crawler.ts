@@ -46,10 +46,8 @@ const maxRequestsInTestMode = isTestMode
   ? Number.parseInt(process.env.CRAWLER_MAX_REQUESTS || "10", 10)
   : 50;
 
-// The cron sync (scripts/cronSyncBlockedCafes.sh) runs this crawler inside a
-// 512Mi container. Each oozy page is an imweb image gallery, so keep the
-// default concurrency low to avoid running out of memory. Override with
-// CRAWLER_MAX_CONCURRENCY in less constrained environments.
+// Each oozy page is an imweb image gallery, so keep the default concurrency
+// low to limit memory use. Override with CRAWLER_MAX_CONCURRENCY.
 const CRAWLER_CONFIG = {
   maxConcurrency: isTestMode
     ? 2

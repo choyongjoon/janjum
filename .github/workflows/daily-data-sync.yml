@@ -13,7 +13,7 @@ on:
         options:
           - "all"
           - "starbucks"
-          # - "compose" # blocked in CI, synced via Render cron
+          # - "compose" # blocks GitHub runners, synced locally
           - "mega"
           - "paik"
           - "ediya"
@@ -24,7 +24,7 @@ on:
           - "mammoth"
           - "mammothexpress"
           - "gongcha"
-          # - "oozy" # blocked in CI, synced via Render cron
+          # - "oozy" # blocks GitHub runners, synced locally
           - "theventi"
           - "angelinus"
           - "tomntoms"
