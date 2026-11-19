@@ -742,9 +742,44 @@ export const getByShortId = query({
     return {
       ...product,
       imageUrl,
+      canonicalShortId: await findCanonicalShortId(ctx, product),
     };
   },
 });
+
+/**
+ * The shortId search engines should index for `product`'s page.
+ *
+ * A soft-removed product is often the same drink as an active one: when a
+ * cafe's site changes its menu ids, the next crawl adds the drink again under
+ * a new externalId and soft-removes the old row. Both pages then show the
+ * same drink, and Google reports the old one as a duplicate of the new one.
+ * Point such a page at the active product with the same name in the same cafe
+ * (names compared like the uploader's revival matching, normalizeProductName).
+ */
+async function findCanonicalShortId(
+  ctx: QueryCtx,
+  product: Doc<"products">
+): Promise<string> {
+  if (product.isActive !== false) {
+    return product.shortId;
+  }
+  const nameKey = normalizeProductName(product.name);
+  const activeRows = await ctx.db
+    .query("productSearch")
+    .withIndex("by_cafe_active", (q) =>
+      q.eq("cafeId", product.cafeId).eq("isActive", true)
+    )
+    .collect();
+  const twin = activeRows.find(
+    (row) => normalizeProductName(row.name) === nameKey
+  );
+  if (!twin) {
+    return product.shortId;
+  }
+  const twinProduct = await ctx.db.get(twin.productId);
+  return twinProduct?.shortId ?? product.shortId;
+}
 
 export const updateImage = mutation({
   args: {
@@ -1144,6 +1179,11 @@ export const listForSitemap = query({
       page: result.page.map((product) => ({
         shortId: product.shortId,
         updatedAt: product.updatedAt,
+        // Lets the sitemap leave out soft-removed duplicates of active
+        // products (see findCanonicalShortId).
+        cafeId: product.cafeId,
+        nameKey: normalizeProductName(product.name),
+        isActive: product.isActive !== false,
       })),
     };
   },

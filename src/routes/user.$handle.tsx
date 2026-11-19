@@ -9,9 +9,16 @@ import { canonicalLink, seo } from "../utils/seo";
 
 export const Route = createFileRoute("/user/$handle")({
   component: UserProfilePage,
-  loader: (opts) => {
-    // We can't use the context.queryClient here since we're in a loader
-    // The user data will be fetched in the component
+  loader: async (opts) => {
+    // Resolve the user on the server so an unknown handle is a real 404.
+    // Otherwise the page rendered a 200 loading state, and crawlers indexed
+    // URLs such as /user/$handle (the route pattern, found in the JS bundle).
+    const user = await opts.context.queryClient.ensureQueryData(
+      convexQuery(api.users.getByHandle, { handle: opts.params.handle })
+    );
+    if (!user) {
+      throw notFound();
+    }
     return { handle: opts.params.handle };
   },
   head: ({ loaderData }) => ({
