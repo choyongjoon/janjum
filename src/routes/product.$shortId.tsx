@@ -13,6 +13,10 @@ import { canonicalLink, DEFAULT_OG_IMAGE, seo } from "../utils/seo";
 import { productDescription, productTitle } from "../utils/seoDescriptions";
 import { productJsonLd } from "../utils/structuredData";
 
+const canonicalShortId = (
+  product: { shortId: string; canonicalShortId?: string } | null | undefined
+) => product?.canonicalShortId ?? product?.shortId;
+
 export const Route = createFileRoute("/product/$shortId")({
   component: ProductPage,
   loader: async (opts) => {
@@ -43,11 +47,12 @@ export const Route = createFileRoute("/product/$shortId")({
           loaderData?.product?.imageUrl ||
           loaderData?.product?.externalImageUrl ||
           DEFAULT_OG_IMAGE,
-        path: `/product/${loaderData?.product?.shortId}`,
+        path: `/product/${canonicalShortId(loaderData?.product)}`,
       }),
     ],
+    // A discontinued duplicate of an active drink points at the active page.
     links: loaderData?.product
-      ? canonicalLink(`/product/${loaderData.product.shortId}`)
+      ? canonicalLink(`/product/${canonicalShortId(loaderData.product)}`)
       : [],
   }),
   notFoundComponent: ProductNotFound,
@@ -128,6 +133,16 @@ function ProductPage() {
                   </div>
                 )}
               </div>
+              {product.canonicalShortId &&
+                product.canonicalShortId !== product.shortId && (
+                  <Link
+                    className="link link-primary mb-2 inline-block"
+                    params={{ shortId: product.canonicalShortId }}
+                    to="/product/$shortId"
+                  >
+                    현재 판매 중인 메뉴 보기
+                  </Link>
+                )}
               {product.nameEn && (
                 <p className="mb-4 text-base-content/70 text-lg">
                   {product.nameEn}

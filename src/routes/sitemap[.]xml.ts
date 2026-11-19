@@ -7,6 +7,10 @@ import {
 } from "../server/convexClient";
 import { getBlogPosts } from "../utils/blogData";
 import { absoluteUrl } from "../utils/seo";
+import {
+  indexableProducts,
+  type SitemapProduct,
+} from "../utils/sitemapProducts";
 
 const PRODUCT_PAGE_SIZE = 1000;
 
@@ -35,7 +39,7 @@ const renderEntry = ({ path, lastmod }: SitemapEntry) => {
 async function collectProductEntries(
   client: ReturnType<typeof createServerConvexClient>
 ) {
-  const entries: SitemapEntry[] = [];
+  const products: SitemapProduct[] = [];
   let cursor: string | null = null;
   let isDone = false;
   while (!isDone) {
@@ -44,16 +48,16 @@ async function collectProductEntries(
       await client.query(api.products.listForSitemap, {
         paginationOpts: { numItems: PRODUCT_PAGE_SIZE, cursor },
       });
-    for (const product of result.page) {
-      entries.push({
-        path: `/product/${product.shortId}`,
-        lastmod: product.updatedAt,
-      });
-    }
+    products.push(...result.page);
     cursor = result.continueCursor;
     isDone = result.isDone;
   }
-  return entries;
+  return indexableProducts(products).map(
+    (product): SitemapEntry => ({
+      path: `/product/${product.shortId}`,
+      lastmod: product.updatedAt,
+    })
+  );
 }
 
 export const ServerRoute = createServerFileRoute("/sitemap.xml").methods({

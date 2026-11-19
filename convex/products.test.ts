@@ -3,6 +3,7 @@
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -302,5 +303,53 @@ describe("orphaned product images", () => {
       hasMore = page.hasMore;
     }
     expect([...listed].sort()).toEqual([...stored].sort());
+  });
+});
+
+describe("product canonical for discontinued duplicates", () => {
+  async function insertProduct(
+    t: TestConvex,
+    cafeId: Id<"cafes">,
+    shortId: string,
+    name: string,
+    isActive: boolean
+  ) {
+    await t.run(async (ctx) => {
+      const productId = await ctx.db.insert("products", {
+        cafeId,
+        name,
+        externalId: shortId,
+        externalUrl: "https://example.com",
+        addedAt: 0,
+        updatedAt: 0,
+        shortId,
+        isActive,
+      });
+      await ctx.db.insert("productSearch", {
+        productId,
+        cafeId,
+        isActive,
+        name,
+        nameKey: name,
+      });
+    });
+  }
+
+  it("points a discontinued duplicate at the active product", async () => {
+    const t = setup();
+    const cafeId = await t.run((ctx) =>
+      ctx.db.insert("cafes", { name: "c", slug: "c" })
+    );
+    await insertProduct(t, cafeId, "old", "HOT 아메리카노", false);
+    await insertProduct(t, cafeId, "new", "H-아메리카노", true);
+    await insertProduct(t, cafeId, "gone", "시즌 라떼", false);
+
+    const old = await t.query(api.products.getByShortId, { shortId: "old" });
+    const active = await t.query(api.products.getByShortId, { shortId: "new" });
+    const gone = await t.query(api.products.getByShortId, { shortId: "gone" });
+
+    expect(old?.canonicalShortId).toBe("new");
+    expect(active?.canonicalShortId).toBe("new");
+    expect(gone?.canonicalShortId).toBe("gone");
   });
 });
