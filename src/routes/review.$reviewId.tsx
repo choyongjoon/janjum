@@ -1,6 +1,6 @@
 import { convexQuery } from "@convex-dev/react-query";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import type { Id } from "convex/_generated/dataModel";
 import { api } from "../../convex/_generated/api";
 import { ReviewCard } from "../components/reviews/ReviewCard";
@@ -9,17 +9,19 @@ import { canonicalLink, seo } from "../utils/seo";
 export const Route = createFileRoute("/review/$reviewId")({
   component: ReviewPage,
   loader: async (opts) => {
-    const review = await opts.context.queryClient.ensureQueryData(
-      convexQuery(api.reviews.getById, {
-        reviewId: opts.params.reviewId as Id<"reviews">,
-      })
-    );
+    // A malformed id (e.g. the route pattern /review/$reviewId, which
+    // crawlers pick up from the JS bundle) fails Convex's id validation.
+    const review = await opts.context.queryClient
+      .ensureQueryData(
+        convexQuery(api.reviews.getById, {
+          reviewId: opts.params.reviewId as Id<"reviews">,
+        })
+      )
+      .catch(() => null);
 
-    // If review not found, redirect to home
+    // A real 404, so crawlers drop the URL instead of seeing a redirect.
     if (!review) {
-      throw redirect({
-        to: "/",
-      });
+      throw notFound();
     }
 
     return review;
