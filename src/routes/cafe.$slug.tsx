@@ -1,4 +1,3 @@
-import { convexQuery } from "@convex-dev/react-query";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
 import type { Id } from "convex/_generated/dataModel";
@@ -12,6 +11,7 @@ import {
 } from "~/components/cafe/OrderSelector";
 import { ProductSearchInput } from "~/components/cafe/ProductSearchInput";
 import { useProductReviewStats } from "~/hooks/useProductReviewStats";
+import { staticConvexQuery } from "~/utils/staticConvexQuery";
 import { api } from "../../convex/_generated/api";
 import { CafeNotFound } from "../components/cafe/CafeNotFound";
 import { JsonLd } from "../components/JsonLd";
@@ -33,7 +33,7 @@ export const Route = createFileRoute("/cafe/$slug")({
   validateSearch: searchSchema,
   loader: async (opts) => {
     const cafe = await opts.context.queryClient.ensureQueryData(
-      convexQuery(api.cafes.getBySlug, { slug: opts.params.slug })
+      staticConvexQuery(api.cafes.getBySlug, { slug: opts.params.slug })
     );
     if (!cafe) {
       throw notFound();
@@ -41,7 +41,7 @@ export const Route = createFileRoute("/cafe/$slug")({
     // Prefetch the menu so the product grid (and its links to every product
     // page) is in the server-rendered HTML that search crawlers read.
     const products = await opts.context.queryClient.ensureQueryData(
-      convexQuery(api.products.getByCafe, { cafeId: cafe._id })
+      staticConvexQuery(api.products.getByCafe, { cafeId: cafe._id })
     );
     return {
       cafe,
@@ -69,7 +69,7 @@ export const Route = createFileRoute("/cafe/$slug")({
 function CafePage() {
   const { slug } = Route.useParams();
   const { data: cafe } = useSuspenseQuery(
-    convexQuery(api.cafes.getBySlug, { slug })
+    staticConvexQuery(api.cafes.getBySlug, { slug })
   );
 
   const { category: selectedCategory, order: selectedOrder = "latest" } =
@@ -77,7 +77,7 @@ function CafePage() {
   const navigate = useNavigate();
 
   const { data: products, isLoading: productsLoading } = useQuery({
-    ...convexQuery(api.products.getByCafe, {
+    ...staticConvexQuery(api.products.getByCafe, {
       cafeId: cafe?._id as Id<"cafes">,
     }),
     enabled: !!cafe?._id,

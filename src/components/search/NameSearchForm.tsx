@@ -1,8 +1,8 @@
-import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { type ChangeEvent, type KeyboardEventHandler, useState } from "react";
 import { usePostHogEvents } from "~/hooks/usePostHogEvents";
+import { staticConvexQuery } from "~/utils/staticConvexQuery";
 import { api } from "../../../convex/_generated/api";
 
 export function NameSearchInput({
@@ -21,7 +21,7 @@ export function NameSearchInput({
 
   // Get search suggestions for autocomplete
   const { data: suggestions } = useQuery(
-    convexQuery(api.products.getSuggestions, {
+    staticConvexQuery(api.products.getSuggestions, {
       searchTerm: value,
       limit: 8,
     })

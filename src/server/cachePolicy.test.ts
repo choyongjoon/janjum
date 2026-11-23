@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyPageCachePolicy,
   hasClerkSession,
+  PAGE_CACHE_TAG,
   PRIVATE_CACHE_CONTROL,
   pageCachePolicy,
 } from "./cachePolicy";
@@ -54,6 +55,18 @@ describe("pageCachePolicy", () => {
     ).toBe("public");
   });
 
+  it("keeps a short cache for pages made of user content", () => {
+    expect(pageCachePolicy({ ...anonymousPage, pathname: "/review/abc" })).toBe(
+      "user-content"
+    );
+    expect(pageCachePolicy({ ...anonymousPage, pathname: "/user/jane" })).toBe(
+      "user-content"
+    );
+    expect(
+      pageCachePolicy({ ...anonymousPage, pathname: "/product/abc" })
+    ).toBe("public");
+  });
+
   it("leaves errors, redirects and cookie-setting responses alone", () => {
     expect(pageCachePolicy({ ...anonymousPage, statusCode: 404 })).toBe("none");
     expect(pageCachePolicy({ ...anonymousPage, isRedirect: true })).toBe(
@@ -67,13 +80,23 @@ describe("pageCachePolicy", () => {
 });
 
 describe("applyPageCachePolicy", () => {
-  it("sets edge caching headers for public pages", () => {
+  it("caches public pages for long and tags them for the sync purge", () => {
     const headers = new Headers();
     applyPageCachePolicy("public", headers);
     expect(headers.get("Cache-Control")).toBe(
       "public, max-age=0, must-revalidate"
     );
+    expect(headers.get("Vercel-CDN-Cache-Control")).toContain(
+      "s-maxage=2592000"
+    );
+    expect(headers.get("Vercel-Cache-Tag")).toBe(PAGE_CACHE_TAG);
+  });
+
+  it("caches user content briefly and leaves it untagged", () => {
+    const headers = new Headers();
+    applyPageCachePolicy("user-content", headers);
     expect(headers.get("Vercel-CDN-Cache-Control")).toContain("s-maxage=300");
+    expect(headers.get("Vercel-Cache-Tag")).toBeNull();
   });
 
   it("marks private responses no-store and leaves 'none' untouched", () => {

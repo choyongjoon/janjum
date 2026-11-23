@@ -20,6 +20,12 @@ fi
 
 echo "Syncing ${#CAFES[@]} cafes: ${CAFES[*]}"
 
+# The uploader marks each cafe whose data changed here; purge the CDN page
+# cache once at the end instead of after every cafe.
+CHANGED_DIR="$ROOT_DIR/actors/crawler/crawler-outputs/changed"
+rm -rf "$CHANGED_DIR"
+export SKIP_CDN_PURGE=1
+
 FAILED=()
 
 for cafe in "${CAFES[@]}"; do
@@ -32,6 +38,10 @@ for cafe in "${CAFES[@]}"; do
     FAILED+=("$cafe")
   fi
 done
+
+echo ""
+(cd "$ROOT_DIR" && pnpm dotenv -e .env.prod-upload -- "$SCRIPT_DIR/purgeCdnCache.sh" --if-changed "$CHANGED_DIR") ||
+  echo "CDN purge failed; pages refresh on the next purge or deploy"
 
 echo ""
 if [ "${#FAILED[@]}" -gt 0 ]; then

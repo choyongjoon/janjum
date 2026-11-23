@@ -1,4 +1,3 @@
-import { convexQuery } from "@convex-dev/react-query";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
@@ -9,6 +8,7 @@ import {
   NewProductsSection,
   recentProductsQueryOptions,
 } from "~/components/NewProductsSection";
+import { staticConvexQuery } from "~/utils/staticConvexQuery";
 import { api } from "../../convex/_generated/api";
 import { canonicalLink, seo } from "../utils/seo";
 import { websiteJsonLd } from "../utils/structuredData";
@@ -17,7 +17,9 @@ export const Route = createFileRoute("/")({
   component: Home,
   loader: async (opts) => {
     await Promise.all([
-      opts.context.queryClient.ensureQueryData(convexQuery(api.cafes.list, {})),
+      opts.context.queryClient.ensureQueryData(
+        staticConvexQuery(api.cafes.list, {})
+      ),
       opts.context.queryClient.ensureQueryData(recentProductsQueryOptions()),
     ]);
   },
@@ -37,7 +39,9 @@ export const Route = createFileRoute("/")({
 });
 
 function Home() {
-  const { data: cafes } = useSuspenseQuery(convexQuery(api.cafes.list, {}));
+  const { data: cafes } = useSuspenseQuery(
+    staticConvexQuery(api.cafes.list, {})
+  );
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
 

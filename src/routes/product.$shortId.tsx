@@ -1,9 +1,10 @@
 import { convexQuery } from "@convex-dev/react-query";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import type { Id } from "convex/_generated/dataModel";
 import { NutritionInfoSection } from "~/components/NutritionInfoSection";
 import { RatingSummary } from "~/components/RatingSummary";
+import { staticConvexQuery } from "~/utils/staticConvexQuery";
 import { api } from "../../convex/_generated/api";
 import { BackLink } from "../components/BackLink";
 import { ExternalLinkIcon } from "../components/icons/ExternalLinkIcon";
@@ -21,7 +22,7 @@ export const Route = createFileRoute("/product/$shortId")({
   component: ProductPage,
   loader: async (opts) => {
     const product = await opts.context.queryClient.ensureQueryData(
-      convexQuery(api.products.getByShortId, {
+      staticConvexQuery(api.products.getByShortId, {
         shortId: opts.params.shortId,
       })
     );
@@ -29,7 +30,7 @@ export const Route = createFileRoute("/product/$shortId")({
       throw notFound();
     }
     const cafe = await opts.context.queryClient.ensureQueryData(
-      convexQuery(api.cafes.getById, { cafeId: product.cafeId })
+      staticConvexQuery(api.cafes.getById, { cafeId: product.cafeId })
     );
     return { product, cafe };
   },
@@ -75,20 +76,25 @@ function ProductPage() {
   const { shortId } = Route.useParams();
 
   const { data: product } = useSuspenseQuery(
-    convexQuery(api.products.getByShortId, {
+    staticConvexQuery(api.products.getByShortId, {
       shortId,
     })
   );
 
   const { data: cafe } = useSuspenseQuery(
-    convexQuery(api.cafes.getById, { cafeId: product?.cafeId as Id<"cafes"> })
-  );
-
-  const { data: reviewStats } = useSuspenseQuery(
-    convexQuery(api.reviews.getProductStats, {
-      productId: product?._id as Id<"products">,
+    staticConvexQuery(api.cafes.getById, {
+      cafeId: product?.cafeId as Id<"cafes">,
     })
   );
+
+  // Reviews change between syncs, so they stay out of the CDN-cached HTML:
+  // fetched in the browser and kept live through a Convex subscription.
+  const { data: reviewStats } = useQuery({
+    ...convexQuery(api.reviews.getProductStats, {
+      productId: product?._id as Id<"products">,
+    }),
+    enabled: Boolean(product?._id),
+  });
 
   if (!product) {
     return <ProductNotFound />;
@@ -149,7 +155,11 @@ function ProductPage() {
                 </p>
               )}
               {/* Rating Display */}
-              <RatingSummary className="mt-4" reviewStats={reviewStats} />
+              {reviewStats ? (
+                <RatingSummary className="mt-4" reviewStats={reviewStats} />
+              ) : (
+                <div aria-hidden="true" className="skeleton mt-4 h-6 w-32" />
+              )}
             </div>
 
             {/* Price */}
