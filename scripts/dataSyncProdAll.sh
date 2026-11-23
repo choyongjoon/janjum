@@ -40,7 +40,7 @@ for cafe in "${CAFES[@]}"; do
 done
 
 echo ""
-(cd "$ROOT_DIR" && pnpm dotenv -e .env.prod-upload -- "$SCRIPT_DIR/purgeCdnCache.sh" --if-changed "$CHANGED_DIR") ||
+(cd "$ROOT_DIR" && pnpm dotenv -e .env.prod-upload -- "$SCRIPT_DIR/purgeCdnCache.sh" --changed "$CHANGED_DIR") ||
   echo "CDN purge failed; pages refresh on the next purge or deploy"
 
 echo ""

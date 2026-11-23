@@ -17,7 +17,7 @@ pnpm run crawl "$1" &&
 status=$?
 
 if [ -z "${SKIP_CDN_PURGE:-}" ]; then
-  pnpm dotenv -e .env.prod-upload -- "$SCRIPT_DIR/purgeCdnCache.sh" --if-changed "$CHANGED_DIR"
+  pnpm dotenv -e .env.prod-upload -- "$SCRIPT_DIR/purgeCdnCache.sh" --changed "$CHANGED_DIR"
 fi
 
 exit $status

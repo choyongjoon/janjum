@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   applyPageCachePolicy,
+  CROSS_CAFE_CACHE_TAG,
+  cafeCacheTag,
   hasClerkSession,
   PAGE_CACHE_TAG,
   PRIVATE_CACHE_CONTROL,
   pageCachePolicy,
+  pageCacheTags,
 } from "./cachePolicy";
 
 const anonymousPage = {
@@ -79,22 +82,53 @@ describe("pageCachePolicy", () => {
   });
 });
 
+describe("pageCacheTags", () => {
+  it("tags cafe and product pages with their cafe", () => {
+    expect(pageCacheTags("/cafe/starbucks", "starbucks")).toEqual([
+      PAGE_CACHE_TAG,
+      cafeCacheTag("starbucks"),
+    ]);
+    expect(pageCacheTags("/product/abc123", "mega")).toEqual([
+      PAGE_CACHE_TAG,
+      "cafe-mega",
+    ]);
+  });
+
+  it("tags pages that mix cafes as cross-cafe", () => {
+    for (const pathname of ["/", "/new", "/search", "/blog/hello"]) {
+      expect(pageCacheTags(pathname, undefined)).toEqual([
+        PAGE_CACHE_TAG,
+        CROSS_CAFE_CACHE_TAG,
+      ]);
+    }
+    // A cafe in loader data doesn't make another page single-cafe.
+    expect(pageCacheTags("/new", "mega")).toContain(CROSS_CAFE_CACHE_TAG);
+  });
+
+  it("falls back to cross-cafe when a product page's cafe is unknown", () => {
+    expect(pageCacheTags("/product/abc123", undefined)).toEqual([
+      PAGE_CACHE_TAG,
+      CROSS_CAFE_CACHE_TAG,
+    ]);
+  });
+});
+
 describe("applyPageCachePolicy", () => {
   it("caches public pages for long and tags them for the sync purge", () => {
     const headers = new Headers();
-    applyPageCachePolicy("public", headers);
+    applyPageCachePolicy("public", headers, ["pages", "cafe-starbucks"]);
     expect(headers.get("Cache-Control")).toBe(
       "public, max-age=0, must-revalidate"
     );
     expect(headers.get("Vercel-CDN-Cache-Control")).toContain(
       "s-maxage=2592000"
     );
-    expect(headers.get("Vercel-Cache-Tag")).toBe(PAGE_CACHE_TAG);
+    expect(headers.get("Vercel-Cache-Tag")).toBe("pages,cafe-starbucks");
   });
 
   it("caches user content briefly and leaves it untagged", () => {
     const headers = new Headers();
-    applyPageCachePolicy("user-content", headers);
+    applyPageCachePolicy("user-content", headers, ["pages"]);
     expect(headers.get("Vercel-CDN-Cache-Control")).toContain("s-maxage=300");
     expect(headers.get("Vercel-Cache-Tag")).toBeNull();
   });
