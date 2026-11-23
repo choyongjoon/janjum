@@ -64,6 +64,33 @@ interface UploadResult {
   updated: number;
 }
 
+/**
+ * Marker files listing the cafes whose upload changed data. The sync purges
+ * the CDN page cache only when at least one marker exists
+ * (`scripts/purgeCdnCache.sh`), so a day without menu changes keeps the cache.
+ */
+const CHANGED_CAFES_DIR = path.join(
+  process.cwd(),
+  "actors",
+  "crawler",
+  "crawler-outputs",
+  "changed"
+);
+
+const recordDataChange = (cafeSlug: string, result: UploadResult) => {
+  const changes =
+    result.created +
+    result.updated +
+    (result.removed || 0) +
+    (result.reactivated || 0);
+  if (changes === 0) {
+    return;
+  }
+  fs.mkdirSync(CHANGED_CAFES_DIR, { recursive: true });
+  fs.writeFileSync(path.join(CHANGED_CAFES_DIR, cafeSlug), `${changes}\n`);
+  logger.info(`Recorded ${changes} change(s) for ${cafeSlug}`);
+};
+
 class ProductUploader {
   private readonly client: ConvexClient;
 
@@ -106,6 +133,9 @@ class ProductUploader {
         downloadImages
       );
       this.handleUploadResult(result, verbose, dryRun);
+      if (!dryRun) {
+        recordDataChange(cafeSlug, result);
+      }
       return result;
     } catch (error) {
       logger.error("Upload failed:", error);

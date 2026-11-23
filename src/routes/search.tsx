@@ -1,10 +1,10 @@
-import { convexQuery } from "@convex-dev/react-query";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { usePostHogEvents } from "~/hooks/usePostHogEvents";
 import { useProductReviewStats } from "~/hooks/useProductReviewStats";
 import { seo } from "~/utils/seo";
+import { staticConvexQuery } from "~/utils/staticConvexQuery";
 import { api } from "../../convex/_generated/api";
 import { SearchIcon } from "../components/icons/SearchIcon";
 import { ProductCard } from "../components/ProductCard";
@@ -28,7 +28,7 @@ export const Route = createFileRoute("/search")({
     // Only prefetch if there's a search term to avoid unnecessary empty queries
     if (searchFilters.searchTerm?.trim()) {
       await opts.context.queryClient.ensureQueryData(
-        convexQuery(api.products.search, {
+        staticConvexQuery(api.products.search, {
           searchTerm: searchFilters.searchTerm,
           limit: 100,
         })
@@ -57,7 +57,7 @@ function SearchPage() {
   );
 
   const { data: searchResults } = useSuspenseQuery(
-    convexQuery(api.products.search, searchParams)
+    staticConvexQuery(api.products.search, searchParams)
   );
 
   const reviewStats = useProductReviewStats(

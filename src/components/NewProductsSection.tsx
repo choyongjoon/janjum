@@ -1,6 +1,6 @@
-import { convexQuery } from "@convex-dev/react-query";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
+import { staticConvexQuery } from "~/utils/staticConvexQuery";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { getRecentProductsSince } from "../../shared/recentProducts";
@@ -12,7 +12,7 @@ const STALE_TIME = 60 * 60 * 1000; // 1 hour
 // Functions rather than constants: `since` must be computed per request, not
 // frozen when a long-running server first loads this module.
 export const recentProductsQueryOptions = () => ({
-  ...convexQuery(api.products.getRecent, {
+  ...staticConvexQuery(api.products.getRecent, {
     limit: 4,
     since: getRecentProductsSince(),
   }),
@@ -22,7 +22,7 @@ export const recentProductsQueryOptions = () => ({
 export const NEW_PRODUCTS_PER_CAFE = 4;
 
 export const recentProductsByCafeQueryOptions = () => ({
-  ...convexQuery(api.products.getRecentByCafe, {
+  ...staticConvexQuery(api.products.getRecentByCafe, {
     perCafe: NEW_PRODUCTS_PER_CAFE,
     since: getRecentProductsSince(),
   }),
@@ -35,7 +35,7 @@ export const recentCafeProductsPageQueryOptions = (
   cafeId: Id<"cafes">,
   offset: number
 ) => ({
-  ...convexQuery(api.products.getRecent, {
+  ...staticConvexQuery(api.products.getRecent, {
     cafeId,
     limit: NEW_PRODUCTS_CAFE_PAGE_SIZE,
     offset,

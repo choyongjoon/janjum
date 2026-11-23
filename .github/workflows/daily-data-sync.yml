@@ -127,6 +127,17 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      # The uploader leaves a marker for each cafe whose data changed; the
+      # purge-cache job only purges when at least one marker exists.
+      - name: Upload change marker
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: changed-${{ matrix.cafe }}
+          path: actors/crawler/crawler-outputs/changed/
+          if-no-files-found: ignore
+          retention-days: 1
+
       # Crawlers that dump the rendered page on failure make a site structure
       # change diagnosable without re-running locally.
       - name: Upload debug page dump
@@ -137,6 +148,38 @@ jobs:
           path: actors/crawler/crawler-outputs/*debug*
           if-no-files-found: ignore
           retention-days: 7
+
+  # Pages are cached at Vercel's CDN for 30 days (src/server/cachePolicy.ts);
+  # invalidate them once after all cafes, and only if some menu data changed.
+  purge-cache:
+    runs-on: ubuntu-latest
+    needs: [sync]
+    if: ${{ !cancelled() }}
+    timeout-minutes: 5
+
+    name: Purge CDN cache
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: scripts
+
+      - name: Download change markers
+        # No markers means nothing changed, which isn't an error.
+        continue-on-error: true
+        uses: actions/download-artifact@v7
+        with:
+          pattern: changed-*
+          path: changed
+          merge-multiple: true
+
+      - name: Purge CDN cache
+        run: scripts/purgeCdnCache.sh --if-changed changed
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
 
   # Summarize and surface failures. Scheduled runs failed silently for weeks
   # before, so failures are tracked in a single open issue.

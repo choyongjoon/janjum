@@ -1,8 +1,8 @@
-import { convexQuery } from "@convex-dev/react-query";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { api } from "convex/_generated/api";
 import type { Doc, Id } from "convex/_generated/dataModel";
+import { staticConvexQuery } from "~/utils/staticConvexQuery";
 import { showToast } from "../../utils/toast";
 
 import { RatingText } from "./RatingText";
@@ -15,7 +15,7 @@ export interface Review extends Doc<"reviews"> {
 
 export function ReviewInUserPage({ review }: { review: Review }) {
   const { data: cafe } = useSuspenseQuery(
-    convexQuery(api.cafes.getById, {
+    staticConvexQuery(api.cafes.getById, {
       cafeId: review.product?.cafeId as Id<"cafes">,
     })
   );
