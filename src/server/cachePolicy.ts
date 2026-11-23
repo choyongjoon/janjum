@@ -6,8 +6,9 @@
  * same for everyone, so they can be cached at the edge.
  *
  * Menu pages only change when the daily sync uploads new data, so they are
- * cached for a long time and tagged; the sync then invalidates the tag
- * (`scripts/purgeCdnCache.ts`) to refresh every page at once. Reviews, the only
+ * cached for a long time and tagged (see `pageCacheTags`); the sync then
+ * invalidates the tags of the cafes whose data changed, plus the pages that
+ * mix cafes (`scripts/purgeCdnCache.sh`). Reviews, the only
  * data users change, load in the browser and aren't part of the cached HTML.
  * Pages made of user content (a review, a profile) keep a short TTL instead, so
  * an edit or deletion shows up within minutes without a purge.
@@ -22,8 +23,21 @@ const PRIVATE_PATH_PREFIXES = ["/profile", "/settings", "/oauth-callback"];
 /** Public pages whose content is written by users. */
 const USER_CONTENT_PATH_PREFIXES = ["/review", "/user"];
 
-/** Tag on every long-cached page; the sync invalidates it after an upload. */
+/** Pages that show a single cafe's data: tagged with that cafe. */
+const SINGLE_CAFE_PATH_PREFIXES = ["/cafe", "/product"];
+
+/** On every long-cached page, to purge them all at once (`--all`). */
 export const PAGE_CACHE_TAG = "pages";
+
+/**
+ * On every long-cached page that isn't a single cafe's (home, new products,
+ * search, blog): any cafe's change may show up there, so the sync always
+ * purges it along with the changed cafes' tags.
+ */
+export const CROSS_CAFE_CACHE_TAG = "cross-cafe";
+
+/** Keep in sync with `scripts/purgeCdnCache.sh`. */
+export const cafeCacheTag = (cafeSlug: string) => `cafe-${cafeSlug}`;
 
 // Clerk session cookies may carry an instance suffix, e.g. `__session_AbCd`.
 const SESSION_COOKIE_PATTERN = /(?:^|;\s*)__session(?:_[\w-]+)?=/;
@@ -40,7 +54,6 @@ export const PUBLIC_CACHE_HEADERS = {
   // deploy also starts with an empty cache.
   "Vercel-CDN-Cache-Control":
     "public, s-maxage=2592000, stale-while-revalidate=86400",
-  "Vercel-Cache-Tag": PAGE_CACHE_TAG,
 } as const;
 
 export const USER_CONTENT_CACHE_HEADERS = {
@@ -80,6 +93,23 @@ export const isPrivatePath = (pathname: string) =>
 
 export const isUserContentPath = (pathname: string) =>
   matchesPrefix(pathname, USER_CONTENT_PATH_PREFIXES);
+
+/**
+ * Cache tags for a long-cached page. A cafe page, or a product page, depends
+ * only on its own cafe's data, so it gets that cafe's tag. Every other page
+ * gets the cross-cafe tag, including a single-cafe page whose cafe isn't
+ * known, so no page is left out of a sync purge.
+ */
+export const pageCacheTags = (
+  pathname: string,
+  cafeSlug: string | undefined
+) => {
+  const dataTag =
+    cafeSlug && matchesPrefix(pathname, SINGLE_CAFE_PATH_PREFIXES)
+      ? cafeCacheTag(cafeSlug)
+      : CROSS_CAFE_CACHE_TAG;
+  return [PAGE_CACHE_TAG, dataTag];
+};
 
 export type PageCachePolicy = "public" | "user-content" | "private" | "none";
 
@@ -121,13 +151,17 @@ export const pageCachePolicy = ({
 
 export const applyPageCachePolicy = (
   policy: PageCachePolicy,
-  headers: Headers
+  headers: Headers,
+  cacheTags: string[] = []
 ) => {
   if (policy === "public" || policy === "user-content") {
     const cacheHeaders =
       policy === "public" ? PUBLIC_CACHE_HEADERS : USER_CONTENT_CACHE_HEADERS;
     for (const [name, value] of Object.entries(cacheHeaders)) {
       headers.set(name, value);
+    }
+    if (policy === "public" && cacheTags.length > 0) {
+      headers.set("Vercel-Cache-Tag", cacheTags.join(","));
     }
   } else if (policy === "private") {
     headers.set("Cache-Control", PRIVATE_CACHE_CONTROL);
