@@ -51,6 +51,16 @@ describe("productJsonLd", () => {
     expect(product.category).toBeUndefined();
   });
 
+  it("emits exactly one aggregateRating per page", () => {
+    // Google's review snippets reject an item with several aggregateRating
+    // values ("리뷰에 여러 개의 집계 평점이 있습니다"). The page must carry a
+    // single rating, on the Product only, never on the MenuItem as well.
+    const json = jsonLdScript(productJsonLd(baseProduct, cafe)).children;
+    expect(json.match(/"aggregateRating"/g)).toHaveLength(1);
+    const [menuItem] = graphOf(productJsonLd(baseProduct, cafe));
+    expect(menuItem.aggregateRating).toBeUndefined();
+  });
+
   it("emits no Product without real reviews, and never invents ratings", () => {
     const graph = graphOf(
       productJsonLd(
