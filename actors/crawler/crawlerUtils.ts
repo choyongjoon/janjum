@@ -3,6 +3,7 @@ import path from "node:path";
 import type { Page } from "playwright";
 import { logger } from "shared/logger";
 import type { Nutritions } from "shared/nutritions";
+import { addGifticonPrices } from "./gifticonPrices";
 
 export interface Product {
   category: string | null;
@@ -44,10 +45,16 @@ export const takeDebugScreenshot = async (page: Page, key: string) => {
   logger.info(`Screenshot saved to: ${screenshotPath}`);
 };
 
-export const writeProductsToJson = async (products: Product[], key: string) => {
-  if (products.length === 0) {
+export const writeProductsToJson = async (
+  crawledProducts: Product[],
+  key: string
+) => {
+  if (crawledProducts.length === 0) {
     throw new Error(`No products extracted for ${key}`);
   }
+
+  // Most cafe sites publish no prices; fill the gaps from gifticon vouchers
+  const products = await addGifticonPrices(crawledProducts, key);
 
   const outputDir = path.join(
     process.cwd(),
