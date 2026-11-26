@@ -59,6 +59,21 @@ export const Route = createFileRoute("/product/$shortId")({
   notFoundComponent: ProductNotFound,
 });
 
+function ProductPrice({ price }: { price?: number }) {
+  if (typeof price !== "number" || price <= 0) {
+    return <p className="mt-3 text-base-content/50 text-sm">가격 정보 없음</p>;
+  }
+
+  return (
+    <p className="mt-3 font-semibold text-base-content text-xl tabular-nums">
+      {price.toLocaleString("ko-KR")}
+      <span className="ml-0.5 font-normal text-base text-base-content/70">
+        원
+      </span>
+    </p>
+  );
+}
+
 function ProductNotFound() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-base-200">
@@ -154,6 +169,7 @@ function ProductPage() {
                   {product.nameEn}
                 </p>
               )}
+              <ProductPrice price={product.price} />
               {/* Rating Display */}
               {reviewStats ? (
                 <RatingSummary className="mt-4" reviewStats={reviewStats} />
@@ -161,18 +177,6 @@ function ProductPage() {
                 <div aria-hidden="true" className="skeleton mt-4 h-6 w-32" />
               )}
             </div>
-
-            {/* Price */}
-            {product.price && (
-              <div className="card border border-primary/20 bg-primary/10">
-                <div className="card-body">
-                  <h3 className="card-title text-primary">가격</h3>
-                  <p className="font-bold text-2xl text-primary">
-                    {product.price.toLocaleString()}원
-                  </p>
-                </div>
-              </div>
-            )}
 
             {/* Description */}
             {product.description && (
