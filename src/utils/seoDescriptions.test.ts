@@ -3,6 +3,7 @@ import {
   cafeDescription,
   MAX_DESCRIPTION_LENGTH,
   productDescription,
+  productDisplayName,
   productTitle,
 } from "./seoDescriptions";
 
@@ -61,5 +62,14 @@ describe("productTitle", () => {
     expect(productTitle("아메리카노", "스타벅스")).toBe(
       "아메리카노 - 스타벅스 | 잔점"
     );
+  });
+});
+
+describe("productDisplayName", () => {
+  it("adds the variant label when there is one", () => {
+    expect(
+      productDisplayName({ name: "아메리카노", variantLabel: "ICE" })
+    ).toBe("아메리카노 (ICE)");
+    expect(productDisplayName({ name: "아메리카노" })).toBe("아메리카노");
   });
 });

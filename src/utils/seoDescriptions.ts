@@ -43,6 +43,18 @@ type ProductForDescription = Pick<
   "name" | "description" | "price" | "nutritions" | "isActive"
 >;
 
+/**
+ * The name plus the variant label when the cafe sells same-name variants,
+ * e.g. "아메리카노 (ICE)", so their titles and descriptions differ.
+ */
+export const productDisplayName = (product: {
+  name: string;
+  variantLabel?: string;
+}) =>
+  product.variantLabel
+    ? `${product.name} (${product.variantLabel})`
+    : product.name;
+
 export const productTitle = (productName: string, cafeName?: string) =>
   cafeName ? `${productName} - ${cafeName} | 잔점` : `${productName} | 잔점`;
 

@@ -11,8 +11,17 @@ import { ExternalLinkIcon } from "../components/icons/ExternalLinkIcon";
 import { JsonLd } from "../components/JsonLd";
 import { ReviewSection } from "../components/reviews/ReviewSection";
 import { canonicalLink, DEFAULT_OG_IMAGE, seo } from "../utils/seo";
-import { productDescription, productTitle } from "../utils/seoDescriptions";
+import {
+  productDescription,
+  productDisplayName,
+  productTitle,
+} from "../utils/seoDescriptions";
 import { productJsonLd } from "../utils/structuredData";
+
+// Same-name variants (HOT/ICE, sizes) get their label in titles and text.
+const withDisplayName = <T extends { name: string; variantLabel?: string }>(
+  product: T
+): T => ({ ...product, name: productDisplayName(product) });
 
 const canonicalShortId = (
   product: { shortId: string; canonicalShortId?: string } | null | undefined
@@ -38,11 +47,14 @@ export const Route = createFileRoute("/product/$shortId")({
     meta: [
       ...seo({
         title: productTitle(
-          loaderData?.product?.name || "상품",
+          loaderData?.product ? productDisplayName(loaderData.product) : "상품",
           loaderData?.cafe?.name
         ),
         description: loaderData?.product
-          ? productDescription(loaderData.product, loaderData.cafe?.name)
+          ? productDescription(
+              withDisplayName(loaderData.product),
+              loaderData.cafe?.name
+            )
           : undefined,
         image:
           loaderData?.product?.imageUrl ||
@@ -119,7 +131,7 @@ function ProductPage() {
 
   return (
     <div className="min-h-screen bg-base-200">
-      <JsonLd data={productJsonLd(product, cafe)} />
+      <JsonLd data={productJsonLd(withDisplayName(product), cafe)} />
       {/* Product Details */}
       <div className="container mx-auto px-4 py-8">
         {/* Back Link */}
@@ -147,6 +159,11 @@ function ProductPage() {
                   className={`break-keep font-bold text-3xl ${isActive ? "" : "text-base-content/50"}`}
                 >
                   {product.name}
+                  {product.variantLabel && (
+                    <span className="ml-2 align-middle font-medium text-base-content/60 text-xl">
+                      {product.variantLabel}
+                    </span>
+                  )}
                 </h1>
                 {!isActive && (
                   <div className="badge badge-soft badge-warning badge-lg shrink-0">
@@ -154,7 +171,9 @@ function ProductPage() {
                   </div>
                 )}
               </div>
-              {product.canonicalShortId &&
+              {!isActive &&
+                product.canonicalIsActive !== false &&
+                product.canonicalShortId &&
                 product.canonicalShortId !== product.shortId && (
                   <Link
                     className="link link-primary mb-2 inline-block"
