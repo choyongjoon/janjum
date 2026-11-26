@@ -73,9 +73,12 @@ export function ProductCard({
         <RatingSummary reviewStats={reviewStats ?? defaultReviewStats} />
         <div className="flex items-center justify-between">
           <div className="space-y-1">
-            {product.price && (
-              <p className="font-bold text-lg text-primary">
-                {product.price.toLocaleString()}원
+            {typeof product.price === "number" && product.price > 0 && (
+              <p className="font-semibold text-base text-base-content tabular-nums">
+                {product.price.toLocaleString("ko-KR")}
+                <span className="ml-0.5 font-normal text-base-content/70 text-sm">
+                  원
+                </span>
               </p>
             )}
           </div>
