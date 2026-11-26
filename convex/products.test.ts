@@ -312,15 +312,16 @@ describe("product canonical for discontinued duplicates", () => {
     cafeId: Id<"cafes">,
     shortId: string,
     name: string,
-    isActive: boolean
+    isActive: boolean,
+    { externalId = shortId, addedAt = 0 } = {}
   ) {
     await t.run(async (ctx) => {
       const productId = await ctx.db.insert("products", {
         cafeId,
         name,
-        externalId: shortId,
+        externalId,
         externalUrl: "https://example.com",
-        addedAt: 0,
+        addedAt,
         updatedAt: 0,
         shortId,
         isActive,
@@ -351,5 +352,43 @@ describe("product canonical for discontinued duplicates", () => {
     expect(old?.canonicalShortId).toBe("new");
     expect(active?.canonicalShortId).toBe("new");
     expect(gone?.canonicalShortId).toBe("gone");
+  });
+
+  it("labels HOT/ICE variants and keeps each as its own page", async () => {
+    const t = setup();
+    const cafeId = await t.run((ctx) =>
+      ctx.db.insert("cafes", { name: "mega", slug: "mega" })
+    );
+    await insertProduct(t, cafeId, "hot", "아메리카노", true, {
+      externalId: "mega_HOT_아메리카노",
+    });
+    await insertProduct(t, cafeId, "ice", "아메리카노", true, {
+      externalId: "mega_ICE_아메리카노",
+    });
+
+    const hot = await t.query(api.products.getByShortId, { shortId: "hot" });
+    const ice = await t.query(api.products.getByShortId, { shortId: "ice" });
+
+    expect([hot?.canonicalShortId, hot?.variantLabel]).toEqual(["hot", "HOT"]);
+    expect([ice?.canonicalShortId, ice?.variantLabel]).toEqual(["ice", "ICE"]);
+  });
+
+  it("points discontinued copies at the oldest copy", async () => {
+    const t = setup();
+    const cafeId = await t.run((ctx) =>
+      ctx.db.insert("cafes", { name: "c", slug: "c" })
+    );
+    await insertProduct(t, cafeId, "first", "사과 생크림 와플", false, {
+      addedAt: 1,
+    });
+    await insertProduct(t, cafeId, "second", "사과생크림와플", false, {
+      addedAt: 2,
+    });
+
+    const second = await t.query(api.products.getByShortId, {
+      shortId: "second",
+    });
+    expect(second?.canonicalShortId).toBe("first");
+    expect(second?.canonicalIsActive).toBe(false);
   });
 });

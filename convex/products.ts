@@ -20,6 +20,12 @@ import {
   type SearchRow,
   syncProductSearch,
 } from "./productSearch";
+import {
+  type ResolvedVariant,
+  resolveProductVariant,
+  type VariantCandidate,
+  variantTraits,
+} from "./productVariants";
 import { generateShortId } from "./shortId";
 import { releaseStorageIds } from "./storageOwnership";
 import { verifyUploadSecret } from "./uploadSecret";
@@ -742,43 +748,48 @@ export const getByShortId = query({
     return {
       ...product,
       imageUrl,
-      canonicalShortId: await findCanonicalShortId(ctx, product),
+      ...(await resolveProductPage(ctx, product)),
     };
   },
 });
 
 /**
- * The shortId search engines should index for `product`'s page.
+ * The page search engines should index for `product`, and the label that tells
+ * it apart from same-name products of its cafe (see resolveProductVariant).
  *
  * A soft-removed product is often the same drink as an active one: when a
  * cafe's site changes its menu ids, the next crawl adds the drink again under
- * a new externalId and soft-removes the old row. Both pages then show the
- * same drink, and Google reports the old one as a duplicate of the new one.
- * Point such a page at the active product with the same name in the same cafe
- * (names compared like the uploader's revival matching, normalizeProductName).
+ * a new externalId and soft-removes the old row. Names are compared like the
+ * uploader's revival matching (normalizeProductName).
  */
-async function findCanonicalShortId(
+async function resolveProductPage(
   ctx: QueryCtx,
   product: Doc<"products">
-): Promise<string> {
-  if (product.isActive !== false) {
-    return product.shortId;
-  }
+): Promise<ResolvedVariant> {
   const nameKey = normalizeProductName(product.name);
-  const activeRows = await ctx.db
+  const cafeRows = await ctx.db
     .query("productSearch")
-    .withIndex("by_cafe_active", (q) =>
-      q.eq("cafeId", product.cafeId).eq("isActive", true)
-    )
+    .withIndex("by_cafe_active", (q) => q.eq("cafeId", product.cafeId))
     .collect();
-  const twin = activeRows.find(
-    (row) => normalizeProductName(row.name) === nameKey
-  );
-  if (!twin) {
-    return product.shortId;
-  }
-  const twinProduct = await ctx.db.get(twin.productId);
-  return twinProduct?.shortId ?? product.shortId;
+  const siblingIds = cafeRows
+    .filter(
+      (row) =>
+        row.productId !== product._id &&
+        normalizeProductName(row.name) === nameKey
+    )
+    .map((row) => row.productId);
+  const siblings = await Promise.all(siblingIds.map((id) => ctx.db.get(id)));
+  const toCandidate = (row: Doc<"products">): VariantCandidate => ({
+    shortId: row.shortId,
+    isActive: row.isActive !== false,
+    addedAt: row.addedAt,
+    ...variantTraits(row),
+  });
+  const self = toCandidate(product);
+  return resolveProductVariant(self, [
+    self,
+    ...siblings.flatMap((row) => (row ? [toCandidate(row)] : [])),
+  ]);
 }
 
 export const updateImage = mutation({
@@ -1179,11 +1190,13 @@ export const listForSitemap = query({
       page: result.page.map((product) => ({
         shortId: product.shortId,
         updatedAt: product.updatedAt,
-        // Lets the sitemap leave out soft-removed duplicates of active
-        // products (see findCanonicalShortId).
+        // Lets the sitemap list only pages that are their own canonical
+        // (see resolveProductPage).
         cafeId: product.cafeId,
         nameKey: normalizeProductName(product.name),
         isActive: product.isActive !== false,
+        addedAt: product.addedAt,
+        ...variantTraits(product),
       })),
     };
   },
